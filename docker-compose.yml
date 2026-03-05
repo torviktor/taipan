@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER:     taipan_user
+      POSTGRES_PASSWORD: taipan_pass
+      POSTGRES_DB:       taipan_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+  backend:
+    build: ./backend
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://taipan_user:taipan_pass@db:5432/taipan_db
+      SECRET_KEY:   CHANGE_ME_IN_PRODUCTION
+    ports:
+      - "8000:8000"
+    restart: always
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    restart: always
+
+  # Nginx контейнер отключён — на сервере уже стоит системный Nginx
+  # Когда появится домен — настроим системный Nginx как прокси
+
+volumes:
+  postgres_data:
