@@ -2,19 +2,21 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.database import engine, Base
 from app.routes import auth, applications, schedule, users, payments
+from app.routes import events, telegram
+from app.models import user
+from app.models import event
 
-# Создаём все таблицы при старте
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Тайпан API",
-    description="API для сайта клуба тхэквондо Тайпан, Павловский Посад",
+    description="API клуба тхэквондо Тайпан",
     version="1.0.0"
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # В продакшне заменить на домен
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,6 +27,8 @@ app.include_router(users.router,        prefix="/api/users",        tags=["По�
 app.include_router(applications.router, prefix="/api/applications", tags=["Заявки"])
 app.include_router(schedule.router,     prefix="/api/schedule",     tags=["Расписание"])
 app.include_router(payments.router,     prefix="/api/payments",     tags=["Оплата"])
+app.include_router(events.router,       prefix="/api/events",       tags=["Календарь"])
+app.include_router(telegram.router,     prefix="/api/telegram",     tags=["Telegram"])
 
 @app.get("/")
 def root():
