@@ -1,0 +1,77 @@
+.footer {
+  background: var(--dark);
+  border-top: 1px solid var(--gray-dim);
+  margin-top: auto;
+}
+
+.footer-inner {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr;
+  gap: 48px;
+  padding: 60px 24px;
+}
+
+.footer-logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 40px;
+  letter-spacing: 6px;
+  color: var(--white);
+  margin-bottom: 12px;
+}
+
+.footer-brand p {
+  color: var(--gray);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.footer-links, .footer-contacts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footer-links h4, .footer-contacts h4 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-bottom: 8px;
+}
+
+.footer-links a {
+  color: var(--gray);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.2s;
+}
+
+.footer-links a:hover { color: var(--white); }
+
+.footer-contacts p {
+  color: var(--gray);
+  font-size: 14px;
+}
+
+.footer-bottom {
+  border-top: 1px solid var(--gray-dim);
+  padding: 20px 0;
+}
+
+.footer-bottom .container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.footer-bottom span {
+  color: var(--gray);
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .footer-inner { grid-template-columns: 1fr; gap: 32px; }
+  .footer-bottom .container { flex-direction: column; gap: 8px; text-align: center; }
+}
