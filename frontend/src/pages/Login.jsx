@@ -3,12 +3,38 @@ import { useNavigate, Link } from 'react-router-dom'
 import axios from 'axios'
 import './Login.css'
 
+function formatPhone(value) {
+  const digits = value.replace(/\D/g, '')
+  let local = digits
+  if (local.startsWith('8')) local = local.slice(1)
+  if (local.startsWith('7')) local = local.slice(1)
+  local = local.slice(0, 10)
+
+  let result = '+7'
+  if (local.length > 0) result += ' (' + local.slice(0, 3)
+  if (local.length >= 3) result += ') ' + local.slice(3, 6)
+  if (local.length >= 6) result += '-' + local.slice(6, 8)
+  if (local.length >= 8) result += '-' + local.slice(8, 10)
+  return result
+}
+
+function normalizePhone(formatted) {
+  const digits = formatted.replace(/\D/g, '')
+  if (digits.startsWith('8')) return '7' + digits.slice(1)
+  if (digits.startsWith('7')) return digits
+  return '7' + digits
+}
+
 export default function Login() {
-  const [phone,    setPhone]    = useState('')
+  const [phone,    setPhone]    = useState('+7 (')
   const [password, setPassword] = useState('')
   const [error,    setError]    = useState('')
   const [loading,  setLoading]  = useState(false)
   const navigate = useNavigate()
+
+  function handlePhoneChange(e) {
+    setPhone(formatPhone(e.target.value))
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -17,7 +43,7 @@ export default function Login() {
 
     try {
       const form = new FormData()
-      form.append('username', phone)
+      form.append('username', normalizePhone(phone))
       form.append('password', password)
 
       const r = await axios.post('/api/auth/login', form)
@@ -25,12 +51,12 @@ export default function Login() {
       localStorage.setItem('role',      r.data.role)
       localStorage.setItem('full_name', r.data.full_name)
 
-      if (r.data.role === 'admin' || r.data.role === 'manager') {
+      if (['admin', 'manager'].includes(r.data.role)) {
         navigate('/admin')
       } else {
         navigate('/cabinet')
       }
-    } catch (err) {
+    } catch {
       setError('Неверный телефон или пароль')
     } finally {
       setLoading(false)
@@ -52,7 +78,7 @@ export default function Login() {
             <input
               type="text"
               value={phone}
-              onChange={e => setPhone(e.target.value)}
+              onChange={handlePhoneChange}
               placeholder="+7 (999) 000-00-00"
               required
             />
