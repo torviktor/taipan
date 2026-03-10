@@ -1,0 +1,63 @@
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--black);
+  padding: 20px;
+}
+
+.login-box {
+  width: 100%;
+  max-width: 420px;
+  background: var(--dark);
+  padding: 48px;
+  border-top: 3px solid var(--red);
+}
+
+.login-logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 36px;
+  letter-spacing: 6px;
+  color: var(--red);
+  margin-bottom: 8px;
+}
+
+.login-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 48px;
+  letter-spacing: 4px;
+  color: var(--white);
+  margin-bottom: 16px;
+}
+
+.login-error {
+  background: rgba(204,0,0,0.15);
+  border-left: 3px solid var(--red);
+  color: #ff6666;
+  padding: 12px 16px;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.login-form { margin-top: 24px; }
+
+.login-btn {
+  width: 100%;
+  text-align: center;
+  margin-top: 8px;
+}
+
+.login-footer {
+  margin-top: 24px;
+  color: var(--gray);
+  font-size: 14px;
+  text-align: center;
+}
+
+.login-footer a {
+  color: var(--red);
+  text-decoration: none;
+}
+
+.login-footer a:hover { text-decoration: underline; }
