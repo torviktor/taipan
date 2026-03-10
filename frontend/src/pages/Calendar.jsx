@@ -7,7 +7,7 @@ import ruLocale from '@fullcalendar/core/locales/ru'
 import axios from 'axios'
 import './Calendar.css'
 
-const API = '/api/events'
+const API = '/api/events/'
 const token = () => localStorage.getItem('token')
 const isAdmin = () => ['manager','admin'].includes(localStorage.getItem('role'))
 
