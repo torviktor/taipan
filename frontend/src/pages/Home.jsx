@@ -2,12 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import './Home.css'
 
-// ── Счётчик цифр ─────────────────────────────────────────────────────────────
 function Counter({ target, suffix = '', duration = 2000 }) {
   const [count, setCount] = useState(0)
   const ref = useRef(null)
   const started = useRef(false)
-
   useEffect(() => {
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting && !started.current) {
@@ -24,38 +22,28 @@ function Counter({ target, suffix = '', duration = 2000 }) {
     if (ref.current) observer.observe(ref.current)
     return () => observer.disconnect()
   }, [target, duration])
-
   return <span ref={ref}>{count}{suffix}</span>
 }
 
-// ── Тренеры ───────────────────────────────────────────────────────────────────
-const TRAINERS = [
-  {
-    name: 'Александр Воронов',
-    rank: 'Мастер спорта, 4 дан',
-    bio: 'Главный тренер клуба. 20 лет в тхэквондо. Воспитал 15 чемпионов России.',
-    img: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=400&h=500&fit=crop',
-  },
-  {
-    name: 'Дмитрий Савельев',
-    rank: 'КМС, 3 дан',
-    bio: 'Тренер детских групп. Специализация — техника и дисциплина.',
-    img: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=500&fit=crop',
-  },
-  {
-    name: 'Ирина Козлова',
-    rank: 'КМС, 2 дан',
-    bio: 'Тренер женских групп. Чемпионка МО по тхэквондо 2019.',
-    img: 'https://images.unsplash.com/photo-1594381898411-846e7d193883?w=400&h=500&fit=crop',
-  },
+const TRAINER = {
+  name:  'Ротарь Екатерина Валерьевна',
+  rank:  '3 дан по тхэквондо ГТФ',
+  bio:   'Тренер клуба тхэквондо г. Павловский Посад. Призёр чемпионатов России и Всероссийских соревнований, многократный призёр первенств Москвы, Московской области и ЦФО. Выпускница Российской государственной академии физической культуры (2005). Высшее профессиональное образование в области физической культуры и спорта.',
+  quote: '«Прежде чем стать сильным, стань дисциплинированным»',
+}
+
+const SECTIONS = [
+  { title: 'Дети 6–10 лет',  desc: 'Базовая техника, дисциплина, координация' },
+  { title: 'Дети 11–16 лет', desc: 'Соревновательная подготовка, спарринги' },
+  { title: 'Взрослые',        desc: 'Все уровни. Фитнес и боевой тхэквондо' },
+  { title: 'Спортсмены',      desc: 'Сборы, турниры, углублённая работа' },
 ]
 
-// ── Секции клуба ─────────────────────────────────────────────────────────────
-const SECTIONS = [
-  { icon: '🥋', title: 'Дети 6–10 лет',   desc: 'Базовая техника, дисциплина, координация' },
-  { icon: '⚡', title: 'Дети 11–16 лет',  desc: 'Соревновательная подготовка, спарринги' },
-  { icon: '🔥', title: 'Взрослые',         desc: 'Все уровни. Фитнес и боевой тхэквондо' },
-  { icon: '🏆', title: 'Спортсмены',       desc: 'Сборы, турниры, углублённая работа' },
+const STATS = [
+  { target: 16,  suffix: '+', label: 'лет клубу' },
+  { target: 50,  suffix: '+', label: 'участников' },
+  { target: 100, suffix: '+', label: 'побед на соревнованиях' },
+  { target: 5,   suffix: '',  label: 'чемпионов России' },
 ]
 
 export default function Home() {
@@ -65,21 +53,13 @@ export default function Home() {
       {/* ── HERO ─────────────────────────────────────────────────── */}
       <section className="hero">
         <div className="hero-bg">
-          <img
-            src="https://images.unsplash.com/photo-1555597673-b21d5c935865?w=1600&fit=crop"
-            alt="Тхэквондо"
-          />
+          <img src="https://images.unsplash.com/photo-1555597673-b21d5c935865?w=1600&fit=crop" alt="Тхэквондо" />
           <div className="hero-overlay" />
         </div>
-
         <div className="container hero-content">
           <div className="hero-text animate-fade-up">
-            <p className="section-label">Павловский Посад • с 2008 года</p>
-            <h1 className="hero-title">
-              КЛУБ<br/>
-              <span className="hero-title-red">ТХЭ<br/>КВОН<br/>ДО</span>
-            </h1>
-            <div className="hero-name">ТАЙПАН</div>
+            <h1 className="hero-title">ТАЙПАН</h1>
+            <p className="hero-subtitle">Клуб тхэквондо · Павловский Посад</p>
             <p className="hero-desc">
               Профессиональные тренировки для детей и взрослых.<br/>
               Первое занятие — <strong>бесплатно.</strong>
@@ -90,33 +70,20 @@ export default function Home() {
             </div>
           </div>
         </div>
-
-        {/* Диагональная полоса внизу */}
-        <div className="hero-slash" />
       </section>
 
       {/* ── СЧЁТЧИКИ ─────────────────────────────────────────────── */}
       <section className="stats">
         <div className="container stats-grid">
-          <div className="stat-item">
-            <div className="stat-number"><Counter target={16} suffix="+" /></div>
-            <div className="stat-label">лет клубу</div>
-          </div>
-          <div className="stat-divider" />
-          <div className="stat-item">
-            <div className="stat-number"><Counter target={300} suffix="+" /></div>
-            <div className="stat-label">учеников</div>
-          </div>
-          <div className="stat-divider" />
-          <div className="stat-item">
-            <div className="stat-number"><Counter target={120} suffix="+" /></div>
-            <div className="stat-label">побед на турнирах</div>
-          </div>
-          <div className="stat-divider" />
-          <div className="stat-item">
-            <div className="stat-number"><Counter target={15} /></div>
-            <div className="stat-label">чемпионов России</div>
-          </div>
+          {STATS.map((s, i) => (
+            <div key={i} className="stat-row">
+              {i > 0 && <div className="stat-divider" />}
+              <div className="stat-item">
+                <div className="stat-number"><Counter target={s.target} suffix={s.suffix} /></div>
+                <div className="stat-label">{s.label}</div>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -129,7 +96,7 @@ export default function Home() {
           <div className="sections-grid">
             {SECTIONS.map((s, i) => (
               <div className="section-card" key={i} style={{ animationDelay: `${i * 0.1}s` }}>
-                <div className="section-card-icon">{s.icon}</div>
+                <div className="section-card-num">{String(i + 1).padStart(2, '0')}</div>
                 <h3>{s.title}</h3>
                 <p>{s.desc}</p>
                 <div className="section-card-line" />
@@ -146,7 +113,7 @@ export default function Home() {
             <img src="https://images.unsplash.com/photo-1566577134770-3d85bb3a9cc4?w=800&fit=crop" alt="Тренировка" />
             <div className="photo-caption">
               <span>ТРЕНИРОВКИ</span>
-              <p>Каждый день кроме воскресенья</p>
+              <p>Тренировки в группах, индивидуальные занятия</p>
             </div>
           </div>
           <div className="photo-side">
@@ -161,38 +128,51 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── ТРЕНЕРЫ ──────────────────────────────────────────────── */}
+      {/* ── ТРЕНЕР ───────────────────────────────────────────────── */}
       <section className="section trainers-section">
         <div className="container">
-          <p className="section-label">Профессионалы своего дела</p>
-          <h2 className="section-title">ТРЕНЕРЫ</h2>
+          <p className="section-label">Профессионал своего дела</p>
+          <h2 className="section-title">ТРЕНЕР</h2>
           <div className="divider" />
-          <div className="trainers-grid">
-            {TRAINERS.map((t, i) => (
-              <div className="trainer-card" key={i}>
-                <div className="trainer-img-wrap">
-                  <img src={t.img} alt={t.name} />
-                  <div className="trainer-overlay" />
-                </div>
-                <div className="trainer-info">
-                  <div className="trainer-rank">{t.rank}</div>
-                  <h3 className="trainer-name">{t.name}</h3>
-                  <p className="trainer-bio">{t.bio}</p>
-                </div>
-              </div>
-            ))}
+          <div className="trainer-single">
+            <div className="trainer-img-wrap">
+              <div className="trainer-img-placeholder"><span>Фото тренера</span></div>
+              <div className="trainer-overlay" />
+            </div>
+            <div className="trainer-info">
+              <div className="trainer-rank">{TRAINER.rank}</div>
+              <h3 className="trainer-name">{TRAINER.name}</h3>
+              <p className="trainer-bio">{TRAINER.bio}</p>
+              <blockquote className="trainer-quote">{TRAINER.quote}</blockquote>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ── CTA ──────────────────────────────────────────────────── */}
-      <section className="cta-section">
-        <div className="cta-bg" />
-        <div className="container cta-content">
-          <p className="section-label">Не откладывай</p>
-          <h2 className="section-title">НАЧНИ<br/>СЕГОДНЯ</h2>
-          <p className="cta-desc">Запишись на пробное занятие — это бесплатно и ни к чему не обязывает</p>
-          <Link to="/apply" className="btn-primary">Записаться на пробное</Link>
+      {/* ── КАРТА ────────────────────────────────────────────────── */}
+      <section className="section map-section">
+        <div className="container">
+          <p className="section-label">Мы находимся</p>
+          <h2 className="section-title">КАК НАС НАЙТИ</h2>
+          <div className="divider" />
+          <div className="map-wrap">
+            <iframe
+              src="https://yandex.ru/map-widget/v1/?ll=38.6572%2C55.7697&z=16&pt=38.6572%2C55.7697%2Cpm2rdm&text=%D0%9F%D0%B0%D0%B2%D0%BB%D0%BE%D0%B2%D1%81%D0%BA%D0%B8%D0%B9+%D0%9F%D0%BE%D1%81%D0%B0%D0%B4%2C+%D1%83%D0%BB.+%D0%9A%D0%B8%D1%80%D0%BE%D0%B2%D0%B0%2C+95"
+              width="100%"
+              height="400"
+              style={{ border: 'none' }}
+              allowFullScreen
+              title="Карта"
+            />
+            <a
+              href="https://yandex.ru/maps/?text=Павловский+Посад,+ул.+Кирова,+95"
+              target="_blank"
+              rel="noreferrer"
+              className="map-link btn-outline"
+            >
+              Открыть в Яндекс Картах →
+            </a>
+          </div>
         </div>
       </section>
 
