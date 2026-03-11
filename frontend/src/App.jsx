@@ -8,6 +8,7 @@ import Apply from './pages/Apply'
 import Login from './pages/Login'
 import Cabinet from './pages/Cabinet'
 import Admin from './pages/Admin'
+import About from './pages/About'
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
       <Navbar />
       <Routes>
         <Route path="/"          element={<Home />} />
+        <Route path="/about"     element={<About />} />
         <Route path="/schedule"  element={<Schedule />} />
         <Route path="/calendar"  element={<Calendar />} />
         <Route path="/apply"     element={<Apply />} />

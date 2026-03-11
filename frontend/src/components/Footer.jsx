@@ -10,11 +10,16 @@ export default function Footer() {
           <div className="footer-logo">ТАЙПАН</div>
           <p>Спортивный клуб тхэквондо<br/>г. Павловский Посад</p>
           <p className="footer-dev">
-            Сайт разработан и принадлежит<br/>
-            клубу «Тайпан» и его основателям.<br/>
+            Сайт разработан{' '}
             <a href="https://github.com/torviktor/taipan" target="_blank" rel="noreferrer">
               github.com/torviktor/taipan
             </a>
+            <br/>
+            Собственность{' '}
+            <a href="https://github.com/torviktor/taipan" target="_blank" rel="noreferrer">
+              github.com/torviktor/taipan
+            </a>{' '}
+            и клуба «Тайпан»
           </p>
         </div>
 
@@ -60,7 +65,7 @@ export default function Footer() {
       <div className="footer-bottom">
         <div className="container">
           <span>© 2025–2026 Клуб тхэквондо «Тайпан», Павловский Посад. Все права защищены.</span>
-          <span>Тхэквондо · Павловский Посад · с 2008 года</span>
+          <span>Тхэквондо · Павловский Посад · с 2025 года</span>
         </div>
       </div>
     </footer>

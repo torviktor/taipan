@@ -1,0 +1,36 @@
+.coming-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--black);
+  text-align: center;
+}
+
+.coming-content {
+  max-width: 600px;
+  padding: 40px 24px;
+}
+
+.coming-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(60px, 10vw, 100px);
+  letter-spacing: 6px;
+  color: var(--white);
+  line-height: 1;
+  margin: 12px 0;
+}
+
+.coming-line {
+  width: 60px;
+  height: 3px;
+  background: var(--red);
+  margin: 24px auto;
+}
+
+.coming-desc {
+  color: var(--gray);
+  font-size: 17px;
+  line-height: 1.7;
+  margin-bottom: 40px;
+}
