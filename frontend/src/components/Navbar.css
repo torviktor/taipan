@@ -5,50 +5,36 @@
   padding: 24px 0;
   transition: all 0.3s ease;
 }
-
 .navbar.scrolled {
   background: rgba(8, 8, 8, 0.95);
   backdrop-filter: blur(10px);
   padding: 14px 0;
   border-bottom: 1px solid #222;
 }
-
 .navbar-inner {
   display: flex;
   align-items: center;
   gap: 48px;
 }
-
 .navbar-logo {
   text-decoration: none;
   display: flex;
-  flex-direction: column;
-  line-height: 1;
+  align-items: center;
 }
-
-.logo-taipan {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 28px;
-  color: var(--white);
-  letter-spacing: 4px;
+.navbar-logo-img {
+  height: 52px;
+  width: auto;
+  transition: transform 0.2s;
 }
-
-.logo-sub {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 6px;
-  color: var(--red);
-  text-transform: uppercase;
+.navbar-logo-img:hover {
+  transform: scale(1.05);
 }
-
 .navbar-links {
   display: flex;
   list-style: none;
   gap: 36px;
   margin-left: auto;
 }
-
 .navbar-links a {
   text-decoration: none;
   color: var(--gray);
@@ -60,7 +46,6 @@
   transition: color 0.2s;
   position: relative;
 }
-
 .navbar-links a::after {
   content: '';
   position: absolute;
@@ -69,19 +54,15 @@
   background: var(--red);
   transition: width 0.2s;
 }
-
 .navbar-links a:hover,
 .navbar-links a.active {
   color: var(--white);
 }
-
 .navbar-links a.active::after,
 .navbar-links a:hover::after {
   width: 100%;
 }
-
 .navbar-actions { margin-left: 16px; }
-
 .burger {
   display: none;
   flex-direction: column;
@@ -92,18 +73,15 @@
   margin-left: auto;
   padding: 4px;
 }
-
 .burger span {
   display: block;
   width: 28px; height: 2px;
   background: var(--white);
   transition: all 0.3s;
 }
-
 .burger.open span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
 .burger.open span:nth-child(2) { opacity: 0; }
 .burger.open span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
-
 .mobile-menu {
   display: none;
   flex-direction: column;
@@ -113,11 +91,9 @@
   overflow: hidden;
   transition: max-height 0.3s ease;
 }
-
 .mobile-menu.open {
   max-height: 400px;
 }
-
 .mobile-menu a {
   padding: 16px 24px;
   color: var(--white);
@@ -130,11 +106,10 @@
   border-bottom: 1px solid var(--gray-dim);
   transition: color 0.2s, padding-left 0.2s;
 }
-
 .mobile-menu a:hover { color: var(--red); padding-left: 36px; }
-
 @media (max-width: 768px) {
   .navbar-links, .navbar-actions { display: none; }
   .burger { display: flex; }
   .mobile-menu { display: flex; }
+  .navbar-logo-img { height: 40px; }
 }

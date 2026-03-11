@@ -3,8 +3,8 @@ import { Link, useLocation } from 'react-router-dom'
 import './Navbar.css'
 
 export default function Navbar() {
-  const [scrolled, setScrolled] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [scrolled,  setScrolled]  = useState(false)
+  const [menuOpen,  setMenuOpen]  = useState(false)
   const location = useLocation()
 
   useEffect(() => {
@@ -17,6 +17,7 @@ export default function Navbar() {
 
   const token = localStorage.getItem('token')
   const role  = localStorage.getItem('role')
+  const isAdmin = ['admin', 'manager'].includes(role)
 
   return (
     <nav className={`navbar ${scrolled ? 'scrolled' : ''}`}>
@@ -24,17 +25,17 @@ export default function Navbar() {
 
         {/* Логотип */}
         <Link to="/" className="navbar-logo">
-          <span className="logo-taipan">ТАЙПАН</span>
-          <span className="logo-sub">ТХЭКВОНДО</span>
+          <img src="/logo.png" alt="Тайпан" className="navbar-logo-img" />
         </Link>
 
         {/* Десктоп меню */}
         <ul className="navbar-links">
-          <li><Link to="/" className={location.pathname === '/' ? 'active' : ''}>Главная</Link></li>
-          <li><Link to="/schedule" className={location.pathname === '/schedule' ? 'active' : ''}>Расписание</Link></li>
-          <li><Link to="/apply" className={location.pathname === '/apply' ? 'active' : ''}>Записаться</Link></li>
-          {token && role === 'manager' && (
-            <li><Link to="/admin" className={location.pathname === '/admin' ? 'active' : ''}>Панель</Link></li>
+          <li><Link to="/"          className={location.pathname === '/'          ? 'active' : ''}>Главная</Link></li>
+          <li><Link to="/schedule"  className={location.pathname === '/schedule'  ? 'active' : ''}>Расписание</Link></li>
+          <li><Link to="/calendar"  className={location.pathname === '/calendar'  ? 'active' : ''}>Календарь</Link></li>
+          <li><Link to="/apply"     className={location.pathname === '/apply'     ? 'active' : ''}>Записаться</Link></li>
+          {isAdmin && (
+            <li><Link to="/admin"   className={location.pathname === '/admin'     ? 'active' : ''}>Панель</Link></li>
           )}
         </ul>
 
@@ -57,7 +58,9 @@ export default function Navbar() {
       <div className={`mobile-menu ${menuOpen ? 'open' : ''}`}>
         <Link to="/">Главная</Link>
         <Link to="/schedule">Расписание</Link>
+        <Link to="/calendar">Календарь</Link>
         <Link to="/apply">Записаться</Link>
+        {isAdmin && <Link to="/admin">Панель</Link>}
         {token ? (
           <Link to="/cabinet">Кабинет</Link>
         ) : (
