@@ -19,27 +19,33 @@ export default function Navbar() {
   const role  = localStorage.getItem('role')
   const isAdmin = ['admin', 'manager'].includes(role)
 
+  const links = [
+    { to: '/',         label: 'Главная' },
+    { to: '/about',    label: 'О клубе' },
+    { to: '/schedule', label: 'Расписание' },
+    { to: '/calendar', label: 'Календарь' },
+    { to: '/apply',    label: 'Записаться' },
+  ]
+
   return (
     <nav className={`navbar ${scrolled ? 'scrolled' : ''}`}>
       <div className="container navbar-inner">
 
-        {/* Логотип */}
         <Link to="/" className="navbar-logo">
           <img src="/logo.png" alt="Тайпан" className="navbar-logo-img" />
         </Link>
 
-        {/* Десктоп меню */}
         <ul className="navbar-links">
-          <li><Link to="/"          className={location.pathname === '/'          ? 'active' : ''}>Главная</Link></li>
-          <li><Link to="/schedule"  className={location.pathname === '/schedule'  ? 'active' : ''}>Расписание</Link></li>
-          <li><Link to="/calendar"  className={location.pathname === '/calendar'  ? 'active' : ''}>Календарь</Link></li>
-          <li><Link to="/apply"     className={location.pathname === '/apply'     ? 'active' : ''}>Записаться</Link></li>
+          {links.map(l => (
+            <li key={l.to}>
+              <Link to={l.to} className={location.pathname === l.to ? 'active' : ''}>{l.label}</Link>
+            </li>
+          ))}
           {isAdmin && (
-            <li><Link to="/admin"   className={location.pathname === '/admin'     ? 'active' : ''}>Панель</Link></li>
+            <li><Link to="/admin" className={location.pathname === '/admin' ? 'active' : ''}>Панель</Link></li>
           )}
         </ul>
 
-        {/* Кнопка входа */}
         <div className="navbar-actions">
           {token ? (
             <Link to="/cabinet" className="btn-primary">Кабинет</Link>
@@ -48,24 +54,15 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Бургер */}
         <button className={`burger ${menuOpen ? 'open' : ''}`} onClick={() => setMenuOpen(!menuOpen)}>
           <span/><span/><span/>
         </button>
       </div>
 
-      {/* Мобильное меню */}
       <div className={`mobile-menu ${menuOpen ? 'open' : ''}`}>
-        <Link to="/">Главная</Link>
-        <Link to="/schedule">Расписание</Link>
-        <Link to="/calendar">Календарь</Link>
-        <Link to="/apply">Записаться</Link>
+        {links.map(l => <Link key={l.to} to={l.to}>{l.label}</Link>)}
         {isAdmin && <Link to="/admin">Панель</Link>}
-        {token ? (
-          <Link to="/cabinet">Кабинет</Link>
-        ) : (
-          <Link to="/login">Войти</Link>
-        )}
+        {token ? <Link to="/cabinet">Кабинет</Link> : <Link to="/login">Войти</Link>}
       </div>
     </nav>
   )

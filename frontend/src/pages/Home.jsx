@@ -40,10 +40,11 @@ const SECTIONS = [
 ]
 
 const STATS = [
-  { target: 16,  suffix: '+', label: 'лет клубу' },
-  { target: 50,  suffix: '+', label: 'участников' },
+  { target: 10,  suffix: '+', label: 'лет тхэквондо в городе' },
+  { target: 50,  suffix: '+', label: 'спортсменов' },
   { target: 100, suffix: '+', label: 'побед на соревнованиях' },
   { target: 5,   suffix: '',  label: 'чемпионов России' },
+  { target: 10,  suffix: '',  label: 'чёрных поясов' },
 ]
 
 export default function Home() {
@@ -109,21 +110,21 @@ export default function Home() {
       {/* ── ФОТО БЛОК ────────────────────────────────────────────── */}
       <section className="photo-block">
         <div className="photo-grid">
-          <div className="photo-main">
-            <img src="https://images.unsplash.com/photo-1566577134770-3d85bb3a9cc4?w=800&fit=crop" alt="Тренировка" />
+          <div className="photo-main photo-placeholder">
             <div className="photo-caption">
               <span>ТРЕНИРОВКИ</span>
               <p>Тренировки в группах, индивидуальные занятия</p>
             </div>
           </div>
           <div className="photo-side">
-            <img src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&fit=crop" alt="Спарринг" />
-            <img src="https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=400&fit=crop" alt="Победа" />
+            <div className="photo-placeholder-sm" />
+            <div className="photo-placeholder-sm" />
           </div>
         </div>
         <div className="photo-label">
           <span className="section-label">Зал в центре города</span>
           <h2 className="section-title">МЕСТО ГДЕ<br/>РОЖДАЮТСЯ<br/>ЧЕМПИОНЫ</h2>
+          <p className="photo-label-desc">Скоро здесь появятся фотографии с наших тренировок и соревнований</p>
           <Link to="/apply" className="btn-primary">Первое занятие бесплатно</Link>
         </div>
       </section>
@@ -156,22 +157,45 @@ export default function Home() {
           <h2 className="section-title">КАК НАС НАЙТИ</h2>
           <div className="divider" />
           <div className="map-wrap">
+            <div className="map-address">
+              <div className="map-address-item">
+                <span className="map-address-icon">📍</span>
+                <div>
+                  <strong>Адрес</strong>
+                  <p>Павловский Посад, ул. Кирова, 95</p>
+                </div>
+              </div>
+              <div className="map-address-item">
+                <span className="map-address-icon">📞</span>
+                <div>
+                  <strong>Телефон</strong>
+                  <p><a href="tel:+79091652800">+7 (909) 165-28-00</a></p>
+                </div>
+              </div>
+              <div className="map-address-item">
+                <span className="map-address-icon">✉️</span>
+                <div>
+                  <strong>Email</strong>
+                  <p><a href="mailto:Bliznec.ket@mail.ru">Bliznec.ket@mail.ru</a></p>
+                </div>
+              </div>
+              <a
+                href="https://yandex.ru/maps/?text=Павловский+Посад,+ул.+Кирова,+95"
+                target="_blank"
+                rel="noreferrer"
+                className="btn-primary map-btn"
+              >
+                Открыть в Яндекс Картах →
+              </a>
+            </div>
             <iframe
-              src="https://yandex.ru/map-widget/v1/?ll=38.6572%2C55.7697&z=16&pt=38.6572%2C55.7697%2Cpm2rdm&text=%D0%9F%D0%B0%D0%B2%D0%BB%D0%BE%D0%B2%D1%81%D0%BA%D0%B8%D0%B9+%D0%9F%D0%BE%D1%81%D0%B0%D0%B4%2C+%D1%83%D0%BB.+%D0%9A%D0%B8%D1%80%D0%BE%D0%B2%D0%B0%2C+95"
+              src="https://yandex.ru/map-widget/v1/?um=constructor%3A&source=constructor&ll=38.6572%2C55.7697&z=16&pt=38.6572%2C55.7697%2Cpm2rdl~38.6572%2C55.7697%2Cpm2rdm"
               width="100%"
               height="400"
               style={{ border: 'none' }}
               allowFullScreen
-              title="Карта"
+              title="Карта клуба Тайпан"
             />
-            <a
-              href="https://yandex.ru/maps/?text=Павловский+Посад,+ул.+Кирова,+95"
-              target="_blank"
-              rel="noreferrer"
-              className="map-link btn-outline"
-            >
-              Открыть в Яндекс Картах →
-            </a>
           </div>
         </div>
       </section>
