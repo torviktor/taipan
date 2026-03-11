@@ -111,5 +111,4 @@
   .navbar-links, .navbar-actions { display: none; }
   .burger { display: flex; }
   .mobile-menu { display: flex; }
-  .navbar-logo-img { height: 40px; }
 }
