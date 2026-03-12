@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import './About.css'
 
 const SECTIONS = [
@@ -34,28 +34,12 @@ about: (
       <span>— Генерал Чой Хонг Хи, основатель тхэквондо</span>
     </div>
     <p>Именно эти ценности мы закладываем в каждого ученика. На тренировках и в повседневной жизни мы живём по пяти принципам тхэквондо:</p>
-
     <div className="about-principles">
-      <div className="about-principle">
-        <span className="about-principle-num">01</span>
-        <div><strong>Почтительность</strong><p>Вежливость и уважение к старшим, тренеру, партнёрам</p></div>
-      </div>
-      <div className="about-principle">
-        <span className="about-principle-num">02</span>
-        <div><strong>Честность</strong><p>Быть правдивым с собой и другими</p></div>
-      </div>
-      <div className="about-principle">
-        <span className="about-principle-num">03</span>
-        <div><strong>Настойчивость и терпение</strong><p>Не сдаваться даже когда тяжело</p></div>
-      </div>
-      <div className="about-principle">
-        <span className="about-principle-num">04</span>
-        <div><strong>Самообладание и самоконтроль</strong><p>Контролировать эмоции и тело</p></div>
-      </div>
-      <div className="about-principle">
-        <span className="about-principle-num">05</span>
-        <div><strong>Неукротимый Дух</strong><p>Внутренняя сила и воля побеждать трудности</p></div>
-      </div>
+      <div className="about-principle"><span className="about-principle-num">01</span><div><strong>Почтительность</strong><p>Вежливость и уважение к старшим, тренеру, партнёрам</p></div></div>
+      <div className="about-principle"><span className="about-principle-num">02</span><div><strong>Честность</strong><p>Быть правдивым с собой и другими</p></div></div>
+      <div className="about-principle"><span className="about-principle-num">03</span><div><strong>Настойчивость и терпение</strong><p>Не сдаваться даже когда тяжело</p></div></div>
+      <div className="about-principle"><span className="about-principle-num">04</span><div><strong>Самообладание и самоконтроль</strong><p>Контролировать эмоции и тело</p></div></div>
+      <div className="about-principle"><span className="about-principle-num">05</span><div><strong>Неукротимый Дух</strong><p>Внутренняя сила и воля побеждать трудности</p></div></div>
     </div>
     <p>Эти принципы работают не только в зале. Они помогают детям в школе, в общении с друзьями и в жизни.</p>
 
@@ -80,7 +64,6 @@ about: (
     <h3>Почему родителям спокойно с нами</h3>
     <p>Мы не просто тренируем удары ногами. Мы воспитываем характер. Здесь ребёнок учится уважать себя и других, не сдаваться, контролировать эмоции и идти к цели.</p>
     <p>Мы открыты для общения, всегда готовы ответить на вопросы и объяснить, почему делаем именно так. Но при этом просим одно — доверять. Мы работаем с детьми каждый день, видим их прогресс и знаем, как помочь каждому стать лучше.</p>
-
     <div className="about-cta">
       Если вы ищете для ребёнка не просто секцию, а место, где его вырастят сильным и достойным человеком — добро пожаловать в «Тайпан».
     </div>
@@ -108,64 +91,87 @@ emblem: (
     <h3>Цветовая гамма</h3>
     <div className="about-colors">
       <div className="about-color-item">
-        <div className="about-color-swatch" style={{background:'#0a0a0a', border:'1px solid #333'}}></div>
-        <div>
-          <strong>Чёрный фон</strong>
-          <p>Дисциплина, сила, мастерство и твёрдость духа. Подчёркивает яркость синей змеи — как молнию в ночи.</p>
-        </div>
+        <div className="about-color-swatch" style={{background:'#0a0a0a',border:'1px solid #333'}}></div>
+        <div><strong>Чёрный фон</strong><p>Дисциплина, сила, мастерство и твёрдость духа. Подчёркивает яркость синей змеи — как молнию в ночи.</p></div>
       </div>
       <div className="about-color-item">
         <div className="about-color-swatch" style={{background:'#1a4fa0'}}></div>
-        <div>
-          <strong>Синий</strong>
-          <p>Мудрость, уверенность и контроль. Внешний синий контур символизирует защиту и единство клуба — своего рода щит.</p>
-        </div>
+        <div><strong>Синий</strong><p>Мудрость, уверенность и контроль. Внешний синий контур символизирует защиту и единство клуба — своего рода щит.</p></div>
       </div>
       <div className="about-color-item">
         <div className="about-color-swatch" style={{background:'#ffffff'}}></div>
-        <div>
-          <strong>Белый текст</strong>
-          <p>Чистота намерений, уважение к традициям и начало пути в тхэквондо.</p>
-        </div>
+        <div><strong>Белый текст</strong><p>Чистота намерений, уважение к традициям и начало пути в тхэквондо.</p></div>
       </div>
     </div>
 
     <h3>Текст на эмблеме</h3>
     <ul>
-      <li><strong>По верхней окружности: «ПАВЛОВСКИЙ ПОСАД»</strong> — географическая привязка, указывающая на принадлежность и гордость за свой город.</li>
-      <li><strong>В центре: «ТАЙПАН»</strong> — название клуба крупным мощным шрифтом, современно и динамично, в духе боевых искусств.</li>
+      <li><strong>По верхней окружности: «ПАВЛОВСКИЙ ПОСАД»</strong> — географическая привязка, гордость за свой город.</li>
+      <li><strong>В центре: «ТАЙПАН»</strong> — название клуба крупным мощным шрифтом, современно и динамично.</li>
       <li><strong>По нижней окружности: «ТХЭКВОНДО»</strong> — вид боевого искусства, его корни и философия.</li>
     </ul>
 
     <h3>Идеологическое наполнение</h3>
     <p>Эмблема клуба «Тайпан» — мощный символ, воплощающий не только физическую силу и мастерство, но и глубокую философию тхэквондо. Синий тайпан на чёрном фоне отражает:</p>
     <div className="about-principles">
-      <div className="about-principle">
-        <span className="about-principle-num">01</span>
-        <div><strong>Силу и скорость</strong><p>Неотъемлемые качества успешного бойца</p></div>
-      </div>
-      <div className="about-principle">
-        <span className="about-principle-num">02</span>
-        <div><strong>Мудрость и контроль</strong><p>Способность использовать силу обдуманно и эффективно</p></div>
-      </div>
-      <div className="about-principle">
-        <span className="about-principle-num">03</span>
-        <div><strong>Дисциплину и решимость</strong><p>Фундамент для достижения любых целей</p></div>
-      </div>
-      <div className="about-principle">
-        <span className="about-principle-num">04</span>
-        <div><strong>Единство и защиту</strong><p>Круг символизирует сплочённость членов клуба и готовность стоять друг за друга</p></div>
-      </div>
-      <div className="about-principle">
-        <span className="about-principle-num">05</span>
-        <div><strong>Стремление к совершенству</strong><p>Непрерывный путь развития в боевых искусствах, символизируемый круглой формой</p></div>
-      </div>
+      <div className="about-principle"><span className="about-principle-num">01</span><div><strong>Силу и скорость</strong><p>Неотъемлемые качества успешного бойца</p></div></div>
+      <div className="about-principle"><span className="about-principle-num">02</span><div><strong>Мудрость и контроль</strong><p>Способность использовать силу обдуманно и эффективно</p></div></div>
+      <div className="about-principle"><span className="about-principle-num">03</span><div><strong>Дисциплину и решимость</strong><p>Фундамент для достижения любых целей</p></div></div>
+      <div className="about-principle"><span className="about-principle-num">04</span><div><strong>Единство и защиту</strong><p>Круг символизирует сплочённость членов клуба</p></div></div>
+      <div className="about-principle"><span className="about-principle-num">05</span><div><strong>Стремление к совершенству</strong><p>Непрерывный путь развития в боевых искусствах</p></div></div>
     </div>
-    <p>Эмблема клуба «Тайпан» является визуальным воплощением ключевых принципов: дисциплина, сила, мудрость и стремление к совершенству. Она служит не только опознавательным знаком, но и источником вдохновения для всех членов клуба.</p>
+    <p>Эмблема служит не только опознавательным знаком, но и источником вдохновения для всех членов клуба.</p>
   </div>
 ),
 
-members: null,
+members: (
+  <div className="about-body">
+    <div className="about-lead">
+      <p>Клуб тхэквондо «Тайпан» — это не просто спортивная секция.</p>
+      <p className="about-lead-name">Это настоящее сообщество, где каждый — часть чего-то большего</p>
+      <p>Здесь занимаются дети, подростки и взрослые, которые выбрали путь самосовершенствования, уважения и настоящей дружбы. Каждый, кто надевает добок и повязывает пояс, становится частью легенды, которая началась с генерала Чхве Хон Хи и продолжается сегодня в нашем зале.</p>
+      <p>Заниматься в нашем клубе — это гордость и большая честь. Ты не просто ходишь на тренировки — ты растёшь в настоящего воина с сердцем и принципами.</p>
+    </div>
+
+    <h3>Каждый участник клуба</h3>
+    <p>Каждый, кто занимается в клубе, с гордостью соблюдает:</p>
+    <ul>
+      <li>Устав клуба и правила, которые помогают всем становиться лучше</li>
+      <li>Уважение к тренеру, товарищам и их родителям — это основа нашей семьи</li>
+      <li>Тренировочную программу и указания тренера — чтобы расти быстро и правильно</li>
+      <li>Участие в тренировках, сборах, аттестациях и мероприятиях клуба</li>
+      <li>Бережное отношение к имуществу и железную дисциплину</li>
+      <li>Своевременную оплату взносов — чтобы клуб оставался сильным и развивался</li>
+    </ul>
+    <p>Занятия в клубе подразумевают, что ты (или твои родители) принимаешь цели клуба и готов идти по пути тхэквондо вместе со всеми.</p>
+
+    <h3>Родители — наши самые важные партнёры</h3>
+    <p>Мы не «принимаем ребёнка на секцию» — мы вместе растим личность. Тренер и родители — одна команда, которая стоит за спиной каждого ребёнка.</p>
+    <p>Родители, которые поддерживают клуб, видят, как их дети меняются на глазах: становятся увереннее, дисциплинированнее, целеустремлённее. И это не просто слова — это результат общей работы.</p>
+    <p>Что делает родителя настоящей частью клуба:</p>
+    <ul>
+      <li>Создаёт дома атмосферу уважения к тренировкам и ценностям тхэквондо</li>
+      <li>Следит, чтобы ребёнок приходил вовремя и в полной экипировке</li>
+      <li>Помогает систематизировать знания и помнить, что каждый пояс — это новая ступень</li>
+      <li>Посещает собрания, открытые тренировки и праздники клуба</li>
+      <li>Доверяет методике тренера и не вмешивается в процесс — это огромная поддержка</li>
+      <li>Уважает других родителей и участников — ведь мы все одна команда</li>
+    </ul>
+    <div className="about-quote">
+      <p>Когда родители и тренер идут рука об руку, ребёнок получает крылья.</p>
+    </div>
+
+    <h3>Тренер — сердце и душа клуба</h3>
+    <p>В традициях тхэквондо тренер — это не просто учитель. Это наставник, пример для подражания и проводник по пути настоящего воина.</p>
+    <p>Уважение к тренеру — это не формальность, а одна из самых важных ценностей, которую заложил основатель тхэквондо генерал Чхве Хон Хи.</p>
+    <p>В нашем клубе тренер — это человек, которому дети и родители доверяют полностью. Потому что знают: здесь не просто учат бить ногами. Здесь воспитывают характер, который остаётся на всю жизнь.</p>
+
+    <div className="about-cta">
+      Добро пожаловать в семью тхэквондо! Здесь гордятся каждым спортсменом. Здесь растут чемпионы и настоящие люди. Здесь ты — часть большой и сильной семьи, которая всегда будет за тебя горой.
+    </div>
+  </div>
+),
+
 structure: null,
 attestation: null,
 camps: null,
@@ -174,6 +180,19 @@ family: null,
 
 export default function About() {
   const [active, setActive] = useState('about')
+  const contentRef = useRef(null)
+
+  const switchSection = (id) => {
+    setActive(id)
+    // Скролл к верху контентной области
+    setTimeout(() => {
+      if (contentRef.current) {
+        const top = contentRef.current.getBoundingClientRect().top + window.scrollY - 120
+        window.scrollTo({ top, behavior: 'smooth' })
+      }
+    }, 0)
+  }
+
   const section = SECTIONS.find(s => s.id === active)
 
   return (
@@ -192,7 +211,7 @@ export default function About() {
             <button
               key={s.id}
               className={`about-nav-item ${active === s.id ? 'active' : ''}`}
-              onClick={() => setActive(s.id)}
+              onClick={() => switchSection(s.id)}
             >
               <span className="about-nav-num">{String(i + 1).padStart(2, '0')}</span>
               <span className="about-nav-title">{s.title}</span>
@@ -200,7 +219,7 @@ export default function About() {
           ))}
         </nav>
 
-        <div className="about-content">
+        <div className="about-content" ref={contentRef}>
           <h2 className="about-section-title">{section.title}</h2>
           <div className="about-divider" />
 
