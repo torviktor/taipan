@@ -16,25 +16,11 @@
   align-items: center;
   gap: 48px;
 }
-.navbar-logo {
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-}
-.navbar-logo-img {
-  height: 64px;
-  width: auto;
-  transition: transform 0.2s;
-}
-.navbar-logo-img:hover {
-  transform: scale(1.05);
-}
-.navbar-links {
-  display: flex;
-  list-style: none;
-  gap: 36px;
-  margin-left: auto;
-}
+.navbar-logo { text-decoration: none; display: flex; align-items: center; }
+.navbar-logo-img { height: 64px; width: auto; transition: transform 0.2s; }
+.navbar-logo-img:hover { transform: scale(1.05); }
+
+.navbar-links { display: flex; list-style: none; gap: 36px; margin-left: auto; }
 .navbar-links a {
   text-decoration: none;
   color: var(--gray);
@@ -55,14 +41,91 @@
   transition: width 0.2s;
 }
 .navbar-links a:hover,
-.navbar-links a.active {
-  color: var(--white);
-}
+.navbar-links a.active { color: var(--white); }
 .navbar-links a.active::after,
-.navbar-links a:hover::after {
-  width: 100%;
+.navbar-links a:hover::after { width: 100%; }
+
+/* ── ACTIONS (поиск + кнопка) ────────────────────────────────────────── */
+.navbar-actions {
+  margin-left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
-.navbar-actions { margin-left: 16px; }
+
+/* ── ПОИСК ───────────────────────────────────────────────────────────── */
+.navbar-search { position: relative; }
+
+.navbar-search-btn {
+  background: none;
+  border: none;
+  color: var(--gray);
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+  border-radius: 0;
+}
+.navbar-search-btn:hover,
+.navbar-search-btn.active { color: var(--white); }
+
+.navbar-search-dropdown {
+  position: absolute;
+  top: calc(100% + 16px);
+  right: 0;
+  width: 320px;
+  background: var(--dark);
+  border: 1px solid var(--gray-dim);
+  border-top: 2px solid var(--red);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  z-index: 200;
+}
+
+.navbar-search-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--gray-dim);
+  color: var(--white);
+  padding: 14px 16px;
+  font-size: 15px;
+  font-family: 'Barlow', sans-serif;
+  box-sizing: border-box;
+  outline: none;
+}
+.navbar-search-input::placeholder { color: var(--gray); }
+
+.navbar-search-results {
+  list-style: none;
+  padding: 8px 0;
+  margin: 0;
+}
+.navbar-search-results li button {
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--gray);
+  padding: 10px 16px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.2s, padding-left 0.2s;
+}
+.navbar-search-results li button:hover { color: var(--white); padding-left: 24px; }
+
+.navbar-search-empty {
+  padding: 16px;
+  color: var(--gray);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ── БУРГЕР ──────────────────────────────────────────────────────────── */
 .burger {
   display: none;
   flex-direction: column;
@@ -73,15 +136,12 @@
   margin-left: auto;
   padding: 4px;
 }
-.burger span {
-  display: block;
-  width: 28px; height: 2px;
-  background: var(--white);
-  transition: all 0.3s;
-}
+.burger span { display: block; width: 28px; height: 2px; background: var(--white); transition: all 0.3s; }
 .burger.open span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
 .burger.open span:nth-child(2) { opacity: 0; }
 .burger.open span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
+/* ── МОБИЛЬНОЕ МЕНЮ ──────────────────────────────────────────────────── */
 .mobile-menu {
   display: none;
   flex-direction: column;
@@ -91,9 +151,7 @@
   overflow: hidden;
   transition: max-height 0.3s ease;
 }
-.mobile-menu.open {
-  max-height: 400px;
-}
+.mobile-menu.open { max-height: 400px; }
 .mobile-menu a {
   padding: 16px 24px;
   color: var(--white);
@@ -107,8 +165,10 @@
   transition: color 0.2s, padding-left 0.2s;
 }
 .mobile-menu a:hover { color: var(--red); padding-left: 36px; }
+
 @media (max-width: 768px) {
-  .navbar-links, .navbar-actions { display: none; }
+  .navbar-links  { display: none; }
+  .navbar-actions { display: none; }
   .burger { display: flex; }
   .mobile-menu { display: flex; }
 }

@@ -35,6 +35,21 @@ export default function Apply() {
     const phone = form.phone.replace(/\D/g, '')
     if (phone.length < 11) { setError('Введите корректный номер телефона'); return }
 
+    // Считаем возраст для удобства тренера
+    const today = new Date()
+    const birth = new Date(form.birth_date)
+    const age = today.getFullYear() - birth.getFullYear()
+      - ((today.getMonth(), today.getDate()) < (birth.getMonth(), birth.getDate()) ? 1 : 0)
+
+    const genderLabel = form.gender === 'male' ? 'Мужской' : 'Женский'
+    const birthLabel  = new Date(form.birth_date).toLocaleDateString('ru-RU')
+
+    const commentLines = [
+      `Дата рождения: ${birthLabel} (${age} лет)`,
+      `Пол: ${genderLabel}`,
+      form.comment ? `Комментарий: ${form.comment}` : '',
+    ].filter(Boolean).join('\n')
+
     setLoading(true)
     try {
       const res = await fetch(`${API}/applications/`, {
@@ -43,11 +58,7 @@ export default function Apply() {
         body: JSON.stringify({
           full_name: form.child_name,
           phone,
-          comment: [
-            `Дата рождения: ${form.birth_date}`,
-            `Пол: ${form.gender === 'male' ? 'Мужской' : 'Женский'}`,
-            form.comment ? `Комментарий: ${form.comment}` : ''
-          ].filter(Boolean).join('\n'),
+          comment: commentLines,
         }),
       })
       if (!res.ok) {

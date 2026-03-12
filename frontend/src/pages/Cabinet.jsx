@@ -235,7 +235,12 @@ export default function Cabinet() {
               <p className="section-label">Личный кабинет</p>
               <h1 className="cabinet-title">{name}</h1>
             </div>
-            <button className="btn-outline cabinet-logout" onClick={logout}>Выйти</button>
+            <div style={{display:'flex',gap:'12px',alignItems:'center',flexWrap:'wrap'}}>
+              <a href="/register?add=1" className="btn-outline" style={{fontSize:'13px',padding:'8px 16px'}}>
+                + Добавить ребёнка
+              </a>
+              <button className="btn-outline cabinet-logout" onClick={logout}>Выйти</button>
+            </div>
           </div>
           {loading && <div className="cabinet-loading">Загрузка...</div>}
           {!loading && myAthletes.length > 0 && (
@@ -300,7 +305,7 @@ export default function Cabinet() {
           <div className="cabinet-search">
             <input type="text" placeholder="Поиск..."
               value={search} onChange={e => setSearch(e.target.value)} />
-            {search && <button className="cabinet-search-clear" onClick={() => setSearch('')}>x</button>}
+            {search && <button className="cabinet-search-clear" onClick={() => setSearch('')}>✕</button>}
           </div>
           {activeFiltersCount > 0 && (
             <button className="cabinet-reset-filters" onClick={resetFilters}>
@@ -357,8 +362,8 @@ export default function Cabinet() {
                     <td className="td-actions">
                       {editing === a.id ? (
                         <>
-                          <button className="td-btn td-btn-save" onClick={() => saveEdit(a.id)}>ok</button>
-                          <button className="td-btn td-btn-cancel" onClick={() => setEditing(null)}>x</button>
+                          <button className="td-btn td-btn-save" onClick={() => saveEdit(a.id)}>✓</button>
+                          <button className="td-btn td-btn-cancel" onClick={() => setEditing(null)}>✕</button>
                         </>
                       ) : (
                         <>
