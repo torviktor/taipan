@@ -4,6 +4,7 @@ import './About.css'
 
 const SECTIONS = [
   { id: 'about',       title: 'О НАС' },
+  { id: 'emblem',      title: 'ЭМБЛЕМА КЛУБА' },
   { id: 'members',     title: 'УЧАСТНИКИ КЛУБА И ИХ ОБЯЗАННОСТИ' },
   { id: 'structure',   title: 'СТРУКТУРА СЕЗОНА И ПОВСЕДНЕВНАЯ ДЕЯТЕЛЬНОСТЬ' },
   { id: 'attestation', title: 'АТТЕСТАЦИИ' },
@@ -11,9 +12,9 @@ const SECTIONS = [
   { id: 'family',      title: 'РОЛЬ СЕМЬИ И ОКРУЖЕНИЯ В ОБУЧЕНИИ ТХЭКВОНДО' },
 ]
 
-// Контент — пока заглушки, будем заполнять по одному
 const CONTENT = {
   about:       null,
+  emblem:      null,
   members:     null,
   structure:   null,
   attestation: null,
@@ -28,7 +29,6 @@ export default function About() {
   return (
     <main className="about-page">
 
-      {/* Hero */}
       <section className="about-hero">
         <div className="container">
           <p className="section-label">Клуб тхэквондо</p>
@@ -39,7 +39,7 @@ export default function About() {
 
       <div className="container about-layout">
 
-        {/* Боковое меню разделов */}
+        {/* Боковое меню */}
         <nav className="about-nav">
           {SECTIONS.map((s, i) => (
             <button
@@ -53,18 +53,31 @@ export default function About() {
           ))}
         </nav>
 
-        {/* Контент раздела */}
+        {/* Контент */}
         <div className="about-content">
           <h2 className="about-section-title">{section.title}</h2>
           <div className="about-divider" />
 
-          {CONTENT[active] ? (
-            <div className="about-body" dangerouslySetInnerHTML={{ __html: CONTENT[active] }} />
-          ) : (
+          {/* Эмблема — особый блок с логотипом */}
+          {active === 'emblem' && CONTENT.emblem === null && (
+            <div className="about-emblem-preview">
+              <img src="/logo.png" alt="Эмблема клуба Тайпан" className="about-emblem-img" />
+              <div className="about-coming" style={{ marginTop: '24px' }}>
+                <p>Описание эмблемы в разработке.</p>
+                <p>Скоро здесь появится подробная информация.</p>
+              </div>
+            </div>
+          )}
+
+          {active !== 'emblem' && CONTENT[active] === null && (
             <div className="about-coming">
               <p>Раздел находится в разработке.</p>
               <p>Скоро здесь появится подробная информация.</p>
             </div>
+          )}
+
+          {CONTENT[active] !== null && (
+            <div className="about-body" dangerouslySetInnerHTML={{ __html: CONTENT[active] }} />
           )}
         </div>
 

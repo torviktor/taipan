@@ -65,18 +65,29 @@ def build_athlete_out(a: Athlete) -> AthleteOut:
 def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
+# ─── МОИ спортсмены — только свои дети текущего пользователя ─────────────────
+# Этот роут используется в личном кабинете родителя.
+# Возвращает только спортсменов привязанных к текущему аккаунту.
+@router.get("/my-athletes", response_model=List[AthleteOut])
+def get_my_athletes(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    athletes = db.query(Athlete).filter(Athlete.user_id == current_user.id).all()
+    return [build_athlete_out(a) for a in athletes]
+
 # ─── Все пользователи (только admin/manager) ──────────────────────────────────
 @router.get("/", response_model=List[UserOut])
 def get_all_users(db: Session = Depends(get_db), _: User = Depends(require_manager)):
     return db.query(User).order_by(User.created_at.desc()).all()
 
-# ─── Список спортсменов (только admin/manager) ────────────────────────────────
+# ─── Все спортсмены (только admin/manager) ────────────────────────────────────
 @router.get("/athletes", response_model=List[AthleteOut])
 def get_athletes(db: Session = Depends(get_db), _: User = Depends(require_manager)):
     athletes = db.query(Athlete).join(User, Athlete.user_id == User.id).all()
     return [build_athlete_out(a) for a in athletes]
 
-# ─── Обновить данные спортсмена (только admin/manager) ────────────────────────
+# ─── Обновить спортсмена (только admin/manager) ───────────────────────────────
 @router.patch("/athletes/{athlete_id}", response_model=AthleteOut)
 def update_athlete(
     athlete_id: int, data: AthleteUpdate,
@@ -106,9 +117,7 @@ def delete_athlete(
     db.commit()
     return {"ok": True}
 
-# ─── Сброс пароля пользователя (только admin/manager) ────────────────────────
-# Тренер открывает список родителей, нажимает "Сбросить пароль",
-# вводит новый пароль — он хешируется и сохраняется.
+# ─── Сброс пароля (только admin/manager) ─────────────────────────────────────
 @router.patch("/{user_id}/reset-password")
 def reset_password(
     user_id: int, data: ResetPasswordRequest,

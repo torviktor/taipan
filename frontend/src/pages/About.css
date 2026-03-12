@@ -28,7 +28,7 @@
   align-items: start;
 }
 
-/* ── БОКОВОЕ МЕНЮ ────────────────────────────────────────────────────── */
+/* ── МЕНЮ ────────────────────────────────────────────────────────────── */
 .about-nav {
   display: flex;
   flex-direction: column;
@@ -51,11 +51,8 @@
   width: 100%;
 }
 
-.about-nav-item:hover { background: var(--dark2); }
-.about-nav-item.active {
-  border-left-color: var(--red);
-  background: var(--dark2);
-}
+.about-nav-item:hover  { background: rgba(255,255,255,0.03); }
+.about-nav-item.active { border-left-color: var(--red); background: rgba(255,255,255,0.03); }
 
 .about-nav-num {
   font-family: 'Bebas Neue', sans-serif;
@@ -83,9 +80,7 @@
 .about-nav-item:hover  .about-nav-title { color: var(--white); }
 
 /* ── КОНТЕНТ ─────────────────────────────────────────────────────────── */
-.about-content {
-  min-height: 400px;
-}
+.about-content { min-height: 400px; }
 
 .about-section-title {
   font-family: 'Bebas Neue', sans-serif;
@@ -132,14 +127,9 @@
   position: relative;
   border-bottom: 1px solid rgba(255,255,255,0.04);
 }
+.about-body ul li::before { content: '—'; position: absolute; left: 0; color: var(--red); }
 
-.about-body ul li::before {
-  content: '—';
-  position: absolute;
-  left: 0;
-  color: var(--red);
-}
-
+/* ── ЗАГЛУШКА ────────────────────────────────────────────────────────── */
 .about-coming {
   color: var(--gray);
   font-size: 16px;
@@ -149,10 +139,29 @@
   text-align: center;
 }
 
+/* ── ЭМБЛЕМА ─────────────────────────────────────────────────────────── */
+.about-emblem-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.about-emblem-img {
+  width: 220px;
+  height: 220px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 40px rgba(204,0,0,0.3));
+}
+
 /* ── АДАПТИВ ─────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .about-layout { grid-template-columns: 1fr; }
-  .about-nav { position: static; flex-direction: row; flex-wrap: wrap; gap: 4px; }
+  .about-nav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
   .about-nav-item { flex: 1; min-width: 140px; padding: 12px; }
-  .about-nav-num { display: none; }
+  .about-nav-num  { display: none; }
 }

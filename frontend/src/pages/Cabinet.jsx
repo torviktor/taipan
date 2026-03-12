@@ -4,7 +4,6 @@ import './Cabinet.css'
 
 const API = '/api'
 
-// ── Хук сортировки ────────────────────────────────────────────────────────────
 function useSorted(data) {
   const [sort, setSort] = useState({ key: null, dir: 'asc' })
   const toggle = (key) => setSort(s =>
@@ -13,8 +12,7 @@ function useSorted(data) {
   const sorted = useMemo(() => {
     if (!sort.key) return data
     return [...data].sort((a, b) => {
-      const va = a[sort.key] ?? ''
-      const vb = b[sort.key] ?? ''
+      const va = a[sort.key] ?? '', vb = b[sort.key] ?? ''
       const cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb), 'ru')
       return sort.dir === 'asc' ? cmp : -cmp
     })
@@ -23,8 +21,8 @@ function useSorted(data) {
 }
 
 function SortIcon({ active, dir }) {
-  if (!active) return <span className="sort-icon sort-icon-idle">⇅</span>
-  return <span className="sort-icon sort-icon-active">{dir === 'asc' ? '↑' : '↓'}</span>
+  if (!active) return <span className="sort-icon sort-icon-idle">o</span>
+  return <span className="sort-icon sort-icon-active">{dir === 'asc' ? 'v' : '^'}</span>
 }
 
 function Th({ children, colKey, sort, toggle, filter }) {
@@ -49,10 +47,9 @@ function ColFilter({ value, onChange, options, placeholder }) {
 }
 
 function ResetPasswordModal({ user, token, onClose }) {
-  const [pwd, setPwd]         = useState('')
-  const [msg, setMsg]         = useState('')
+  const [pwd, setPwd] = useState('')
+  const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
-
   const save = async () => {
     if (pwd.length < 4) { setMsg('Минимум 4 символа'); return }
     setLoading(true)
@@ -65,7 +62,6 @@ function ResetPasswordModal({ user, token, onClose }) {
     if (r.ok) { setMsg('Пароль изменён'); setTimeout(onClose, 1200) }
     else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
   }
-
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={e => e.stopPropagation()}>
@@ -75,9 +71,7 @@ function ResetPasswordModal({ user, token, onClose }) {
           onChange={e => setPwd(e.target.value)} className="modal-input" />
         {msg && <div className="modal-msg">{msg}</div>}
         <div className="modal-btns-row">
-          <button className="btn-primary" onClick={save} disabled={loading}>
-            {loading ? '...' : 'Сохранить'}
-          </button>
+          <button className="btn-primary" onClick={save} disabled={loading}>{loading ? '...' : 'Сохранить'}</button>
           <button className="btn-outline" onClick={onClose}>Отмена</button>
         </div>
       </div>
@@ -93,11 +87,11 @@ const STATUS_LABELS = {
 }
 
 export default function Cabinet() {
-  const navigate  = useNavigate()
-  const token     = localStorage.getItem('token')
-  const role      = localStorage.getItem('role')
-  const name      = localStorage.getItem('full_name')
-  const isAdmin   = ['admin', 'manager'].includes(role)
+  const navigate = useNavigate()
+  const token    = localStorage.getItem('token')
+  const role     = localStorage.getItem('role')
+  const name     = localStorage.getItem('full_name')
+  const isAdmin  = ['admin', 'manager'].includes(role)
 
   const [athletes,     setAthletes]     = useState([])
   const [applications, setApplications] = useState([])
@@ -108,26 +102,21 @@ export default function Cabinet() {
   const [search,       setSearch]       = useState('')
   const [view,         setView]         = useState('athletes')
   const [resetUser,    setResetUser]    = useState(null)
-
   const [cf, setCfState] = useState({ gender: '', group: '', gup_dan: '', parent_name: '' })
   const setCf = (k, v) => setCfState(f => ({ ...f, [k]: v }))
   const resetFilters = () => { setSearch(''); setCfState({ gender: '', group: '', gup_dan: '', parent_name: '' }) }
 
   useEffect(() => {
     if (!token) { navigate('/login'); return }
-    if (isAdmin) {
-      loadAthletes()
-      loadApplications()
-    } else {
-      loadMyAthletes()
-    }
+    if (isAdmin) { loadAthletes(); loadApplications() }
+    else loadMyAthletes()
   }, [])
 
   const loadAthletes = async () => {
     setLoading(true)
     try {
       const r = await fetch(`${API}/users/athletes`, { headers: { Authorization: `Bearer ${token}` } })
-      setAthletes(await r.json())
+      if (r.ok) setAthletes(await r.json())
     } catch {}
     setLoading(false)
   }
@@ -142,13 +131,8 @@ export default function Cabinet() {
   const loadMyAthletes = async () => {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/users/athletes`, { headers: { Authorization: `Bearer ${token}` } })
-      if (r.ok) {
-        const all = await r.json()
-        // Фильтруем только своих (по user_id из токена)
-        // Для упрощения — показываем все, backend вернёт только свои если не admin
-        setMyAthletes(all)
-      }
+      const r = await fetch(`${API}/users/my-athletes`, { headers: { Authorization: `Bearer ${token}` } })
+      if (r.ok) setMyAthletes(await r.json())
     } catch {}
     setLoading(false)
   }
@@ -188,17 +172,13 @@ export default function Cabinet() {
     loadApplications()
   }
 
-  // Уникальные значения фильтров
   const uniqueGroups = useMemo(() =>
     [...new Set(athletes.map(a => a.group || a.auto_group).filter(Boolean))].sort()
   , [athletes])
 
   const uniqueGupDan = useMemo(() => {
     const vals = new Set()
-    athletes.forEach(a => {
-      if (a.dan) vals.add(`${a.dan} дан`)
-      else if (a.gup) vals.add(`${a.gup} гып`)
-    })
+    athletes.forEach(a => { if (a.dan) vals.add(`${a.dan} дан`); else if (a.gup) vals.add(`${a.gup} гып`) })
     return [...vals].sort()
   }, [athletes])
 
@@ -211,10 +191,7 @@ export default function Cabinet() {
     if (s && !a.full_name.toLowerCase().includes(s) && !(a.parent_name || '').toLowerCase().includes(s)) return false
     if (cf.gender && a.gender !== cf.gender) return false
     if (cf.group) { const g = a.group || a.auto_group || ''; if (g !== cf.group) return false }
-    if (cf.gup_dan) {
-      const val = a.dan ? `${a.dan} дан` : a.gup ? `${a.gup} гып` : ''
-      if (val !== cf.gup_dan) return false
-    }
+    if (cf.gup_dan) { const val = a.dan ? `${a.dan} дан` : a.gup ? `${a.gup} гып` : ''; if (val !== cf.gup_dan) return false }
     if (cf.parent_name && a.parent_name !== cf.parent_name) return false
     return true
   }), [athletes, search, cf])
@@ -249,7 +226,6 @@ export default function Cabinet() {
   const activeFiltersCount = Object.values(cf).filter(Boolean).length + (search ? 1 : 0)
   const logout = () => { localStorage.clear(); navigate('/login') }
 
-  // ── Обычный пользователь ──────────────────────────────────────────────────
   if (!isAdmin) {
     return (
       <main className="cabinet-page">
@@ -261,28 +237,28 @@ export default function Cabinet() {
             </div>
             <button className="btn-outline cabinet-logout" onClick={logout}>Выйти</button>
           </div>
-
           {loading && <div className="cabinet-loading">Загрузка...</div>}
-
-          {myAthletes.length > 0 ? (
+          {!loading && myAthletes.length > 0 && (
             <div className="my-athletes">
-              <p className="section-label" style={{marginBottom: '16px'}}>Спортсмены</p>
+              <p className="section-label" style={{ marginBottom: '16px' }}>Спортсмены</p>
               {myAthletes.map(a => (
                 <div className="my-athlete-card" key={a.id}>
                   <div className="my-athlete-name">{a.full_name}</div>
                   <div className="my-athlete-details">
-                    <span>{a.birth_date}</span>
+                    <span>Дата рождения: {a.birth_date}</span>
                     <span>{a.age} лет</span>
-                    <span>{a.gender === 'male' ? 'Муж.' : 'Жен.'}</span>
+                    <span>{a.gender === 'male' ? 'Мужской' : 'Женский'}</span>
                     <span>{a.group || a.auto_group}</span>
-                    <span>{a.dan ? `${a.dan} дан` : a.gup ? `${a.gup} гып` : '—'}</span>
+                    <span>{a.dan ? `${a.dan} дан` : a.gup ? `${a.gup} гып` : 'Пояс не указан'}</span>
                   </div>
                 </div>
               ))}
             </div>
-          ) : (
+          )}
+          {!loading && myAthletes.length === 0 && (
             <div className="cabinet-coming">
-              <p>Данные спортсмена загружаются или ещё не добавлены.</p>
+              <p>Данные о спортсменах пока не добавлены.</p>
+              <p>Если вы регистрировали ребёнка — обратитесь к тренеру.</p>
             </div>
           )}
         </div>
@@ -290,13 +266,11 @@ export default function Cabinet() {
     )
   }
 
-  // ── Админ ─────────────────────────────────────────────────────────────────
   return (
     <main className="cabinet-page">
       {resetUser && (
         <ResetPasswordModal user={resetUser} token={token} onClose={() => setResetUser(null)} />
       )}
-
       <div className="container cabinet-container">
         <div className="cabinet-header">
           <div>
@@ -326,7 +300,7 @@ export default function Cabinet() {
           <div className="cabinet-search">
             <input type="text" placeholder="Поиск..."
               value={search} onChange={e => setSearch(e.target.value)} />
-            {search && <button className="cabinet-search-clear" onClick={() => setSearch('')}>✕</button>}
+            {search && <button className="cabinet-search-clear" onClick={() => setSearch('')}>x</button>}
           </div>
           {activeFiltersCount > 0 && (
             <button className="cabinet-reset-filters" onClick={resetFilters}>
@@ -337,7 +311,6 @@ export default function Cabinet() {
 
         {loading && <div className="cabinet-loading">Загрузка...</div>}
 
-        {/* ── Спортсмены ── */}
         {view === 'athletes' && (
           <div className="athletes-table-wrap">
             <table className="athletes-table">
@@ -347,18 +320,14 @@ export default function Cabinet() {
                   <Th colKey="birth_date"  sort={sortA} toggle={toggleA}>Дата рожд.</Th>
                   <Th colKey="age"         sort={sortA} toggle={toggleA}>Возраст</Th>
                   <Th colKey="gender"      sort={sortA} toggle={toggleA}
-                    filter={<ColFilter value={cf.gender} onChange={v => setCf('gender', v)}
-                      options={['male', 'female']} />}>Пол</Th>
+                    filter={<ColFilter value={cf.gender} onChange={v => setCf('gender', v)} options={['male','female']} />}>Пол</Th>
                   <Th colKey="group"       sort={sortA} toggle={toggleA}
-                    filter={<ColFilter value={cf.group} onChange={v => setCf('group', v)}
-                      options={uniqueGroups} />}>Группа</Th>
+                    filter={<ColFilter value={cf.group} onChange={v => setCf('group', v)} options={uniqueGroups} />}>Группа</Th>
                   <Th colKey="gup"         sort={sortA} toggle={toggleA}
-                    filter={<ColFilter value={cf.gup_dan} onChange={v => setCf('gup_dan', v)}
-                      options={uniqueGupDan} />}>Гып / Дан</Th>
+                    filter={<ColFilter value={cf.gup_dan} onChange={v => setCf('gup_dan', v)} options={uniqueGupDan} />}>Гып / Дан</Th>
                   <Th colKey="weight"      sort={sortA} toggle={toggleA}>Вес (кг)</Th>
                   <Th colKey="parent_name" sort={sortA} toggle={toggleA}
-                    filter={<ColFilter value={cf.parent_name} onChange={v => setCf('parent_name', v)}
-                      options={uniqueParents} />}>Родитель</Th>
+                    filter={<ColFilter value={cf.parent_name} onChange={v => setCf('parent_name', v)} options={uniqueParents} />}>Родитель</Th>
                   <th>Действия</th>
                 </tr>
               </thead>
@@ -370,7 +339,7 @@ export default function Cabinet() {
                     <td>{a.age}</td>
                     <td>{a.gender === 'male' ? 'М' : 'Ж'}</td>
                     <td>{editing === a.id
-                      ? <input value={editData.group} onChange={e => setEditData(d=>({...d,group:e.target.value}))} className="td-input"/>
+                      ? <input value={editData.group} onChange={e=>setEditData(d=>({...d,group:e.target.value}))} className="td-input"/>
                       : (a.group || a.auto_group)}</td>
                     <td>{editing === a.id
                       ? <div style={{display:'flex',gap:'4px'}}>
@@ -388,8 +357,8 @@ export default function Cabinet() {
                     <td className="td-actions">
                       {editing === a.id ? (
                         <>
-                          <button className="td-btn td-btn-save" onClick={() => saveEdit(a.id)}>✓</button>
-                          <button className="td-btn td-btn-cancel" onClick={() => setEditing(null)}>✕</button>
+                          <button className="td-btn td-btn-save" onClick={() => saveEdit(a.id)}>ok</button>
+                          <button className="td-btn td-btn-cancel" onClick={() => setEditing(null)}>x</button>
                         </>
                       ) : (
                         <>
@@ -406,7 +375,6 @@ export default function Cabinet() {
           </div>
         )}
 
-        {/* ── Родители ── */}
         {view === 'parents' && (
           <div className="athletes-table-wrap">
             <table className="athletes-table">
@@ -433,18 +401,17 @@ export default function Cabinet() {
           </div>
         )}
 
-        {/* ── Заявки на вступление ── */}
         {view === 'applications' && (
           <div className="athletes-table-wrap">
             <table className="athletes-table">
               <thead>
                 <tr>
                   <Th colKey="created_at" sort={sortAp} toggle={toggleAp}>Дата</Th>
-                  <Th colKey="full_name"  sort={sortAp} toggle={toggleAp}>ФИО ребёнка</Th>
+                  <Th colKey="full_name"  sort={sortAp} toggle={toggleAp}>ФИО</Th>
                   <Th colKey="phone"      sort={sortAp} toggle={toggleAp}>Телефон</Th>
                   <th>Комментарий</th>
                   <Th colKey="status"     sort={sortAp} toggle={toggleAp}>Статус</Th>
-                  <th>Действия</th>
+                  <th>Изменить статус</th>
                 </tr>
               </thead>
               <tbody>
@@ -456,10 +423,9 @@ export default function Cabinet() {
                       <td className="td-name">{a.full_name}</td>
                       <td>{a.phone}</td>
                       <td style={{fontSize:'13px',color:'var(--gray)',maxWidth:'200px'}}>{a.comment || '—'}</td>
-                      <td><span style={{color: st.color, fontWeight: 700, fontSize: '13px'}}>{st.label}</span></td>
-                      <td className="td-actions" style={{whiteSpace:'nowrap'}}>
-                        <select className="td-status-select"
-                          value={a.status}
+                      <td><span style={{color:st.color,fontWeight:700,fontSize:'13px'}}>{st.label}</span></td>
+                      <td>
+                        <select className="td-status-select" value={a.status}
                           onChange={e => updateAppStatus(a.id, e.target.value)}>
                           <option value="new">Новая</option>
                           <option value="processing">В обработке</option>
