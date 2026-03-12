@@ -127,15 +127,17 @@
   margin-top: 32px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
   padding: 24px 28px;
   background: var(--dark);
   border-left: 3px solid var(--red);
 }
-
-.subscribe-hint span { font-size: 28px; }
-
-.subscribe-hint strong {
+.subscribe-hint-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.subscribe-hint-text strong {
   display: block;
   color: var(--white);
   font-family: 'Barlow Condensed', sans-serif;
@@ -145,11 +147,9 @@
   text-transform: uppercase;
   margin-bottom: 4px;
 }
-
-.subscribe-hint p { color: var(--gray); font-size: 14px; }
-
-.subscribe-hint a { color: var(--red); text-decoration: none; }
-.subscribe-hint a:hover { text-decoration: underline; }
+.subscribe-hint-text p { color: var(--gray); font-size: 14px; margin: 0; }
+.subscribe-hint-text a { color: var(--red); text-decoration: none; }
+.subscribe-hint-text a:hover { text-decoration: underline; }
 
 /* ── Модальное окно ────────────────────────────────────────────── */
 .modal-overlay {

@@ -1,0 +1,187 @@
+.schedule-page {
+  min-height: 100vh;
+  background: var(--black);
+}
+
+.schedule-hero {
+  padding: 140px 0 60px;
+  background: var(--dark);
+  border-bottom: 1px solid var(--gray-dim);
+}
+
+.schedule-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(60px, 10vw, 100px);
+  letter-spacing: 8px;
+  color: var(--white);
+  line-height: 1;
+  margin: 12px 0;
+}
+
+.schedule-sub {
+  color: var(--gray);
+  font-size: 15px;
+  letter-spacing: 1px;
+  margin-top: 16px;
+}
+
+/* ── BODY ────────────────────────────────────────────────────────────── */
+.schedule-body { padding: 60px 0 80px; }
+
+.schedule-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  margin-bottom: 48px;
+}
+
+/* ── КАРТОЧКА ────────────────────────────────────────────────────────── */
+.schedule-card {
+  background: var(--dark);
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  position: relative;
+  overflow: hidden;
+}
+
+.schedule-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+.schedule-card--junior::before { background: var(--red); }
+.schedule-card--senior::before { background: linear-gradient(90deg, var(--red), #ff4444); }
+
+.schedule-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.schedule-card-num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 56px;
+  color: rgba(204,0,0,0.2);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.schedule-card-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 36px;
+  letter-spacing: 3px;
+  color: var(--white);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.schedule-card-age {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--red);
+}
+
+/* ── ДНИ НЕДЕЛИ ──────────────────────────────────────────────────────── */
+.schedule-days-row {
+  display: flex;
+  gap: 6px;
+}
+
+.schedule-day-pill {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 6px 10px;
+  border: 1px solid var(--gray-dim);
+  color: var(--gray);
+  transition: all 0.2s;
+  flex: 1;
+  text-align: center;
+}
+
+.schedule-day-pill.active {
+  background: var(--red);
+  border-color: var(--red);
+  color: var(--white);
+}
+
+/* ── ВРЕМЯ ───────────────────────────────────────────────────────────── */
+.schedule-times {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--gray-dim);
+}
+
+.schedule-time-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--gray-dim);
+}
+.schedule-time-row:last-child { border-bottom: none; }
+
+.schedule-time-day {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gray);
+}
+
+.schedule-time-val {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 24px;
+  letter-spacing: 2px;
+  color: var(--white);
+}
+
+.schedule-card-footer { margin-top: auto; }
+
+/* ── ЗАМЕТКИ ─────────────────────────────────────────────────────────── */
+.schedule-note {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  border: 1px solid var(--gray-dim);
+}
+
+.schedule-note-item {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 24px;
+  background: var(--dark);
+}
+
+.schedule-note-item span { font-size: 24px; flex-shrink: 0; }
+
+.schedule-note-item strong {
+  display: block;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-bottom: 4px;
+}
+
+.schedule-note-item p { color: var(--gray); font-size: 15px; margin: 0; }
+.schedule-note-item a { color: var(--gray); text-decoration: none; transition: color 0.2s; }
+.schedule-note-item a:hover { color: var(--white); }
+
+@media (max-width: 768px) {
+  .schedule-cards { grid-template-columns: 1fr; }
+  .schedule-note  { grid-template-columns: 1fr; }
+  .schedule-card  { padding: 28px 20px; }
+}
