@@ -7,7 +7,7 @@ export default function GroupKids2() {
       <section className="group-hero">
         <div className="container">
           <p className="section-label">Программа подготовки</p>
-          <h1 className="group-title">ПОДРОСТКИ 10–18 ЛЕТ</h1>
+          <h1 className="group-title">ДЕТИ 11–16 ЛЕТ</h1>
           <p className="group-subtitle">Спортивная специализация, тактика, соревнования</p>
           <div className="divider" />
         </div>
@@ -18,7 +18,7 @@ export default function GroupKids2() {
         <div className="group-intro">
           <p>
             Этот этап является <strong>учебно-тренировочным (этапом спортивной специализации)</strong>.
-            В возрасте 10–18 лет происходит переход от освоения основ к углублённому изучению техники
+            В возрасте 11–16 лет происходит переход от освоения основ к углублённому изучению техники
             и тактики поединка, формированию индивидуального стиля и активной соревновательной практике.
           </p>
         </div>
