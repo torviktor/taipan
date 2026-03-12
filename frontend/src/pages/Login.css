@@ -16,16 +16,8 @@
   text-align: center;
 }
 
-.login-logo-img {
-  display: inline-block;
-  margin-bottom: 8px;
-}
-
-.login-logo-img img {
-  height: 72px;
-  width: 72px;
-  object-fit: contain;
-}
+.login-logo-img { display: inline-block; margin-bottom: 8px; }
+.login-logo-img img { height: 72px; width: 72px; object-fit: contain; }
 
 .login-title {
   font-family: 'Bebas Neue', sans-serif;
@@ -47,12 +39,36 @@
 
 .login-form { margin-top: 24px; text-align: left; }
 
-.login-btn {
-  width: 100%;
-  text-align: center;
-  margin-top: 8px;
-}
+.login-btn { width: 100%; text-align: center; margin-top: 8px; }
 
+/* Забыли пароль */
+.login-forgot { margin-top: 16px; text-align: center; }
+
+.login-forgot-btn {
+  background: none;
+  border: none;
+  color: var(--gray);
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  font-family: 'Barlow', sans-serif;
+  transition: color 0.2s;
+}
+.login-forgot-btn:hover { color: var(--white); }
+
+.login-forgot-msg {
+  margin-top: 10px;
+  background: var(--black);
+  border: 1px solid var(--gray-dim);
+  padding: 14px 16px;
+  font-size: 14px;
+  color: var(--gray);
+  line-height: 1.7;
+  text-align: left;
+}
+.login-forgot-msg a { color: var(--red); text-decoration: none; }
+
+/* Разделитель */
 .login-divider {
   display: flex;
   align-items: center;
@@ -61,9 +77,7 @@
   color: var(--gray);
   font-size: 13px;
 }
-
-.login-divider::before,
-.login-divider::after {
+.login-divider::before, .login-divider::after {
   content: '';
   flex: 1;
   height: 1px;
@@ -84,10 +98,5 @@
   font-size: 14px;
   text-align: center;
 }
-
-.login-footer a {
-  color: var(--red);
-  text-decoration: none;
-}
-
+.login-footer a { color: var(--red); text-decoration: none; }
 .login-footer a:hover { text-decoration: underline; }

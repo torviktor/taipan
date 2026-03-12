@@ -1,8 +1,93 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './Cabinet.css'
 
 const API = '/api'
+
+// ── Хук сортировки ────────────────────────────────────────────────────────────
+function useSorted(data) {
+  const [sort, setSort] = useState({ key: null, dir: 'asc' })
+  const toggle = (key) => setSort(s =>
+    s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }
+  )
+  const sorted = useMemo(() => {
+    if (!sort.key) return data
+    return [...data].sort((a, b) => {
+      const va = a[sort.key] ?? ''
+      const vb = b[sort.key] ?? ''
+      const cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb), 'ru')
+      return sort.dir === 'asc' ? cmp : -cmp
+    })
+  }, [data, sort])
+  return { sorted, sort, toggle }
+}
+
+// ── Иконка сортировки ─────────────────────────────────────────────────────────
+function SortIcon({ active, dir }) {
+  if (!active) return <span className="sort-icon sort-icon-idle">⇅</span>
+  return <span className="sort-icon sort-icon-active">{dir === 'asc' ? '↑' : '↓'}</span>
+}
+
+// ── Заголовок с сортировкой ───────────────────────────────────────────────────
+function Th({ children, colKey, sort, toggle, filter }) {
+  return (
+    <th className="th-sortable" style={{ verticalAlign: 'top' }}>
+      <div className="th-inner" onClick={() => toggle(colKey)}>
+        {children} <SortIcon active={sort.key === colKey} dir={sort.dir} />
+      </div>
+      {filter}
+    </th>
+  )
+}
+
+// ── Выпадающий фильтр ─────────────────────────────────────────────────────────
+function ColFilter({ value, onChange, options, placeholder }) {
+  return (
+    <select className="col-filter" value={value} onChange={e => onChange(e.target.value)}
+      onClick={e => e.stopPropagation()}>
+      <option value="">{placeholder || 'Все'}</option>
+      {options.map(o => <option key={o} value={o}>{o}</option>)}
+    </select>
+  )
+}
+
+// ── Модалка сброса пароля ─────────────────────────────────────────────────────
+function ResetPasswordModal({ user, token, onClose }) {
+  const [pwd, setPwd]         = useState('')
+  const [msg, setMsg]         = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const save = async () => {
+    if (pwd.length < 4) { setMsg('Минимум 4 символа'); return }
+    setLoading(true)
+    const r = await fetch(`${API}/users/${user.user_id}/reset-password`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ new_password: pwd }),
+    })
+    setLoading(false)
+    if (r.ok) { setMsg('Пароль изменён'); setTimeout(onClose, 1200) }
+    else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()}>
+        <h3>Сброс пароля</h3>
+        <p>{user.parent_name}</p>
+        <input type="text" placeholder="Новый пароль" value={pwd}
+          onChange={e => setPwd(e.target.value)} className="modal-input" />
+        {msg && <div className="modal-msg">{msg}</div>}
+        <div className="modal-btns-row">
+          <button className="btn-primary" onClick={save} disabled={loading}>
+            {loading ? '...' : 'Сохранить'}
+          </button>
+          <button className="btn-outline" onClick={onClose}>Отмена</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function Cabinet() {
   const navigate  = useNavigate()
@@ -11,12 +96,18 @@ export default function Cabinet() {
   const name      = localStorage.getItem('full_name')
   const isAdmin   = ['admin', 'manager'].includes(role)
 
-  const [athletes, setAthletes]   = useState([])
-  const [loading,  setLoading]    = useState(false)
-  const [editing,  setEditing]    = useState(null)   // id редактируемого
-  const [editData, setEditData]   = useState({})
-  const [filter,   setFilter]     = useState('')
-  const [view,     setView]       = useState('athletes') // athletes | parents
+  const [athletes,  setAthletes]  = useState([])
+  const [loading,   setLoading]   = useState(false)
+  const [editing,   setEditing]   = useState(null)
+  const [editData,  setEditData]  = useState({})
+  const [search,    setSearch]    = useState('')
+  const [view,      setView]      = useState('athletes')
+  const [resetUser, setResetUser] = useState(null)
+
+  // Фильтры по столбцам
+  const [cf, setCfState] = useState({ gender: '', group: '', gup_dan: '', parent_name: '' })
+  const setCf = (k, v) => setCfState(f => ({ ...f, [k]: v }))
+  const resetFilters = () => { setSearch(''); setCfState({ gender: '', group: '', gup_dan: '', parent_name: '' }) }
 
   useEffect(() => {
     if (!token) { navigate('/login'); return }
@@ -26,12 +117,9 @@ export default function Cabinet() {
   const loadAthletes = async () => {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/users/athletes`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      const data = await r.json()
-      setAthletes(data)
-    } catch { }
+      const r = await fetch(`${API}/users/athletes`, { headers: { Authorization: `Bearer ${token}` } })
+      setAthletes(await r.json())
+    } catch {}
     setLoading(false)
   }
 
@@ -47,32 +135,86 @@ export default function Cabinet() {
     if (editData.gup)    body.gup    = parseInt(editData.gup)
     if (editData.dan)    body.dan    = parseInt(editData.dan)
     await fetch(`${API}/users/athletes/${id}`, {
-      method:  'PATCH',
+      method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body:    JSON.stringify(body),
+      body: JSON.stringify(body),
     })
     setEditing(null)
     loadAthletes()
   }
 
   const deleteAthlete = async (id) => {
-    if (!window.confirm('Удалить спортсмена?')) return
-    await fetch(`${API}/users/athletes/${id}`, {
-      method:  'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    if (!window.confirm('Удалить спортсмена из базы?')) return
+    await fetch(`${API}/users/athletes/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
     loadAthletes()
   }
 
-  const filtered = athletes.filter(a =>
-    a.full_name.toLowerCase().includes(filter.toLowerCase()) ||
-    (a.parent_name || '').toLowerCase().includes(filter.toLowerCase())
+  // ── Уникальные значения для фильтров ──────────────────────────────────────
+  const uniqueGroups = useMemo(() =>
+    [...new Set(athletes.map(a => a.group || a.auto_group).filter(Boolean))].sort()
+  , [athletes])
+
+  const uniqueGupDan = useMemo(() => {
+    const vals = new Set()
+    athletes.forEach(a => {
+      if (a.dan) vals.add(`${a.dan} дан`)
+      else if (a.gup) vals.add(`${a.gup} гып`)
+    })
+    return [...vals].sort((a, b) => {
+      // Сортируем: сначала гыпы (10→1), потом даны (1→9)
+      const aD = a.includes('дан'), bD = b.includes('дан')
+      if (!aD && !bD) return parseInt(b) - parseInt(a)  // гыпы по убыванию
+      if (aD && bD)   return parseInt(a) - parseInt(b)  // даны по возрастанию
+      return aD ? 1 : -1  // гыпы перед данами
+    })
+  }, [athletes])
+
+  const uniqueParents = useMemo(() =>
+    [...new Set(athletes.map(a => a.parent_name).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru'))
+  , [athletes])
+
+  // ── Применение фильтров ───────────────────────────────────────────────────
+  const filteredAthletes = useMemo(() => athletes.filter(a => {
+    const s = search.toLowerCase()
+    if (s && !a.full_name.toLowerCase().includes(s) &&
+        !(a.parent_name || '').toLowerCase().includes(s)) return false
+    if (cf.gender && a.gender !== cf.gender) return false
+    if (cf.group) {
+      const g = a.group || a.auto_group || ''
+      if (g !== cf.group) return false
+    }
+    if (cf.gup_dan) {
+      const val = a.dan ? `${a.dan} дан` : a.gup ? `${a.gup} гып` : ''
+      if (val !== cf.gup_dan) return false
+    }
+    if (cf.parent_name && a.parent_name !== cf.parent_name) return false
+    return true
+  }), [athletes, search, cf])
+
+  // ── Родители ──────────────────────────────────────────────────────────────
+  const parents = useMemo(() => {
+    const map = new Map()
+    athletes.forEach(a => {
+      if (!map.has(a.parent_phone)) {
+        map.set(a.parent_phone, {
+          user_id: a.user_id, parent_name: a.parent_name, parent_phone: a.parent_phone,
+          children: athletes.filter(x => x.parent_phone === a.parent_phone).map(x => x.full_name),
+        })
+      }
+    })
+    return [...map.values()]
+  }, [athletes])
+
+  const filteredParents = parents.filter(p =>
+    p.parent_name.toLowerCase().includes(search.toLowerCase()) ||
+    p.children.join(' ').toLowerCase().includes(search.toLowerCase())
   )
 
-  const logout = () => {
-    localStorage.clear()
-    navigate('/login')
-  }
+  const { sorted: sortedAthletes, sort: sortA, toggle: toggleA } = useSorted(filteredAthletes)
+  const { sorted: sortedParents,  sort: sortP, toggle: toggleP  } = useSorted(filteredParents)
+
+  const activeFiltersCount = Object.values(cf).filter(Boolean).length + (search ? 1 : 0)
+  const logout = () => { localStorage.clear(); navigate('/login') }
 
   // ── Обычный пользователь ──────────────────────────────────────────────────
   if (!isAdmin) {
@@ -95,11 +237,14 @@ export default function Cabinet() {
     )
   }
 
-  // ── Админ / тренер ────────────────────────────────────────────────────────
+  // ── Админ ─────────────────────────────────────────────────────────────────
   return (
     <main className="cabinet-page">
-      <div className="container cabinet-container">
+      {resetUser && (
+        <ResetPasswordModal user={resetUser} token={token} onClose={() => setResetUser(null)} />
+      )}
 
+      <div className="container cabinet-container">
         <div className="cabinet-header">
           <div>
             <p className="section-label">Панель управления</p>
@@ -109,100 +254,96 @@ export default function Cabinet() {
           <button className="btn-outline cabinet-logout" onClick={logout}>Выйти</button>
         </div>
 
-        {/* Вкладки */}
         <div className="cabinet-tabs">
-          <button
-            className={`cabinet-tab ${view === 'athletes' ? 'active' : ''}`}
-            onClick={() => setView('athletes')}
-          >
+          <button className={`cabinet-tab ${view === 'athletes' ? 'active' : ''}`} onClick={() => setView('athletes')}>
             Спортсмены ({athletes.length})
           </button>
-          <button
-            className={`cabinet-tab ${view === 'parents' ? 'active' : ''}`}
-            onClick={() => setView('parents')}
-          >
-            Родители
+          <button className={`cabinet-tab ${view === 'parents' ? 'active' : ''}`} onClick={() => setView('parents')}>
+            Родители ({parents.length})
           </button>
         </div>
 
-        {/* Поиск */}
-        <div className="cabinet-search">
-          <input
-            type="text"
-            placeholder="Поиск по имени..."
-            value={filter}
-            onChange={e => setFilter(e.target.value)}
-          />
+        {/* Строка поиска + кнопка сброса фильтров */}
+        <div className="cabinet-toolbar">
+          <div className="cabinet-search">
+            <input type="text" placeholder="Поиск по имени..."
+              value={search} onChange={e => setSearch(e.target.value)} />
+            {search && <button className="cabinet-search-clear" onClick={() => setSearch('')}>✕</button>}
+          </div>
+          {activeFiltersCount > 0 && (
+            <button className="cabinet-reset-filters" onClick={resetFilters}>
+              Сбросить фильтры ({activeFiltersCount})
+            </button>
+          )}
         </div>
 
         {loading && <div className="cabinet-loading">Загрузка...</div>}
 
-        {/* ── Список спортсменов ── */}
+        {/* ── Спортсмены ── */}
         {view === 'athletes' && (
           <div className="athletes-table-wrap">
             <table className="athletes-table">
               <thead>
                 <tr>
-                  <th>ФИО</th>
-                  <th>Дата рожд.</th>
-                  <th>Возраст</th>
-                  <th>Пол</th>
-                  <th>Группа</th>
-                  <th>Гып / Дан</th>
-                  <th>Вес (кг)</th>
-                  <th>Родитель</th>
+                  <Th colKey="full_name"   sort={sortA} toggle={toggleA}>ФИО</Th>
+                  <Th colKey="birth_date"  sort={sortA} toggle={toggleA}>Дата рожд.</Th>
+                  <Th colKey="age"         sort={sortA} toggle={toggleA}>Возраст</Th>
+                  <Th colKey="gender"      sort={sortA} toggle={toggleA}
+                    filter={<ColFilter value={cf.gender} onChange={v => setCf('gender', v)}
+                      options={['male', 'female']} placeholder="Все" />}>
+                    Пол
+                  </Th>
+                  <Th colKey="group"       sort={sortA} toggle={toggleA}
+                    filter={<ColFilter value={cf.group} onChange={v => setCf('group', v)}
+                      options={uniqueGroups} />}>
+                    Группа
+                  </Th>
+                  <Th colKey="gup"         sort={sortA} toggle={toggleA}
+                    filter={<ColFilter value={cf.gup_dan} onChange={v => setCf('gup_dan', v)}
+                      options={uniqueGupDan} />}>
+                    Гып / Дан
+                  </Th>
+                  <Th colKey="weight"      sort={sortA} toggle={toggleA}>Вес (кг)</Th>
+                  <Th colKey="parent_name" sort={sortA} toggle={toggleA}
+                    filter={<ColFilter value={cf.parent_name} onChange={v => setCf('parent_name', v)}
+                      options={uniqueParents} />}>
+                    Родитель
+                  </Th>
                   <th>Действия</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(a => (
+                {sortedAthletes.map(a => (
                   <tr key={a.id}>
                     <td className="td-name">{a.full_name}</td>
                     <td>{a.birth_date}</td>
                     <td>{a.age}</td>
                     <td>{a.gender === 'male' ? 'М' : 'Ж'}</td>
                     <td>
-                      {editing === a.id ? (
-                        <input
-                          value={editData.group}
-                          onChange={e => setEditData(d => ({ ...d, group: e.target.value }))}
-                          className="td-input"
-                        />
-                      ) : (
-                        a.group || a.auto_group
-                      )}
+                      {editing === a.id
+                        ? <input value={editData.group}
+                            onChange={e => setEditData(d => ({...d, group: e.target.value}))}
+                            className="td-input" />
+                        : (a.group || a.auto_group)}
                     </td>
                     <td>
-                      {editing === a.id ? (
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          <input
-                            placeholder="Гып"
-                            value={editData.gup}
-                            onChange={e => setEditData(d => ({ ...d, gup: e.target.value, dan: '' }))}
-                            className="td-input td-input-sm"
-                          />
-                          <input
-                            placeholder="Дан"
-                            value={editData.dan}
-                            onChange={e => setEditData(d => ({ ...d, dan: e.target.value, gup: '' }))}
-                            className="td-input td-input-sm"
-                          />
-                        </div>
-                      ) : (
-                        a.dan ? `${a.dan} дан` : a.gup ? `${a.gup} гып` : '—'
-                      )}
+                      {editing === a.id
+                        ? <div style={{display:'flex',gap:'4px'}}>
+                            <input placeholder="Гып" value={editData.gup}
+                              onChange={e => setEditData(d=>({...d,gup:e.target.value,dan:''}))}
+                              className="td-input td-input-sm"/>
+                            <input placeholder="Дан" value={editData.dan}
+                              onChange={e => setEditData(d=>({...d,dan:e.target.value,gup:''}))}
+                              className="td-input td-input-sm"/>
+                          </div>
+                        : a.dan ? `${a.dan} дан` : a.gup ? `${a.gup} гып` : '—'}
                     </td>
                     <td>
-                      {editing === a.id ? (
-                        <input
-                          value={editData.weight}
-                          onChange={e => setEditData(d => ({ ...d, weight: e.target.value }))}
-                          className="td-input td-input-sm"
-                          placeholder="кг"
-                        />
-                      ) : (
-                        a.weight ? `${a.weight} кг` : '—'
-                      )}
+                      {editing === a.id
+                        ? <input value={editData.weight} placeholder="кг"
+                            onChange={e => setEditData(d=>({...d,weight:e.target.value}))}
+                            className="td-input td-input-sm"/>
+                        : a.weight ? `${a.weight} кг` : '—'}
                     </td>
                     <td className="td-parent">
                       <div>{a.parent_name}</div>
@@ -225,39 +366,42 @@ export default function Cabinet() {
                 ))}
               </tbody>
             </table>
-            {filtered.length === 0 && !loading && (
+            {sortedAthletes.length === 0 && !loading && (
               <div className="cabinet-empty">Спортсменов не найдено</div>
             )}
           </div>
         )}
 
-        {/* ── Список родителей ── */}
+        {/* ── Родители ── */}
         {view === 'parents' && (
           <div className="athletes-table-wrap">
             <table className="athletes-table">
               <thead>
                 <tr>
-                  <th>ФИО родителя</th>
-                  <th>Телефон</th>
-                  <th>Email</th>
-                  <th>Спортсмены</th>
+                  <Th colKey="parent_name"  sort={sortP} toggle={toggleP}>ФИО родителя</Th>
+                  <Th colKey="parent_phone" sort={sortP} toggle={toggleP}>Телефон</Th>
+                  <Th colKey="children"     sort={sortP} toggle={toggleP}>Спортсмены</Th>
+                  <th>Пароль</th>
                 </tr>
               </thead>
               <tbody>
-                {[...new Map(
-                  filtered
-                    .filter(a => a.parent_name)
-                    .map(a => [a.parent_phone, a])
-                ).values()].map((a, i) => (
+                {sortedParents.map((p, i) => (
                   <tr key={i}>
-                    <td>{a.parent_name}</td>
-                    <td>{a.parent_phone}</td>
-                    <td>—</td>
-                    <td>{filtered.filter(x => x.parent_phone === a.parent_phone).map(x => x.full_name).join(', ')}</td>
+                    <td className="td-name">{p.parent_name}</td>
+                    <td>{p.parent_phone}</td>
+                    <td>{p.children.join(', ')}</td>
+                    <td>
+                      <button className="td-btn td-btn-edit" onClick={() => setResetUser(p)}>
+                        Сбросить пароль
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            {sortedParents.length === 0 && !loading && (
+              <div className="cabinet-empty">Родителей не найдено</div>
+            )}
           </div>
         )}
 

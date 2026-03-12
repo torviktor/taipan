@@ -13,18 +13,24 @@
   width: 100%;
   background: var(--dark);
   border: 1px solid var(--gray-dim);
+  border-top: 3px solid var(--red);
   padding: 48px 40px;
   text-align: center;
 }
 
-.register-preview-icon {
-  font-size: 56px;
-  margin-bottom: 16px;
+.register-preview-emblem {
+  margin-bottom: 20px;
+}
+
+.register-preview-emblem img {
+  height: 80px;
+  width: 80px;
+  object-fit: contain;
 }
 
 .register-preview-title {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 40px;
+  font-size: 36px;
   letter-spacing: 4px;
   color: var(--white);
   margin-bottom: 24px;
@@ -37,20 +43,10 @@
   line-height: 1.7;
   margin-bottom: 32px;
 }
-
 .register-preview-body p { margin-bottom: 12px; }
 .register-preview-body strong { color: var(--white); }
-
-.register-preview-body ul {
-  padding-left: 20px;
-  margin: 8px 0 16px;
-}
-
-.register-preview-body ul li {
-  margin-bottom: 6px;
-  color: var(--gray);
-}
-
+.register-preview-body ul { padding-left: 20px; margin: 8px 0 16px; }
+.register-preview-body ul li { margin-bottom: 6px; }
 .register-preview-note {
   font-size: 13px !important;
   color: rgba(245,245,245,0.4) !important;
@@ -58,11 +54,7 @@
   padding-top: 16px;
   margin-top: 8px;
 }
-
-.register-preview-note a {
-  color: var(--red);
-  text-decoration: none;
-}
+.register-preview-note a { color: var(--red); text-decoration: none; }
 
 .register-preview-btns {
   display: flex;
@@ -70,9 +62,75 @@
   gap: 12px;
   align-items: center;
 }
-
 .register-preview-btns .btn-primary,
 .register-preview-btns .btn-outline {
+  width: 100%;
+  text-align: center;
+}
+
+/* ── МОДАЛЬНОЕ ОКНО ──────────────────────────────────────────────────── */
+.register-modal {
+  max-width: 480px;
+  width: 100%;
+  background: var(--dark);
+  border: 1px solid var(--red);
+  padding: 48px 40px;
+  text-align: center;
+}
+
+.register-modal-icon { margin-bottom: 20px; }
+
+.register-modal h2 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--white);
+  margin-bottom: 16px;
+}
+
+.register-modal p {
+  color: var(--gray);
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.modal-children-list {
+  list-style: none;
+  padding: 12px 16px;
+  margin: 0 0 16px;
+  background: var(--black);
+  border-left: 3px solid var(--red);
+  text-align: left;
+}
+
+.modal-children-list li {
+  color: var(--white);
+  font-size: 15px;
+  padding: 4px 0;
+}
+
+.modal-question { color: var(--white) !important; font-size: 17px !important; }
+
+.modal-note {
+  font-size: 13px !important;
+  color: rgba(245,245,245,0.4) !important;
+  border-top: 1px solid var(--gray-dim);
+  padding-top: 16px;
+  margin-top: 8px;
+}
+
+.modal-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.modal-btns .btn-primary,
+.modal-btns .btn-outline {
   width: 100%;
   text-align: center;
 }
@@ -83,6 +141,7 @@
   width: 100%;
   background: var(--dark);
   border: 1px solid var(--gray-dim);
+  border-top: 3px solid var(--red);
   padding: 48px 40px;
 }
 
@@ -147,38 +206,34 @@
 .role-btn {
   background: var(--black);
   border: 1px solid var(--gray-dim);
-  padding: 20px 16px;
+  padding: 24px 16px 20px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   transition: border-color 0.2s, background 0.2s;
 }
 
 .role-btn:hover { border-color: var(--red); }
 .role-btn.active { border-color: var(--red); background: rgba(204,0,0,0.08); }
 
-.role-btn span { font-size: 28px; }
+.role-btn-icon { color: var(--gray); transition: color 0.2s; }
+.role-btn.active .role-btn-icon,
+.role-btn:hover .role-btn-icon { color: var(--red); }
+
 .role-btn strong { color: var(--white); font-size: 15px; }
 .role-btn small { color: var(--gray); font-size: 12px; }
 
 /* Поля */
-.register-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
+.register-fields { display: flex; flex-direction: column; gap: 16px; }
 
 .register-field label {
   display: block;
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--gray);
-  margin-bottom: 6px;
+  font-size: 12px; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--gray); margin-bottom: 6px;
 }
 
 .register-field input,
@@ -195,18 +250,13 @@
 }
 
 .register-field input:focus,
-.register-field select:focus {
-  outline: none;
-  border-color: var(--red);
-}
-
+.register-field select:focus { outline: none; border-color: var(--red); }
 .register-field select option { background: var(--dark); }
 
-.register-belt {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
+.field-hint { font-size: 13px; margin-top: 6px; padding: 8px 12px; }
+.field-hint-warn { background: rgba(204,0,0,0.1); color: #ff8888; border-left: 2px solid var(--red); }
+
+.register-belt { display: flex; flex-direction: column; gap: 12px; }
 
 .register-check {
   display: flex !important;
@@ -220,32 +270,63 @@
 }
 
 .register-check input[type="checkbox"] {
-  width: auto;
-  padding: 0;
+  width: auto; padding: 0;
   accent-color: var(--red);
 }
 
-.register-submit {
+/* Несколько спортсменов */
+.athlete-form-block { margin-bottom: 24px; }
+
+.athlete-form-sep {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--gray);
+  border-top: 1px dashed var(--gray-dim);
+  padding-top: 16px; margin-bottom: 16px;
+}
+
+.athlete-remove-btn {
+  background: none;
+  border: 1px solid var(--red);
+  color: var(--red);
+  padding: 6px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-top: 12px;
+  font-family: 'Barlow Condensed', sans-serif;
+  letter-spacing: 1px;
+  transition: all 0.2s;
+}
+.athlete-remove-btn:hover { background: var(--red); color: var(--white); }
+
+.athlete-add-btn {
+  background: none;
+  border: 1px dashed var(--gray-dim);
+  color: var(--gray);
+  padding: 12px 24px;
+  font-size: 14px;
+  cursor: pointer;
   width: 100%;
   margin-top: 8px;
-  font-size: 16px;
-  padding: 16px;
+  font-family: 'Barlow Condensed', sans-serif;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  transition: all 0.2s;
 }
+.athlete-add-btn:hover { border-color: var(--red); color: var(--white); }
+
+.register-submit { width: 100%; margin-top: 8px; font-size: 16px; padding: 16px; }
 
 .register-login-link {
-  text-align: center;
-  margin-top: 20px;
-  color: var(--gray);
-  font-size: 14px;
+  text-align: center; margin-top: 20px;
+  color: var(--gray); font-size: 14px;
 }
-
-.register-login-link a {
-  color: var(--red);
-  text-decoration: none;
-}
+.register-login-link a { color: var(--red); text-decoration: none; }
 
 @media (max-width: 600px) {
   .register-form-wrap,
-  .register-preview { padding: 32px 20px; }
+  .register-preview,
+  .register-modal { padding: 32px 20px; }
   .register-role-btns { grid-template-columns: 1fr; }
 }

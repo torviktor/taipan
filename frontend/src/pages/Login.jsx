@@ -25,10 +25,11 @@ function normalizePhone(formatted) {
 }
 
 export default function Login() {
-  const [phone,    setPhone]    = useState('+7 (')
-  const [password, setPassword] = useState('')
-  const [error,    setError]    = useState('')
-  const [loading,  setLoading]  = useState(false)
+  const [phone,        setPhone]        = useState('+7 (')
+  const [password,     setPassword]     = useState('')
+  const [error,        setError]        = useState('')
+  const [loading,      setLoading]      = useState(false)
+  const [forgotShown,  setForgotShown]  = useState(false)
   const navigate = useNavigate()
 
   async function handleSubmit(e) {
@@ -63,7 +64,9 @@ export default function Login() {
         </Link>
         <h1 className="login-title">ВХОД</h1>
         <div className="divider" />
+
         {error && <div className="login-error">{error}</div>}
+
         <form className="login-form" onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Телефон</label>
@@ -90,9 +93,20 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="login-divider">
-          <span>или</span>
+        <div className="login-forgot">
+          <button className="login-forgot-btn" onClick={() => setForgotShown(!forgotShown)}>
+            Забыли пароль?
+          </button>
+          {forgotShown && (
+            <div className="login-forgot-msg">
+              Восстановление пароля через SMS не предусмотрено.<br/>
+              Обратитесь к администратору клуба:<br/>
+              <a href="tel:+79091652800">+7 (909) 165-28-00</a>
+            </div>
+          )}
         </div>
+
+        <div className="login-divider"><span>или</span></div>
 
         <Link to="/register" className="btn-outline login-register-btn">
           Зарегистрироваться
