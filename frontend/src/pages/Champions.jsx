@@ -1,115 +1,126 @@
 import { Link } from 'react-router-dom'
 import './Champions.css'
 
+// Иерархия: elite > world > europe > russia (алфавит)
 const CHAMPIONS = [
   {
+    level: 'elite',
     name: 'Кабанова Ольга',
     achievements: [
-      '4-кратная Чемпионка России',
-      '4-кратная Чемпионка Европы',
+      'Чемпион Мира',
+      'Чемпион Европы',
+      'Чемпион России',
     ],
-    level: 'elite',
   },
   {
+    level: 'world',
     name: 'Шамарин Глеб',
     achievements: [
-      'Чемпион России (2022)',
-      '1 место Кубок Мира (2021)',
+      'Чемпион Мира',
+      'Чемпион России',
     ],
-    level: 'elite',
   },
   {
-    name: 'Андрюшин Кирилл',
-    achievements: [
-      '1 место Кубок Мира (2021)',
-    ],
-    level: 'world',
-  },
-  {
+    level: 'europe',
     name: 'Фуртаева Анастасия',
     achievements: [
-      'Чемпионка России',
+      'Призёр чемпионата Европы',
       'Призёр чемпионата России',
-      'Бронзовый призёр Чемпионата Европы (2020)',
     ],
-    level: 'europe',
+  },
+  // Россия — по алфавиту
+  {
+    level: 'russia',
+    name: 'Андрюшин Кирилл',
+    achievements: [
+      'Призёр чемпионата России',
+    ],
   },
   {
+    level: 'russia',
+    name: 'Дорофеев Максим',
+    achievements: [
+      'Призёр чемпионата России',
+    ],
+  },
+  {
+    level: 'russia',
     name: 'Келим Анастасия',
     achievements: [
-      '1 место «Юность России» (2023)',
-      '1 место Кубок России (2025)',
+      'Призёр чемпионата России',
     ],
-    level: 'russia',
   },
   {
-    name: 'Дорофеев Максим',
-    achievements: [ '1 место командное масоги (2021)' ],
     level: 'russia',
-  },
-  {
-    name: 'Медведев Илья',
-    achievements: [ '2, 3 места Первенство России (2020–2022)' ],
-    level: 'russia',
-  },
-  {
-    name: 'Медведева Анастасия',
-    achievements: [ '3 место Первенство России (2020–2022)' ],
-    level: 'russia',
-  },
-  {
     name: 'Козлов Иван',
-    achievements: [ '3 место Первенство России (2020)' ],
-    level: 'russia',
+    achievements: [
+      'Призёр чемпионата России',
+    ],
   },
   {
+    level: 'russia',
     name: 'Комаров Константин',
-    achievements: [ '3 место командное масоги, Первенство России (2022)' ],
-    level: 'russia',
+    achievements: [
+      'Призёр чемпионата России',
+    ],
   },
   {
-    name: 'Коростелёва Мария',
-    achievements: [ '3 место Чемпионат России (2022)' ],
     level: 'russia',
+    name: 'Коростелёва Мария',
+    achievements: [
+      'Призёр чемпионата России',
+    ],
+  },
+  {
+    level: 'russia',
+    name: 'Медведев Илья',
+    achievements: [
+      'Призёр чемпионата России',
+    ],
+  },
+  {
+    level: 'russia',
+    name: 'Медведева Анастасия',
+    achievements: [
+      'Призёр чемпионата России',
+    ],
+  },
+  {
+    level: 'russia',
+    name: 'Ротарь Екатерина',
+    achievements: [
+      'Призёр чемпионатов России',
+      'Призёр Всероссийских соревнований',
+      'Тренер клуба «Тайпан»',
+    ],
   },
 ]
 
-// SVG значки уровней
-const BadgeElite = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-    <circle cx="9" cy="9" r="8" stroke="#FFD700" strokeWidth="1.5"/>
-    <path d="M9 4l1.5 3h3l-2.5 2 1 3L9 10.5 6 12l1-3L4.5 7h3L9 4z" fill="#FFD700"/>
-  </svg>
-)
-
-const BadgeWorld = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-    <circle cx="9" cy="9" r="8" stroke="#C0C0C0" strokeWidth="1.5"/>
-    <path d="M9 4l1.5 3h3l-2.5 2 1 3L9 10.5 6 12l1-3L4.5 7h3L9 4z" fill="#C0C0C0"/>
-  </svg>
-)
-
-const BadgeEurope = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-    <circle cx="9" cy="9" r="8" stroke="#CD7F32" strokeWidth="1.5"/>
-    <path d="M9 4l1.5 3h3l-2.5 2 1 3L9 10.5 6 12l1-3L4.5 7h3L9 4z" fill="#CD7F32"/>
-  </svg>
-)
-
-const BadgeRussia = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-    <rect x="1" y="4" width="16" height="4" rx="0" fill="#FFFFFF" stroke="#ccc" strokeWidth="0.5"/>
-    <rect x="1" y="8" width="16" height="3" fill="#0039A6"/>
-    <rect x="1" y="11" width="16" height="4" rx="0" fill="#D52B1E"/>
-    <rect x="1" y="4" width="16" height="11" rx="2" stroke="rgba(255,255,255,0.2)" strokeWidth="1"/>
-  </svg>
-)
-
 const LEVEL_CONFIG = {
-  elite:  { label: 'Чемпион мира и Европы', Icon: BadgeElite,  color: '#FFD700' },
-  world:  { label: 'Чемпион мира',          Icon: BadgeWorld,  color: '#C0C0C0' },
-  europe: { label: 'Призёр Европы',         Icon: BadgeEurope, color: '#CD7F32' },
-  russia: { label: 'Чемпион / призёр России', Icon: BadgeRussia, color: '#ffffff' },
+  elite:  { label: 'Чемпион Мира и Европы', color: '#FFD700' },
+  world:  { label: 'Чемпион Мира',          color: '#C0C0C0' },
+  europe: { label: 'Призёр Европы',         color: '#cc4444' },
+  russia: { label: 'Призёр России',         color: 'var(--red)' },
+}
+
+function GoldIcon()   { return <svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,1 10,6 15,6 11,9.5 12.5,15 8,11.5 3.5,15 5,9.5 1,6 6,6" fill="#FFD700"/></svg> }
+function SilverIcon() { return <svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,1 10,6 15,6 11,9.5 12.5,15 8,11.5 3.5,15 5,9.5 1,6 6,6" fill="#C0C0C0"/></svg> }
+function BronzeIcon() { return <svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,1 10,6 15,6 11,9.5 12.5,15 8,11.5 3.5,15 5,9.5 1,6 6,6" fill="#cc4444"/></svg> }
+function RussiaIcon() {
+  return (
+    <svg width="20" height="14" viewBox="0 0 20 14">
+      <rect width="20" height="4.67" y="0"    fill="#ffffff"/>
+      <rect width="20" height="4.67" y="4.67" fill="#0039A6"/>
+      <rect width="20" height="4.67" y="9.33" fill="#D52B1E"/>
+    </svg>
+  )
+}
+
+function LevelIcon({ level }) {
+  if (level === 'elite')  return <GoldIcon />
+  if (level === 'world')  return <SilverIcon />
+  if (level === 'europe') return <BronzeIcon />
+  return <RussiaIcon />
 }
 
 export default function Champions() {
@@ -117,12 +128,12 @@ export default function Champions() {
     <main className="champions-page">
       <section className="champions-hero">
         <div className="container">
-          <p className="section-label">Гордость города</p>
+          <p className="section-label">Клуб тхэквондо «Тайпан»</p>
           <h1 className="champions-title">ЗАЛ СЛАВЫ</h1>
-          <div className="divider" />
           <p className="champions-subtitle">
-            Спортсмены г. Павловский Посад, завоевавшие награды на соревнованиях<br/>
-            всероссийского и международного уровня в виде спорта тхэквондо
+            Спортсмены г. Павловский Посад, завоевавшие награды<br/>
+            на соревнованиях всероссийского и международного уровня<br/>
+            в виде спорта тхэквондо
           </p>
         </div>
       </section>
@@ -130,32 +141,31 @@ export default function Champions() {
       <section className="champions-grid-section">
         <div className="container">
 
-          {/* Легенда */}
           <div className="champions-legend">
             {Object.entries(LEVEL_CONFIG).map(([key, cfg]) => (
-              <div className="legend-item" key={key}>
-                <cfg.Icon />
-                <span style={{ color: cfg.color }}>{cfg.label}</span>
+              <div className="legend-item" key={key} style={{color: cfg.color}}>
+                <LevelIcon level={key} />
+                {cfg.label}
               </div>
             ))}
           </div>
 
           <div className="champions-grid">
-            {CHAMPIONS.map((c, i) => {
+            {CHAMPIONS.map((c) => {
               const cfg = LEVEL_CONFIG[c.level]
               return (
-                <div className={`champion-card champion-card--${c.level}`} key={i}>
+                <div key={c.name} className={`champion-card champion-card--${c.level}`}>
                   <div className="champion-img-placeholder">
                     <span>Фото</span>
                   </div>
                   <div className="champion-info">
-                    <div className="champion-level">
-                      <cfg.Icon />
-                      <span style={{ color: cfg.color }}>{cfg.label}</span>
+                    <div className="champion-level" style={{color: cfg.color}}>
+                      <LevelIcon level={c.level} />
+                      {cfg.label}
                     </div>
-                    <h3 className="champion-name">{c.name}</h3>
+                    <div className="champion-name">{c.name}</div>
                     <ul className="champion-achievements">
-                      {c.achievements.map((a, j) => <li key={j}>{a}</li>)}
+                      {c.achievements.map((a, i) => <li key={i}>{a}</li>)}
                     </ul>
                   </div>
                 </div>

@@ -7,7 +7,7 @@ export default function GroupAdults() {
       <section className="group-hero">
         <div className="container">
           <p className="section-label">Программа подготовки</p>
-          <h1 className="group-title">ВЗРОСЛЫЕ 18+</h1>
+          <h1 className="group-title">ВЗРОСЛЫЕ 16+</h1>
           <p className="group-subtitle">Боевое тхэквондо, самозащита, стиль жизни</p>
           <div className="divider" />
         </div>
