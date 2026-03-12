@@ -321,3 +321,12 @@
   margin-bottom: 4px;
 }
 .about-color-item p { margin: 0; color: var(--gray); font-size: 14px; line-height: 1.5; }
+
+/* ── ССЫЛКИ В ТЕКСТЕ ─────────────────────────────────────────────────── */
+.about-body a {
+  color: var(--red);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(204,0,0,0.3);
+  transition: border-color 0.2s;
+}
+.about-body a:hover { border-bottom-color: var(--red); }
