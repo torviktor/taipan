@@ -32,10 +32,19 @@ const EMPTY_FORM = {
   notify_everyone:    true,
 }
 
+// SVG иконка Telegram
+const TelegramIcon = () => (
+  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="16" cy="16" r="15" stroke="#CC0000" strokeWidth="1.5"/>
+    <path d="M7 15.5l14.5-5.5-4 14-3-5.5-4 2.5 1-5L7 15.5z" stroke="#CC0000" strokeWidth="1.5" strokeLinejoin="round"/>
+    <path d="M11.5 21.5l1.5-5 3 3" stroke="#CC0000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+)
+
 export default function CalendarPage() {
   const [events,      setEvents]      = useState([])
   const [modal,       setModal]       = useState(false)
-  const [editEvent,   setEditEvent]   = useState(null)   // null = создание
+  const [editEvent,   setEditEvent]   = useState(null)
   const [form,        setForm]        = useState(EMPTY_FORM)
   const [loading,     setLoading]     = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
@@ -43,7 +52,6 @@ export default function CalendarPage() {
 
   useEffect(() => { loadEvents() }, [])
 
-  // ── Загрузить события ─────────────────────────────────────────────
   async function loadEvents() {
     try {
       const r = await axios.get(API)
@@ -61,7 +69,6 @@ export default function CalendarPage() {
     }
   }
 
-  // ── Открыть форму создания ────────────────────────────────────────
   function openCreate(dateInfo) {
     if (!isAdmin()) return
     const date = dateInfo?.dateStr || new Date().toISOString().split('T')[0]
@@ -70,7 +77,6 @@ export default function CalendarPage() {
     setModal(true)
   }
 
-  // ── Открыть форму редактирования ──────────────────────────────────
   function openEdit(clickInfo) {
     const e = clickInfo.event.extendedProps
     const dt = new Date(e.event_date)
@@ -87,7 +93,6 @@ export default function CalendarPage() {
     setModal(true)
   }
 
-  // ── Сохранить событие ─────────────────────────────────────────────
   async function saveEvent(e) {
     e.preventDefault()
     setLoading(true)
@@ -115,7 +120,6 @@ export default function CalendarPage() {
     }
   }
 
-  // ── Удалить событие ───────────────────────────────────────────────
   async function deleteEvent() {
     const headers = { Authorization: `Bearer ${token()}` }
     try {
@@ -123,12 +127,11 @@ export default function CalendarPage() {
       setDeleteConfirm(null)
       setModal(false)
       loadEvents()
-    } catch (err) {
+    } catch {
       alert('Ошибка удаления')
     }
   }
 
-  // ── Переключить день уведомления ──────────────────────────────────
   function toggleNotifyDay(days) {
     setForm(f => ({
       ...f,
@@ -141,7 +144,6 @@ export default function CalendarPage() {
   return (
     <main className="calendar-page">
 
-      {/* Заголовок */}
       <section className="calendar-hero">
         <div className="container">
           <p className="section-label">Расписание событий</p>
@@ -155,7 +157,6 @@ export default function CalendarPage() {
 
       <div className="container calendar-body">
 
-        {/* Кнопка добавить (только для админа) */}
         {isAdmin() && (
           <div className="calendar-toolbar">
             <button className="btn-primary" onClick={() => openCreate(null)}>
@@ -167,7 +168,6 @@ export default function CalendarPage() {
           </div>
         )}
 
-        {/* Календарь */}
         <div className="calendar-wrap">
           <FullCalendar
             ref={calendarRef}
@@ -188,18 +188,19 @@ export default function CalendarPage() {
           />
         </div>
 
-        {/* Подсказка для подписки */}
+        {/* Подсказка Telegram — SVG иконка вместо эмодзи */}
         <div className="subscribe-hint">
-          <span>🔔</span>
-          <div>
-            <strong>Получай уведомления о событиях</strong>
-            <p>Напиши боту <a href="https://t.me/taipan_tkd_bot" target="_blank" rel="noreferrer">@taipan_tkd_bot</a> в Telegram — нажми /start</p>
+          <div className="subscribe-hint-icon">
+            <TelegramIcon />
+          </div>
+          <div className="subscribe-hint-text">
+            <strong>Подключи уведомления о событиях</strong>
+            <p>Напиши боту <a href="https://t.me/taipan_tkd_bot" target="_blank" rel="noreferrer">@taipan_tkd_bot</a> в Telegram и нажми /start — получай напоминания о тренировках и соревнованиях</p>
           </div>
         </div>
 
       </div>
 
-      {/* ── Модальное окно создания / редактирования ─────────────── */}
       {modal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
           <div className="modal">
@@ -209,74 +210,47 @@ export default function CalendarPage() {
             </div>
 
             <form className="modal-form" onSubmit={saveEvent}>
-
-              {/* Название */}
               <div className="form-group">
                 <label>Наименование *</label>
-                <input
-                  type="text"
-                  value={form.title}
+                <input type="text" value={form.title}
                   onChange={e => setForm(f => ({...f, title: e.target.value}))}
-                  placeholder="Например: Открытый турнир по тхэквондо"
-                  required
-                />
+                  placeholder="Например: Открытый турнир по тхэквондо" required />
               </div>
 
-              {/* Дата и время */}
               <div className="form-row">
                 <div className="form-group">
                   <label>Дата *</label>
-                  <input
-                    type="date"
-                    value={form.event_date}
-                    onChange={e => setForm(f => ({...f, event_date: e.target.value}))}
-                    required
-                  />
+                  <input type="date" value={form.event_date}
+                    onChange={e => setForm(f => ({...f, event_date: e.target.value}))} required />
                 </div>
                 <div className="form-group">
                   <label>Время *</label>
-                  <input
-                    type="time"
-                    value={form.event_time}
-                    onChange={e => setForm(f => ({...f, event_time: e.target.value}))}
-                    required
-                  />
+                  <input type="time" value={form.event_time}
+                    onChange={e => setForm(f => ({...f, event_time: e.target.value}))} required />
                 </div>
               </div>
 
-              {/* Место */}
               <div className="form-group">
                 <label>Место проведения</label>
-                <input
-                  type="text"
-                  value={form.location}
+                <input type="text" value={form.location}
                   onChange={e => setForm(f => ({...f, location: e.target.value}))}
-                  placeholder="Например: Зал №1, ул. Примерная 1"
-                />
+                  placeholder="Например: Зал №1, ул. Кирова 95" />
               </div>
 
-              {/* Описание */}
               <div className="form-group">
                 <label>Описание</label>
-                <textarea
-                  value={form.description}
+                <textarea value={form.description}
                   onChange={e => setForm(f => ({...f, description: e.target.value}))}
-                  placeholder="Дополнительная информация о событии..."
-                  rows={3}
-                />
+                  placeholder="Дополнительная информация о событии..." rows={3} />
               </div>
 
-              {/* Уведомить за */}
               <div className="form-group">
                 <label>Уведомить подписчиков за</label>
                 <div className="notify-options">
                   {NOTIFY_OPTIONS.map(opt => (
-                    <button
-                      key={opt.days}
-                      type="button"
+                    <button key={opt.days} type="button"
                       className={`notify-btn ${form.notify_before_days.includes(opt.days) ? 'active' : ''}`}
-                      onClick={() => toggleNotifyDay(opt.days)}
-                    >
+                      onClick={() => toggleNotifyDay(opt.days)}>
                       {opt.label}
                     </button>
                   ))}
@@ -284,51 +258,34 @@ export default function CalendarPage() {
                 <p className="form-hint">
                   Выбрано: {form.notify_before_days.length === 0
                     ? 'без напоминаний'
-                    : form.notify_before_days
-                        .sort((a,b) => b-a)
-                        .map(d => NOTIFY_OPTIONS.find(o => o.days === d)?.label)
-                        .join(', ')
-                  }
+                    : form.notify_before_days.sort((a,b) => b-a)
+                        .map(d => NOTIFY_OPTIONS.find(o => o.days === d)?.label).join(', ')}
                 </p>
               </div>
 
-              {/* Кого уведомлять */}
               <div className="form-group">
                 <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={form.notify_everyone}
-                    onChange={e => setForm(f => ({...f, notify_everyone: e.target.checked}))}
-                  />
+                  <input type="checkbox" checked={form.notify_everyone}
+                    onChange={e => setForm(f => ({...f, notify_everyone: e.target.checked}))} />
                   Уведомить всех подписчиков
                 </label>
               </div>
 
-              {/* Кнопки */}
               <div className="modal-actions">
                 {editEvent && (
-                  <button
-                    type="button"
-                    className="btn-delete"
-                    onClick={() => setDeleteConfirm(editEvent.id)}
-                  >
-                    Удалить
-                  </button>
+                  <button type="button" className="btn-delete"
+                    onClick={() => setDeleteConfirm(editEvent.id)}>Удалить</button>
                 )}
-                <button type="button" className="btn-outline" onClick={() => setModal(false)}>
-                  Отмена
-                </button>
+                <button type="button" className="btn-outline" onClick={() => setModal(false)}>Отмена</button>
                 <button type="submit" className="btn-primary" disabled={loading}>
                   {loading ? 'Сохранение...' : editEvent ? 'Сохранить' : 'Создать'}
                 </button>
               </div>
-
             </form>
           </div>
         </div>
       )}
 
-      {/* ── Подтверждение удаления ────────────────────────────────── */}
       {deleteConfirm && (
         <div className="modal-overlay">
           <div className="modal modal-small">
@@ -336,7 +293,7 @@ export default function CalendarPage() {
               <h2>Удалить событие?</h2>
             </div>
             <p style={{color:'var(--gray)', padding:'0 0 24px'}}>
-              Это действие нельзя отменить. Все напоминания для этого события будут отменены.
+              Это действие нельзя отменить. Все напоминания будут отменены.
             </p>
             <div className="modal-actions">
               <button className="btn-outline" onClick={() => setDeleteConfirm(null)}>Отмена</button>
