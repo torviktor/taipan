@@ -1,0 +1,251 @@
+.register-page {
+  min-height: 100vh;
+  background: var(--black);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 100px 24px 60px;
+}
+
+/* ── ПРЕВЬЮ ──────────────────────────────────────────────────────────── */
+.register-preview {
+  max-width: 560px;
+  width: 100%;
+  background: var(--dark);
+  border: 1px solid var(--gray-dim);
+  padding: 48px 40px;
+  text-align: center;
+}
+
+.register-preview-icon {
+  font-size: 56px;
+  margin-bottom: 16px;
+}
+
+.register-preview-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 40px;
+  letter-spacing: 4px;
+  color: var(--white);
+  margin-bottom: 24px;
+}
+
+.register-preview-body {
+  text-align: left;
+  color: var(--gray);
+  font-size: 15px;
+  line-height: 1.7;
+  margin-bottom: 32px;
+}
+
+.register-preview-body p { margin-bottom: 12px; }
+.register-preview-body strong { color: var(--white); }
+
+.register-preview-body ul {
+  padding-left: 20px;
+  margin: 8px 0 16px;
+}
+
+.register-preview-body ul li {
+  margin-bottom: 6px;
+  color: var(--gray);
+}
+
+.register-preview-note {
+  font-size: 13px !important;
+  color: rgba(245,245,245,0.4) !important;
+  border-top: 1px solid var(--gray-dim);
+  padding-top: 16px;
+  margin-top: 8px;
+}
+
+.register-preview-note a {
+  color: var(--red);
+  text-decoration: none;
+}
+
+.register-preview-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.register-preview-btns .btn-primary,
+.register-preview-btns .btn-outline {
+  width: 100%;
+  text-align: center;
+}
+
+/* ── ФОРМА ───────────────────────────────────────────────────────────── */
+.register-form-wrap {
+  max-width: 600px;
+  width: 100%;
+  background: var(--dark);
+  border: 1px solid var(--gray-dim);
+  padding: 48px 40px;
+}
+
+.register-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.register-logo img {
+  height: 72px;
+  width: 72px;
+  object-fit: contain;
+  margin-bottom: 16px;
+}
+
+.register-header h1 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 36px;
+  letter-spacing: 4px;
+  color: var(--white);
+  margin-bottom: 4px;
+}
+
+.register-header p {
+  color: var(--gray);
+  font-size: 14px;
+  letter-spacing: 2px;
+}
+
+.register-error {
+  background: rgba(204,0,0,0.15);
+  border: 1px solid var(--red);
+  color: #ff6666;
+  padding: 12px 16px;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.register-section {
+  margin-bottom: 32px;
+  border-top: 1px solid var(--gray-dim);
+  padding-top: 24px;
+}
+
+.register-section h3 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-bottom: 20px;
+}
+
+/* Роль */
+.register-role-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.role-btn {
+  background: var(--black);
+  border: 1px solid var(--gray-dim);
+  padding: 20px 16px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.role-btn:hover { border-color: var(--red); }
+.role-btn.active { border-color: var(--red); background: rgba(204,0,0,0.08); }
+
+.role-btn span { font-size: 28px; }
+.role-btn strong { color: var(--white); font-size: 15px; }
+.role-btn small { color: var(--gray); font-size: 12px; }
+
+/* Поля */
+.register-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.register-field label {
+  display: block;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gray);
+  margin-bottom: 6px;
+}
+
+.register-field input,
+.register-field select {
+  width: 100%;
+  background: var(--black);
+  border: 1px solid var(--gray-dim);
+  color: var(--white);
+  padding: 12px 16px;
+  font-size: 15px;
+  font-family: 'Barlow', sans-serif;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.register-field input:focus,
+.register-field select:focus {
+  outline: none;
+  border-color: var(--red);
+}
+
+.register-field select option { background: var(--dark); }
+
+.register-belt {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.register-check {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  color: var(--gray) !important;
+  cursor: pointer;
+}
+
+.register-check input[type="checkbox"] {
+  width: auto;
+  padding: 0;
+  accent-color: var(--red);
+}
+
+.register-submit {
+  width: 100%;
+  margin-top: 8px;
+  font-size: 16px;
+  padding: 16px;
+}
+
+.register-login-link {
+  text-align: center;
+  margin-top: 20px;
+  color: var(--gray);
+  font-size: 14px;
+}
+
+.register-login-link a {
+  color: var(--red);
+  text-decoration: none;
+}
+
+@media (max-width: 600px) {
+  .register-form-wrap,
+  .register-preview { padding: 32px 20px; }
+  .register-role-btns { grid-template-columns: 1fr; }
+}

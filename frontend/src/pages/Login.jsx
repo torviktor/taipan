@@ -9,7 +9,6 @@ function formatPhone(value) {
   if (local.startsWith('8')) local = local.slice(1)
   if (local.startsWith('7')) local = local.slice(1)
   local = local.slice(0, 10)
-
   let result = '+7'
   if (local.length > 0) result += ' (' + local.slice(0, 3)
   if (local.length >= 3) result += ') ' + local.slice(3, 6)
@@ -32,25 +31,18 @@ export default function Login() {
   const [loading,  setLoading]  = useState(false)
   const navigate = useNavigate()
 
-  function handlePhoneChange(e) {
-    setPhone(formatPhone(e.target.value))
-  }
-
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setLoading(true)
-
     try {
       const form = new FormData()
       form.append('username', normalizePhone(phone))
       form.append('password', password)
-
       const r = await axios.post('/api/auth/login', form)
       localStorage.setItem('token',     r.data.access_token)
       localStorage.setItem('role',      r.data.role)
       localStorage.setItem('full_name', r.data.full_name)
-
       if (['admin', 'manager'].includes(r.data.role)) {
         navigate('/admin')
       } else {
@@ -66,19 +58,19 @@ export default function Login() {
   return (
     <main className="login-page">
       <div className="login-box">
-        <div className="login-logo">ТАЙПАН</div>
+        <Link to="/" className="login-logo-img">
+          <img src="/logo.png" alt="Тайпан" />
+        </Link>
         <h1 className="login-title">ВХОД</h1>
         <div className="divider" />
-
         {error && <div className="login-error">{error}</div>}
-
         <form className="login-form" onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Телефон</label>
             <input
               type="text"
               value={phone}
-              onChange={handlePhoneChange}
+              onChange={e => setPhone(formatPhone(e.target.value))}
               placeholder="+7 (999) 000-00-00"
               required
             />
@@ -98,8 +90,16 @@ export default function Login() {
           </button>
         </form>
 
+        <div className="login-divider">
+          <span>или</span>
+        </div>
+
+        <Link to="/register" className="btn-outline login-register-btn">
+          Зарегистрироваться
+        </Link>
+
         <p className="login-footer">
-          Нет аккаунта? <Link to="/apply">Запишитесь на пробное занятие</Link>
+          Ещё не в клубе? <Link to="/apply">Запишитесь на пробное занятие</Link>
         </p>
       </div>
     </main>

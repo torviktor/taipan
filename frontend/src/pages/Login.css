@@ -13,14 +13,18 @@
   background: var(--dark);
   padding: 48px;
   border-top: 3px solid var(--red);
+  text-align: center;
 }
 
-.login-logo {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 36px;
-  letter-spacing: 6px;
-  color: var(--red);
+.login-logo-img {
+  display: inline-block;
   margin-bottom: 8px;
+}
+
+.login-logo-img img {
+  height: 72px;
+  width: 72px;
+  object-fit: contain;
 }
 
 .login-title {
@@ -38,14 +42,40 @@
   padding: 12px 16px;
   font-size: 14px;
   margin-bottom: 20px;
+  text-align: left;
 }
 
-.login-form { margin-top: 24px; }
+.login-form { margin-top: 24px; text-align: left; }
 
 .login-btn {
   width: 100%;
   text-align: center;
   margin-top: 8px;
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  color: var(--gray);
+  font-size: 13px;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--gray-dim);
+}
+
+.login-register-btn {
+  display: block;
+  width: 100%;
+  text-align: center;
+  text-decoration: none;
+  box-sizing: border-box;
 }
 
 .login-footer {

@@ -6,6 +6,7 @@ import Schedule from './pages/Schedule'
 import Calendar from './pages/Calendar'
 import Apply from './pages/Apply'
 import Login from './pages/Login'
+import Register from './pages/Register'
 import Cabinet from './pages/Cabinet'
 import Admin from './pages/Admin'
 import About from './pages/About'
@@ -19,14 +20,15 @@ export default function App() {
     <>
       <Navbar />
       <Routes>
-        <Route path="/"            element={<Home />} />
-        <Route path="/about"       element={<About />} />
-        <Route path="/schedule"    element={<Schedule />} />
-        <Route path="/calendar"    element={<Calendar />} />
-        <Route path="/apply"       element={<Apply />} />
-        <Route path="/login"       element={<Login />} />
-        <Route path="/cabinet"     element={<Cabinet />} />
-        <Route path="/admin"       element={<Admin />} />
+        <Route path="/"                  element={<Home />} />
+        <Route path="/about"             element={<About />} />
+        <Route path="/schedule"          element={<Schedule />} />
+        <Route path="/calendar"          element={<Calendar />} />
+        <Route path="/apply"             element={<Apply />} />
+        <Route path="/login"             element={<Login />} />
+        <Route path="/register"          element={<Register />} />
+        <Route path="/cabinet"           element={<Cabinet />} />
+        <Route path="/admin"             element={<Admin />} />
         <Route path="/groups/kids-6-10"  element={<GroupKids1 />} />
         <Route path="/groups/kids-11-16" element={<GroupKids2 />} />
         <Route path="/groups/adults"     element={<GroupAdults />} />

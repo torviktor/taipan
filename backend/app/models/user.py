@@ -1,14 +1,20 @@
-from sqlalchemy import Column, Integer, String, DateTime, Enum, ForeignKey, Text, Numeric, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Enum, ForeignKey, Text, Numeric, Boolean, Date
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, date
 from app.core.database import Base
 import enum
 
 # ─── Роли пользователей ───────────────────────────────────────────────────────
 class UserRole(str, enum.Enum):
-    student  = "student"   # Ученик
-    manager  = "manager"   # Менеджер / тренер
-    admin    = "admin"     # Администратор
+    parent   = "parent"   # Родитель
+    athlete  = "athlete"  # Взрослый спортсмен
+    manager  = "manager"  # Тренер
+    admin    = "admin"    # Администратор
+
+# ─── Пол ──────────────────────────────────────────────────────────────────────
+class Gender(str, enum.Enum):
+    male   = "male"
+    female = "female"
 
 # ─── Пользователь ─────────────────────────────────────────────────────────────
 class User(Base):
@@ -19,22 +25,60 @@ class User(Base):
     phone        = Column(String(20), unique=True, nullable=False)
     email        = Column(String(200), unique=True, nullable=True)
     password     = Column(String(300), nullable=False)
-    role         = Column(Enum(UserRole), default=UserRole.student)
-    age          = Column(Integer, nullable=True)
+    role         = Column(Enum(UserRole), default=UserRole.parent)
     created_at   = Column(DateTime, default=datetime.utcnow)
     is_active    = Column(Boolean, default=True)
 
+    athletes     = relationship("Athlete", back_populates="user", cascade="all, delete-orphan")
     applications = relationship("Application", back_populates="user")
     payments     = relationship("Payment", back_populates="user")
+
+# ─── Спортсмен (данные участника клуба) ───────────────────────────────────────
+class Athlete(Base):
+    __tablename__ = "athletes"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    user_id      = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    full_name    = Column(String(200), nullable=False)   # ФИО спортсмена
+    birth_date   = Column(Date, nullable=False)          # Дата рождения
+    gender       = Column(Enum(Gender), nullable=False)  # Пол
+    gup          = Column(Integer, nullable=True)        # Гып (1-10, None если дан)
+    dan          = Column(Integer, nullable=True)        # Дан (1+, None если гып)
+
+    # Поля заполняемые тренером
+    weight       = Column(Numeric(5, 2), nullable=True)  # Весовая категория
+    group        = Column(String(100), nullable=True)    # Группа (авто + ручная коррекция)
+
+    created_at   = Column(DateTime, default=datetime.utcnow)
+    updated_at   = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="athletes")
+
+    @property
+    def age(self) -> int:
+        today = date.today()
+        b = self.birth_date
+        return today.year - b.year - ((today.month, today.day) < (b.month, b.day))
+
+    @property
+    def auto_group(self) -> str:
+        a = self.age
+        if a <= 10:
+            return "Младшая группа (6–10 лет)"
+        elif a <= 16:
+            return "Старшая группа (11–16 лет)"
+        else:
+            return "Взрослые"
 
 # ─── Секции клуба ─────────────────────────────────────────────────────────────
 class Section(Base):
     __tablename__ = "sections"
 
     id          = Column(Integer, primary_key=True)
-    name        = Column(String(100), nullable=False)   # Например: "Дети 6-10 лет"
+    name        = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
-    price       = Column(Numeric(10, 2), nullable=True) # Цена абонемента
+    price       = Column(Numeric(10, 2), nullable=True)
 
     schedule     = relationship("Schedule", back_populates="section")
     applications = relationship("Application", back_populates="section")
@@ -43,46 +87,46 @@ class Section(Base):
 class Schedule(Base):
     __tablename__ = "schedule"
 
-    id         = Column(Integer, primary_key=True)
-    section_id = Column(Integer, ForeignKey("sections.id"))
-    day_of_week = Column(Integer, nullable=False)  # 0=Пн, 1=Вт, ... 6=Вс
-    time_start  = Column(String(5), nullable=False) # "10:00"
-    time_end    = Column(String(5), nullable=False) # "11:30"
+    id          = Column(Integer, primary_key=True)
+    section_id  = Column(Integer, ForeignKey("sections.id"))
+    day_of_week = Column(Integer, nullable=False)
+    time_start  = Column(String(5), nullable=False)
+    time_end    = Column(String(5), nullable=False)
     trainer     = Column(String(200), nullable=True)
-    location    = Column(String(300), nullable=True) # Зал / адрес
+    location    = Column(String(300), nullable=True)
 
     section = relationship("Section", back_populates="schedule")
 
 # ─── Заявки на запись ─────────────────────────────────────────────────────────
 class ApplicationStatus(str, enum.Enum):
-    new        = "new"        # Новая
-    processing = "processing" # В обработке
-    confirmed  = "confirmed"  # Подтверждена
-    rejected   = "rejected"   # Отклонена
+    new        = "new"
+    processing = "processing"
+    confirmed  = "confirmed"
+    rejected   = "rejected"
 
 class Application(Base):
     __tablename__ = "applications"
 
-    id           = Column(Integer, primary_key=True)
-    user_id      = Column(Integer, ForeignKey("users.id"), nullable=True)  # Может быть без регистрации
-    section_id   = Column(Integer, ForeignKey("sections.id"), nullable=True)
-    full_name    = Column(String(200), nullable=False)  # Дублируем для незарегистрированных
-    phone        = Column(String(20), nullable=False)
-    age          = Column(Integer, nullable=True)
-    comment      = Column(Text, nullable=True)
-    status       = Column(Enum(ApplicationStatus), default=ApplicationStatus.new)
-    created_at   = Column(DateTime, default=datetime.utcnow)
-    updated_at   = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=True)
+    section_id = Column(Integer, ForeignKey("sections.id"), nullable=True)
+    full_name  = Column(String(200), nullable=False)
+    phone      = Column(String(20), nullable=False)
+    age        = Column(Integer, nullable=True)
+    comment    = Column(Text, nullable=True)
+    status     = Column(Enum(ApplicationStatus), default=ApplicationStatus.new)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user    = relationship("User", back_populates="applications")
     section = relationship("Section", back_populates="applications")
 
 # ─── Оплаты ───────────────────────────────────────────────────────────────────
 class PaymentStatus(str, enum.Enum):
-    pending  = "pending"   # Ожидает
-    paid     = "paid"      # Оплачено
-    failed   = "failed"    # Ошибка
-    refunded = "refunded"  # Возврат
+    pending  = "pending"
+    paid     = "paid"
+    failed   = "failed"
+    refunded = "refunded"
 
 class Payment(Base):
     __tablename__ = "payments"
@@ -90,7 +134,7 @@ class Payment(Base):
     id          = Column(Integer, primary_key=True)
     user_id     = Column(Integer, ForeignKey("users.id"))
     amount      = Column(Numeric(10, 2), nullable=False)
-    description = Column(String(300), nullable=True)  # "Абонемент январь 2025"
+    description = Column(String(300), nullable=True)
     status      = Column(Enum(PaymentStatus), default=PaymentStatus.pending)
     created_at  = Column(DateTime, default=datetime.utcnow)
     paid_at     = Column(DateTime, nullable=True)
