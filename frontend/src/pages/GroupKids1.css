@@ -1,0 +1,192 @@
+.group-page {
+  min-height: 100vh;
+  background: var(--black);
+}
+
+.group-hero {
+  padding: 140px 0 60px;
+  background: var(--dark);
+  border-bottom: 1px solid var(--gray-dim);
+}
+
+.group-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(52px, 9vw, 100px);
+  letter-spacing: 6px;
+  color: var(--white);
+  line-height: 1;
+  margin: 12px 0 8px;
+}
+
+.group-subtitle {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-top: 4px;
+}
+
+.group-container {
+  padding-top: 60px;
+  padding-bottom: 80px;
+  max-width: 900px;
+}
+
+/* ── ВВОДНЫЙ ТЕКСТ ───────────────────────────────────────────────────── */
+.group-intro {
+  border-left: 3px solid var(--red);
+  padding: 20px 24px;
+  background: rgba(204,0,0,0.04);
+  margin-bottom: 48px;
+  color: var(--gray);
+  font-size: 16px;
+  line-height: 1.8;
+}
+.group-intro strong { color: var(--white); }
+
+/* ── ЗАГОЛОВОК СЕКЦИИ ────────────────────────────────────────────────── */
+.group-section-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-bottom: 24px;
+}
+
+/* ── НАПРАВЛЕНИЯ ─────────────────────────────────────────────────────── */
+.group-directions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 48px;
+}
+
+.group-direction {
+  display: flex;
+  gap: 0;
+  background: var(--dark);
+  border-left: 3px solid transparent;
+  transition: border-color 0.2s;
+  overflow: hidden;
+}
+.group-direction:hover { border-left-color: var(--red); }
+
+.group-direction-num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 48px;
+  color: rgba(204,0,0,0.15);
+  line-height: 1;
+  flex-shrink: 0;
+  width: 80px;
+  padding: 20px 0 20px 20px;
+  display: flex;
+  align-items: flex-start;
+}
+
+.group-direction-body {
+  padding: 20px 24px 20px 0;
+  flex: 1;
+}
+
+.group-direction-body h3 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--white);
+  margin-bottom: 10px;
+}
+
+.group-direction-body p {
+  color: var(--gray);
+  font-size: 15px;
+  line-height: 1.75;
+  margin-bottom: 10px;
+}
+.group-direction-body p:last-child { margin-bottom: 0; }
+.group-direction-body strong { color: var(--white); }
+
+.group-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0;
+}
+.group-list li {
+  color: var(--gray);
+  font-size: 14px;
+  padding: 6px 0 6px 16px;
+  position: relative;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.group-list li::before { content: '—'; position: absolute; left: 0; color: var(--red); }
+.group-list li strong { color: var(--white); }
+
+/* ── ИТОГ ────────────────────────────────────────────────────────────── */
+.group-result {
+  border: 1px solid var(--gray-dim);
+  border-left: 3px solid var(--red);
+  padding: 20px 24px;
+  color: var(--gray);
+  font-size: 15px;
+  line-height: 1.7;
+  font-style: italic;
+  margin-bottom: 48px;
+}
+
+/* ── РАСПИСАНИЕ ──────────────────────────────────────────────────────── */
+.group-schedule-block {
+  background: var(--dark);
+  border-top: 3px solid var(--red);
+  padding: 32px;
+}
+
+.group-schedule-block h3 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-bottom: 20px;
+}
+
+.group-schedule-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.group-schedule-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  background: var(--black);
+  gap: 16px;
+}
+
+.group-schedule-day {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--white);
+}
+
+.group-schedule-time {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 2px;
+  color: var(--red);
+}
+
+@media (max-width: 600px) {
+  .group-direction-num { width: 50px; font-size: 32px; }
+  .group-schedule-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+}
