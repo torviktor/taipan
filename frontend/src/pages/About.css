@@ -261,3 +261,63 @@
   }
   .about-nav-num { display: none; }
 }
+
+/* ── CTA — переопределение (скромнее) ───────────────────────────────── */
+.about-cta {
+  margin-top: 32px;
+  padding: 20px 24px;
+  background: none;
+  border: 1px solid var(--gray-dim);
+  border-left: 3px solid var(--red);
+  color: var(--gray);
+  font-family: 'Barlow', sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.7;
+  font-style: italic;
+}
+
+/* ── ЭМБЛЕМА — hero изображение ─────────────────────────────────────── */
+.about-emblem-hero {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 40px;
+}
+.about-emblem-img {
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 32px rgba(204,0,0,0.25));
+}
+
+/* ── ЦВЕТА ───────────────────────────────────────────────────────────── */
+.about-colors {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 16px 0 24px;
+}
+.about-color-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 16px 20px;
+  background: var(--dark);
+}
+.about-color-swatch {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+.about-color-item strong {
+  display: block;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--white);
+  margin-bottom: 4px;
+}
+.about-color-item p { margin: 0; color: var(--gray); font-size: 14px; line-height: 1.5; }
