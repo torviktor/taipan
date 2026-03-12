@@ -9,20 +9,28 @@ import Login from './pages/Login'
 import Cabinet from './pages/Cabinet'
 import Admin from './pages/Admin'
 import About from './pages/About'
+import GroupKids1 from './pages/GroupKids1'
+import GroupKids2 from './pages/GroupKids2'
+import GroupAdults from './pages/GroupAdults'
+import Champions from './pages/Champions'
 
 export default function App() {
   return (
     <>
       <Navbar />
       <Routes>
-        <Route path="/"          element={<Home />} />
-        <Route path="/about"     element={<About />} />
-        <Route path="/schedule"  element={<Schedule />} />
-        <Route path="/calendar"  element={<Calendar />} />
-        <Route path="/apply"     element={<Apply />} />
-        <Route path="/login"     element={<Login />} />
-        <Route path="/cabinet"   element={<Cabinet />} />
-        <Route path="/admin"     element={<Admin />} />
+        <Route path="/"            element={<Home />} />
+        <Route path="/about"       element={<About />} />
+        <Route path="/schedule"    element={<Schedule />} />
+        <Route path="/calendar"    element={<Calendar />} />
+        <Route path="/apply"       element={<Apply />} />
+        <Route path="/login"       element={<Login />} />
+        <Route path="/cabinet"     element={<Cabinet />} />
+        <Route path="/admin"       element={<Admin />} />
+        <Route path="/groups/kids-6-10"  element={<GroupKids1 />} />
+        <Route path="/groups/kids-11-16" element={<GroupKids2 />} />
+        <Route path="/groups/adults"     element={<GroupAdults />} />
+        <Route path="/champions"         element={<Champions />} />
       </Routes>
       <Footer />
     </>

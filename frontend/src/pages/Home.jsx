@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import './Home.css'
 
 function Counter({ target, suffix = '', duration = 2000 }) {
@@ -33,21 +33,24 @@ const TRAINER = {
 }
 
 const SECTIONS = [
-  { title: 'Дети 6–10 лет',  desc: 'Базовая техника, дисциплина, координация' },
-  { title: 'Дети 11–16 лет', desc: 'Соревновательная подготовка, спарринги' },
-  { title: 'Взрослые',        desc: 'Все уровни. Фитнес и боевой тхэквондо' },
-  { title: 'Спортсмены',      desc: 'Сборы, турниры, углублённая работа' },
+  { title: 'Дети 6–10 лет',  desc: 'Базовая техника, дисциплина, координация', link: '/groups/kids-6-10' },
+  { title: 'Дети 11–16 лет', desc: 'Соревновательная подготовка, спарринги',   link: '/groups/kids-11-16' },
+  { title: 'Взрослые',        desc: 'Все уровни. Фитнес и боевой тхэквондо',    link: '/groups/adults' },
+  { title: 'Зал славы',       desc: 'Наши чемпионы и призёры',                  link: '/champions' },
 ]
 
 const STATS = [
   { target: 10,  suffix: '+', label: 'лет тхэквондо в городе' },
-  { target: 50,  suffix: '+', label: 'спортсменов' },
-  { target: 100, suffix: '+', label: 'побед на соревнованиях' },
-  { target: 5,   suffix: '',  label: 'чемпионов России' },
-  { target: 10,  suffix: '',  label: 'чёрных поясов' },
+  { target: 50,  suffix: '+', label: 'спортсменов сегодня' },
+  { target: 4,   suffix: '',  label: 'чемпиона Европы и мира' },
+  { target: 9,   suffix: '+', label: 'чемпионов и призёров России' },
+  { target: 14,  suffix: '',  label: 'чёрных поясов' },
+  { target: 7,   suffix: '',  label: 'МС и КМС' },
 ]
 
 export default function Home() {
+  const navigate = useNavigate()
+
   return (
     <main className="home">
 
@@ -59,8 +62,13 @@ export default function Home() {
         </div>
         <div className="container hero-content">
           <div className="hero-text animate-fade-up">
-            <h1 className="hero-title">ТАЙПАН</h1>
-            <p className="hero-subtitle">Клуб тхэквондо · Павловский Посад</p>
+            <div className="hero-brand">
+              <img src="/logo.png" alt="Тайпан" className="hero-logo" />
+              <div className="hero-brand-text">
+                <h1 className="hero-title">ТАЙПАН</h1>
+                <p className="hero-subtitle">Клуб тхэквондо · Павловский Посад</p>
+              </div>
+            </div>
             <p className="hero-desc">
               Профессиональные тренировки для детей и взрослых.<br/>
               Первое занятие — <strong>бесплатно.</strong>
@@ -96,11 +104,20 @@ export default function Home() {
           <div className="divider" />
           <div className="sections-grid">
             {SECTIONS.map((s, i) => (
-              <div className="section-card" key={i} style={{ animationDelay: `${i * 0.1}s` }}>
+              <div
+                className="section-card"
+                key={i}
+                style={{ animationDelay: `${i * 0.1}s` }}
+                onClick={() => navigate(s.link)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => e.key === 'Enter' && navigate(s.link)}
+              >
                 <div className="section-card-num">{String(i + 1).padStart(2, '0')}</div>
                 <h3>{s.title}</h3>
                 <p>{s.desc}</p>
                 <div className="section-card-line" />
+                <div className="section-card-arrow">→</div>
               </div>
             ))}
           </div>
@@ -189,7 +206,7 @@ export default function Home() {
               </a>
             </div>
             <iframe
-              src="https://yandex.ru/map-widget/v1/?um=constructor%3A&source=constructor&ll=38.6572%2C55.7697&z=16&pt=38.6572%2C55.7697%2Cpm2rdl~38.6572%2C55.7697%2Cpm2rdm"
+              src="https://yandex.ru/map-widget/v1/?ll=38.6572%2C55.7697&z=16&pt=38.6572%2C55.7697%2Cpm2rdm"
               width="100%"
               height="400"
               style={{ border: 'none' }}

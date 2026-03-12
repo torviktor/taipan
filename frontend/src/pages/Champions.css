@@ -1,0 +1,148 @@
+.champions-page {
+  background: var(--black);
+  min-height: 100vh;
+}
+
+.champions-hero {
+  padding: 140px 0 80px;
+  background: var(--dark);
+  border-bottom: 1px solid var(--gray-dim);
+  text-align: center;
+}
+
+.champions-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(60px, 10vw, 120px);
+  letter-spacing: 8px;
+  color: var(--white);
+  line-height: 1;
+  margin: 12px 0;
+}
+
+.champions-subtitle {
+  color: var(--gray);
+  font-size: 16px;
+  line-height: 1.7;
+  margin-top: 24px;
+}
+
+.champions-grid-section {
+  padding: 80px 0;
+}
+
+.champions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 2px;
+  margin-bottom: 60px;
+}
+
+.champion-card {
+  background: var(--dark);
+  overflow: hidden;
+  transition: transform 0.3s, background 0.3s;
+  position: relative;
+}
+
+.champion-card:hover {
+  transform: translateY(-6px);
+  background: var(--dark2);
+}
+
+/* Цветная полоска сверху по уровню */
+.champion-card--elite::before  { background: linear-gradient(90deg, #gold, #FFD700); }
+.champion-card--world::before  { background: linear-gradient(90deg, #C0C0C0, #E8E8E8); }
+.champion-card--europe::before { background: linear-gradient(90deg, #cc0000, #ff3333); }
+.champion-card--russia::before { background: var(--red); }
+
+.champion-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+
+.champion-card--elite::before  { background: linear-gradient(90deg, #FFD700, #FFA500); }
+.champion-card--world::before  { background: linear-gradient(90deg, #C0C0C0, #A8A8A8); }
+.champion-card--europe::before { background: linear-gradient(90deg, #cc0000, #ff4444); }
+.champion-card--russia::before { background: var(--red); }
+
+.champion-img-placeholder {
+  height: 240px;
+  background: var(--dark2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px dashed var(--gray-dim);
+}
+
+.champion-img-placeholder span {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px;
+  letter-spacing: 3px;
+  color: var(--gray);
+  text-transform: uppercase;
+}
+
+.champion-info {
+  padding: 24px;
+}
+
+.champion-level {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gray);
+  margin-bottom: 8px;
+}
+
+.champion-card--elite .champion-level  { color: #FFD700; }
+.champion-card--world .champion-level  { color: #C0C0C0; }
+.champion-card--europe .champion-level { color: #ff6666; }
+
+.champion-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--white);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+  line-height: 1.1;
+}
+
+.champion-achievements {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.champion-achievements li {
+  color: var(--gray);
+  font-size: 14px;
+  line-height: 1.5;
+  padding-left: 12px;
+  position: relative;
+}
+
+.champion-achievements li::before {
+  content: '—';
+  position: absolute;
+  left: 0;
+  color: var(--red);
+}
+
+.champions-back {
+  text-align: center;
+  padding-top: 20px;
+}
+
+@media (max-width: 600px) {
+  .champions-grid { grid-template-columns: 1fr; }
+  .champion-img-placeholder { height: 180px; }
+}
