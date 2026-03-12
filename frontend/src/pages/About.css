@@ -1,167 +1,92 @@
-.about-page {
-  min-height: 100vh;
-  background: var(--black);
-}
 
-.about-hero {
-  padding: 140px 0 60px;
-  background: var(--dark);
-  border-bottom: 1px solid var(--gray-dim);
-}
-
-.about-title {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(60px, 10vw, 100px);
-  letter-spacing: 8px;
-  color: var(--white);
-  line-height: 1;
-  margin: 12px 0;
-}
-
-/* ── LAYOUT ──────────────────────────────────────────────────────────── */
-.about-layout {
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 48px;
-  padding-top: 60px;
-  padding-bottom: 80px;
-  align-items: start;
-}
-
-/* ── МЕНЮ ────────────────────────────────────────────────────────────── */
-.about-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  position: sticky;
-  top: 100px;
-}
-
-.about-nav-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 16px 20px;
-  background: var(--dark);
-  border: none;
-  border-left: 3px solid transparent;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.2s, border-color 0.2s;
-  width: 100%;
-}
-
-.about-nav-item:hover  { background: rgba(255,255,255,0.03); }
-.about-nav-item.active { border-left-color: var(--red); background: rgba(255,255,255,0.03); }
-
-.about-nav-num {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 22px;
-  color: rgba(204,0,0,0.3);
-  line-height: 1;
-  flex-shrink: 0;
-  margin-top: 1px;
-  transition: color 0.2s;
-}
-.about-nav-item.active .about-nav-num,
-.about-nav-item:hover  .about-nav-num { color: var(--red); }
-
-.about-nav-title {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--gray);
-  line-height: 1.4;
-  transition: color 0.2s;
-}
-.about-nav-item.active .about-nav-title,
-.about-nav-item:hover  .about-nav-title { color: var(--white); }
-
-/* ── КОНТЕНТ ─────────────────────────────────────────────────────────── */
-.about-content { min-height: 400px; }
-
-.about-section-title {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(28px, 4vw, 48px);
-  letter-spacing: 4px;
-  color: var(--white);
-  line-height: 1.1;
-  margin-bottom: 16px;
-}
-
-.about-divider {
-  width: 48px;
-  height: 3px;
-  background: var(--red);
+/* ── ЛИД-БЛОК ────────────────────────────────────────────────────────── */
+.about-lead {
+  border-left: 3px solid var(--red);
+  padding: 20px 24px;
+  background: rgba(204,0,0,0.04);
   margin-bottom: 32px;
 }
-
-.about-body {
-  color: var(--gray);
-  font-size: 16px;
-  line-height: 1.8;
+.about-lead p { margin-bottom: 8px; color: var(--gray); font-size: 16px; line-height: 1.7; }
+.about-lead p:last-child { margin-bottom: 0; }
+.about-lead-name {
+  font-family: 'Barlow Condensed', sans-serif !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  letter-spacing: 2px !important;
+  text-transform: uppercase !important;
+  color: var(--white) !important;
 }
 
-.about-body h3 {
+/* ── ЦИТАТА ──────────────────────────────────────────────────────────── */
+.about-quote {
+  border: 1px solid var(--gray-dim);
+  border-left: 3px solid var(--red);
+  padding: 24px 28px;
+  margin: 24px 0;
+  background: var(--dark);
+}
+.about-quote p {
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--white);
+  font-style: italic;
+  margin-bottom: 12px;
+}
+.about-quote span {
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: 20px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--white);
-  margin: 32px 0 12px;
+  color: var(--red);
 }
 
-.about-body p { margin-bottom: 16px; }
-
-.about-body ul {
-  padding-left: 0;
-  list-style: none;
-  margin-bottom: 16px;
-}
-
-.about-body ul li {
-  padding: 8px 0 8px 20px;
-  position: relative;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
-}
-.about-body ul li::before { content: '—'; position: absolute; left: 0; color: var(--red); }
-
-/* ── ЗАГЛУШКА ────────────────────────────────────────────────────────── */
-.about-coming {
-  color: var(--gray);
-  font-size: 16px;
-  line-height: 1.8;
-  padding: 48px 40px;
-  border: 1px dashed var(--gray-dim);
-  text-align: center;
-}
-
-/* ── ЭМБЛЕМА ─────────────────────────────────────────────────────────── */
-.about-emblem-preview {
+/* ── ПРИНЦИПЫ ────────────────────────────────────────────────────────── */
+.about-principles {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  gap: 2px;
+  margin: 24px 0;
 }
-
-.about-emblem-img {
-  width: 220px;
-  height: 220px;
-  object-fit: contain;
-  filter: drop-shadow(0 0 40px rgba(204,0,0,0.3));
+.about-principle {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 16px 20px;
+  background: var(--dark);
+  border-left: 3px solid transparent;
+  transition: border-color 0.2s;
 }
+.about-principle:hover { border-left-color: var(--red); }
+.about-principle-num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 32px;
+  color: rgba(204,0,0,0.3);
+  line-height: 1;
+  flex-shrink: 0;
+  width: 36px;
+}
+.about-principle strong {
+  display: block;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--white);
+  margin-bottom: 4px;
+}
+.about-principle p { margin: 0; color: var(--gray); font-size: 14px; line-height: 1.5; }
 
-/* ── АДАПТИВ ─────────────────────────────────────────────────────────── */
-@media (max-width: 900px) {
-  .about-layout { grid-template-columns: 1fr; }
-  .about-nav {
-    position: static;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-  .about-nav-item { flex: 1; min-width: 140px; padding: 12px; }
-  .about-nav-num  { display: none; }
+/* ── CTA-БЛОК ────────────────────────────────────────────────────────── */
+.about-cta {
+  margin-top: 32px;
+  padding: 28px 32px;
+  background: var(--red);
+  color: var(--white);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  line-height: 1.6;
 }
