@@ -1,6 +1,30 @@
 import { Link } from 'react-router-dom'
 import './Footer.css'
 
+function IconLocation() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="footer-svg-icon">
+      <path d="M9 1C6.24 1 4 3.24 4 6c0 4 5 11 5 11s5-7 5-11c0-2.76-2.24-5-5-5z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <circle cx="9" cy="6" r="1.8" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+    </svg>
+  )
+}
+function IconPhone() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="footer-svg-icon">
+      <path d="M3 3h4l1.5 3.5-2 1.2a9 9 0 004.8 4.8l1.2-2L16 11v4a1 1 0 01-1 1C7.16 16 2 10.84 2 4a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" fill="none"/>
+    </svg>
+  )
+}
+function IconMail() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="footer-svg-icon">
+      <rect x="2" y="4" width="14" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <path d="M2 5l7 5 7-5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
 export default function Footer() {
   return (
     <footer className="footer">
@@ -26,14 +50,21 @@ export default function Footer() {
         </div>
         <div className="footer-contacts">
           <h4>Контакты</h4>
-          <p>📍 Павловский Посад, ул. Кирова, 95</p>
-          <p>📞 +7 (909) 165-28-00</p>
-          <p>✉️ Bliznec.ket@mail.ru</p>
+          <div className="footer-contact-item">
+            <IconLocation />
+            <span>Павловский Посад, ул. Кирова, 95</span>
+          </div>
+          <div className="footer-contact-item">
+            <IconPhone />
+            <a href="tel:+79091652800">+7 (909) 165-28-00</a>
+          </div>
+          <div className="footer-contact-item">
+            <IconMail />
+            <a href="mailto:Bliznec.ket@mail.ru">Bliznec.ket@mail.ru</a>
+          </div>
           <a
             href="https://yandex.ru/maps/?text=Павловский+Посад,+ул.+Кирова,+95"
-            target="_blank"
-            rel="noreferrer"
-            className="footer-map-link"
+            target="_blank" rel="noreferrer" className="footer-map-link"
           >
             Открыть на карте →
           </a>

@@ -163,7 +163,7 @@
   background: var(--dark);
 }
 
-.schedule-note-item span { font-size: 24px; flex-shrink: 0; }
+.schedule-svg-icon { color: var(--red); flex-shrink: 0; margin-top: 2px; }
 
 .schedule-note-item strong {
   display: block;
@@ -184,4 +184,16 @@
   .schedule-cards { grid-template-columns: 1fr; }
   .schedule-note  { grid-template-columns: 1fr; }
   .schedule-card  { padding: 28px 20px; }
+}
+
+/* ── Мобильный фикс заголовков ───────────────────────────────────── */
+@media (max-width: 480px) {
+  .schedule-title {
+    font-size: clamp(44px, 16vw, 80px) !important;
+    letter-spacing: 3px;
+  }
+  .schedule-card-title { font-size: 26px; letter-spacing: 2px; }
+  .schedule-day-pill { font-size: 11px; padding: 5px 6px; }
+  .schedule-time-val { font-size: 18px; }
+  .schedule-time-row { padding: 12px 14px; }
 }

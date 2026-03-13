@@ -1,6 +1,31 @@
 import { Link } from 'react-router-dom'
 import './Schedule.css'
 
+function IconLocation() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="schedule-svg-icon">
+      <path d="M9 1C6.24 1 4 3.24 4 6c0 4 5 11 5 11s5-7 5-11c0-2.76-2.24-5-5-5z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <circle cx="9" cy="6" r="1.8" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+    </svg>
+  )
+}
+function IconPhone() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="schedule-svg-icon">
+      <path d="M3 3h4l1.5 3.5-2 1.2a9 9 0 004.8 4.8l1.2-2L16 11v4a1 1 0 01-1 1C7.16 16 2 10.84 2 4a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" fill="none"/>
+    </svg>
+  )
+}
+function IconKimono() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="schedule-svg-icon">
+      <path d="M4 2l5 3 5-3v14l-5-3-5 3V2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" fill="none"/>
+      <path d="M9 5v8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
+
 const SCHEDULE = [
   {
     group: 'Младшая группа',
@@ -100,21 +125,21 @@ export default function Schedule() {
           {/* Доп. инфо */}
           <div className="schedule-note">
             <div className="schedule-note-item">
-              <span>📍</span>
+              <IconLocation />
               <div>
                 <strong>Адрес зала</strong>
                 <p>Павловский Посад, ул. Кирова, 95</p>
               </div>
             </div>
             <div className="schedule-note-item">
-              <span>📞</span>
+              <IconPhone />
               <div>
                 <strong>Запись и вопросы</strong>
                 <p><a href="tel:+79091652800">+7 (909) 165-28-00</a></p>
               </div>
             </div>
             <div className="schedule-note-item">
-              <span>🥋</span>
+              <IconKimono />
               <div>
                 <strong>Первое занятие</strong>
                 <p>Бесплатно для новых участников</p>

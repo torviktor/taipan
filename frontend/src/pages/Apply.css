@@ -207,3 +207,16 @@
 @media (max-width: 600px) {
   .apply-row { grid-template-columns: 1fr; }
 }
+
+/* ── Мобильный фикс заголовка ────────────────────────────────────── */
+@media (max-width: 480px) {
+  .apply-title {
+    font-size: clamp(44px, 16vw, 80px) !important;
+    letter-spacing: 3px;
+  }
+  .apply-sub {
+    font-size: 12px;
+    letter-spacing: 2px;
+  }
+  .apply-form-wrap { padding: 24px 16px; }
+}
