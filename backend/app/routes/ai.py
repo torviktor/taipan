@@ -5,7 +5,7 @@ import os
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 
 SYSTEM_PROMPT = """Ты — TaipanGPT, умный помощник клуба тхэквондо «Тайпан» в Павловском Посаде.
 Отвечай кратко, по делу, дружелюбно. Только на русском языке.
@@ -38,7 +38,7 @@ class ChatRequest(BaseModel):
 
 @router.post("/chat")
 async def chat(req: ChatRequest):
-    if not GROQ_API_KEY:
+    if not OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI не настроен")
 
     if len(req.message) > 500:
@@ -50,13 +50,15 @@ async def chat(req: ChatRequest):
 
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
+            "https://openrouter.ai/api/v1/chat/completions",
             headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                 "Content-Type": "application/json",
+                "HTTP-Referer": "https://taipan-tkd.ru",
+                "X-Title": "TaipanGPT",
             },
             json={
-                "model": "llama-3.1-8b-instant",
+                "model": "meta-llama/llama-3.1-8b-instruct:free",
                 "max_tokens": 512,
                 "temperature": 0.7,
                 "messages": messages,
@@ -64,7 +66,7 @@ async def chat(req: ChatRequest):
         )
 
     if resp.status_code != 200:
-        raise HTTPException(status_code=502, detail="Ошибка AI")
+        raise HTTPException(status_code=502, detail=f"Ошибка AI: {resp.text[:200]}")
 
     data = resp.json()
     reply = data["choices"][0]["message"]["content"]

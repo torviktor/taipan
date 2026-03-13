@@ -8,14 +8,10 @@ const SUGGESTIONS = [
   'С какого возраста берёте детей?',
 ]
 
-function BotIcon() {
+function TIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-      <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="1.5"/>
-      <circle cx="7" cy="9" r="1.2" fill="currentColor"/>
-      <circle cx="13" cy="9" r="1.2" fill="currentColor"/>
-      <path d="M7 13c.8 1 5.2 1 6 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-      <path d="M10 1v2M10 17v2M1 10h2M17 10h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+      <path d="M4 5h12M10 5v10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
     </svg>
   )
 }
@@ -39,7 +35,7 @@ function CloseIcon() {
 export default function TaipanGPT() {
   const [open,     setOpen]     = useState(false)
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Привет! Я TaipanGPT — помощник клуба тхэквондо «Тайпан». Спрашивай про расписание, запись, группы — отвечу быстро 🥋' }
+    { role: 'assistant', content: 'Привет! Я TaipanGPT — помощник клуба тхэквондо «Тайпан». Спрашивай про расписание, запись, группы — отвечу быстро.' }
   ])
   const [input,    setInput]    = useState('')
   const [loading,  setLoading]  = useState(false)
@@ -47,7 +43,6 @@ export default function TaipanGPT() {
   const bottomRef  = useRef(null)
   const inputRef   = useRef(null)
 
-  // Показываем пульсирующую кнопку через 3 сек после загрузки
   useEffect(() => {
     const t = setTimeout(() => setShown(true), 3000)
     return () => clearTimeout(t)
@@ -70,7 +65,6 @@ export default function TaipanGPT() {
     setMessages(newMessages)
     setLoading(true)
 
-    // история без первого приветствия (оно из системного промпта)
     const history = newMessages
       .slice(1)
       .slice(-10)
@@ -101,23 +95,21 @@ export default function TaipanGPT() {
 
   return (
     <>
-      {/* ── Кнопка открытия ── */}
       <button
         className={`taipan-gpt-fab ${shown ? 'shown' : ''} ${open ? 'hidden' : ''}`}
         onClick={() => setOpen(true)}
         aria-label="TaipanGPT — помощник клуба"
       >
-        <BotIcon />
+        <TIcon />
         <span className="taipan-gpt-fab-label">TaipanGPT</span>
         <span className="taipan-gpt-fab-pulse" />
       </button>
 
-      {/* ── Окно чата ── */}
       {open && (
         <div className="taipan-gpt-window">
           <div className="taipan-gpt-header">
             <div className="taipan-gpt-header-info">
-              <div className="taipan-gpt-avatar"><BotIcon /></div>
+              <div className="taipan-gpt-avatar"><TIcon /></div>
               <div>
                 <div className="taipan-gpt-name">TaipanGPT</div>
                 <div className="taipan-gpt-status">
@@ -133,14 +125,14 @@ export default function TaipanGPT() {
             {messages.map((m, i) => (
               <div key={i} className={`taipan-gpt-msg taipan-gpt-msg--${m.role}`}>
                 {m.role === 'assistant' && (
-                  <div className="taipan-gpt-msg-avatar"><BotIcon /></div>
+                  <div className="taipan-gpt-msg-avatar"><TIcon /></div>
                 )}
                 <div className="taipan-gpt-bubble">{m.content}</div>
               </div>
             ))}
             {loading && (
               <div className="taipan-gpt-msg taipan-gpt-msg--assistant">
-                <div className="taipan-gpt-msg-avatar"><BotIcon /></div>
+                <div className="taipan-gpt-msg-avatar"><TIcon /></div>
                 <div className="taipan-gpt-bubble taipan-gpt-typing">
                   <span/><span/><span/>
                 </div>
@@ -149,7 +141,6 @@ export default function TaipanGPT() {
             <div ref={bottomRef} />
           </div>
 
-          {/* Подсказки — показываем только если 1 сообщение (приветствие) */}
           {messages.length === 1 && (
             <div className="taipan-gpt-suggestions">
               {SUGGESTIONS.map((s, i) => (
