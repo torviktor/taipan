@@ -3,10 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.database import engine, Base
 from app.routes import auth, applications, schedule, users, payments
 from app.routes import events, telegram
+from app.routes.ai import router as ai_router
 from app.models import user
 from app.models import event
-from app.routes.ai import router as ai_router
-app.include_router(ai_router, prefix="/api")
 
 Base.metadata.create_all(bind=engine)
 
@@ -31,6 +30,7 @@ app.include_router(schedule.router,     prefix="/api/schedule",     tags=["Ра�
 app.include_router(payments.router,     prefix="/api/payments",     tags=["Оплата"])
 app.include_router(events.router,       prefix="/api/events",       tags=["Календарь"])
 app.include_router(telegram.router,     prefix="/api/telegram",     tags=["Telegram"])
+app.include_router(ai_router,           prefix="/api",              tags=["AI"])
 
 @app.get("/")
 def root():
