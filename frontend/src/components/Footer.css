@@ -117,42 +117,72 @@
 .footer-ad {
   border-top: 1px solid var(--gray-dim);
   border-bottom: 1px solid var(--gray-dim);
-  padding: 24px 0;
+  padding: 28px 0;
+  overflow: hidden;
 }
 
 .ad-banner {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 24px;
   flex-wrap: wrap;
+  padding: 20px 28px;
+  background: linear-gradient(90deg, rgba(204,0,0,0.06) 0%, transparent 60%);
+  border-left: 3px solid var(--red);
+  overflow: hidden;
+}
+
+/* Бегущая подсветка */
+.ad-banner::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(204,0,0,0.06), transparent);
+  animation: adShimmer 4s ease-in-out infinite;
+}
+@keyframes adShimmer {
+  0%   { left: -100%; }
+  100% { left: 160%; }
 }
 
 .ad-label {
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 3px;
-  color: var(--gray-dim);
-  border: 1px solid var(--gray-dim);
-  padding: 3px 8px;
+  color: var(--red);
+  border: 1px solid rgba(204,0,0,0.4);
+  padding: 3px 10px;
   flex-shrink: 0;
+  text-transform: uppercase;
+  animation: adPulse 2s ease-in-out infinite;
+}
+@keyframes adPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
 }
 
 .ad-text {
-  color: var(--gray);
+  color: var(--white);
   font-size: 15px;
+  font-weight: 500;
   margin: 0;
 }
 
 .ad-sub {
-  color: rgba(255,255,255,0.25);
+  color: var(--gray);
   font-size: 13px;
   margin: 0;
 }
 
 .ad-btn {
   margin-left: auto;
-  color: var(--red);
+  color: var(--white);
+  background: rgba(204,0,0,0.15);
+  border: 1px solid rgba(204,0,0,0.4);
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 13px;
   font-weight: 700;
@@ -160,9 +190,13 @@
   text-transform: uppercase;
   text-decoration: none;
   flex-shrink: 0;
-  transition: opacity 0.2s;
+  padding: 8px 20px;
+  transition: background 0.2s, border-color 0.2s;
 }
-.ad-btn:hover { opacity: 0.75; }
+.ad-btn:hover {
+  background: var(--red);
+  border-color: var(--red);
+}
 
 /* ── НИЖНЯЯ СТРОКА ───────────────────────────────────────────────────── */
 .footer-bottom .container {
