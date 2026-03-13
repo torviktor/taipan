@@ -9,6 +9,7 @@ services:
       POSTGRES_USER:     taipan_user
       POSTGRES_PASSWORD: taipan_pass
       POSTGRES_DB:       taipan_db
+      - ANTHROPIC_API_KEY=${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}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: always

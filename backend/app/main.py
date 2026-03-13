@@ -5,6 +5,8 @@ from app.routes import auth, applications, schedule, users, payments
 from app.routes import events, telegram
 from app.models import user
 from app.models import event
+from app.routes.ai import router as ai_router
+app.include_router(ai_router, prefix="/api")
 
 Base.metadata.create_all(bind=engine)
 

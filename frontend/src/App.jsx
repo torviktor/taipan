@@ -15,6 +15,7 @@ import GroupKids1 from './pages/GroupKids1'
 import GroupKids2 from './pages/GroupKids2'
 import GroupAdults from './pages/GroupAdults'
 import Champions from './pages/Champions'
+import TaipanGPT from './components/TaipanGPT'
 
 export default function App() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/champions"         element={<Champions />} />
       </Routes>
       <Footer />
+      <TaipanGPT />
     </>
   )
 }
