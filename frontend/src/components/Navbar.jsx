@@ -2,17 +2,16 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import './Navbar.css'
 
-// Статический индекс страниц + ключевые слова
 const STATIC_INDEX = [
-  { path: '/',          title: 'Главная',             keywords: 'главная клуб тайпан тхэквондо павловский посад' },
-  { path: '/about',     title: 'О клубе',             keywords: 'о клубе тренер ротарь екатерина история эмблема обязанности сезон аттестация сборы семья' },
-  { path: '/schedule',  title: 'Расписание',           keywords: 'расписание тренировки группа младшая старшая вторник четверг суббота время 17:30 19:00' },
-  { path: '/calendar',  title: 'Календарь событий',    keywords: 'календарь события соревнования сборы турнир' },
-  { path: '/apply',     title: 'Записаться',           keywords: 'записаться заявка вступление пробное занятие регистрация' },
-  { path: '/champions', title: 'Зал славы',            keywords: 'зал славы чемпионы кабанова шамарин фуртаева андрюшин келим медведев козлов комаров коростелёва дорофеев' },
+  { path: '/',          title: 'Главная',           keywords: 'главная клуб тайпан тхэквондо павловский посад' },
+  { path: '/about',     title: 'О клубе',           keywords: 'о клубе тренер ротарь екатерина история эмблема обязанности сезон аттестация сборы семья' },
+  { path: '/schedule',  title: 'Расписание',         keywords: 'расписание тренировки группа младшая старшая вторник четверг суббота время 17:30 19:00' },
+  { path: '/calendar',  title: 'Календарь событий',  keywords: 'календарь события соревнования сборы турнир' },
+  { path: '/apply',     title: 'Записаться',         keywords: 'записаться заявка вступление пробное занятие регистрация' },
+  { path: '/champions', title: 'Зал славы',          keywords: 'зал славы чемпионы кабанова шамарин фуртаева андрюшин келим медведев козлов комаров коростелёва дорофеев ротарь' },
   { path: '/groups/kids-6-10',  title: 'Группа 6–10 лет',  keywords: 'младшая группа дети 6 7 8 9 10 лет' },
-  { path: '/groups/kids-11-16', title: 'Группа 10–18 лет', keywords: 'старшая группа подростки 11 12 13 14 15 16 17 18 лет' },
-  { path: '/groups/adults',     title: 'Взрослая группа',  keywords: 'взрослые группа 18 лет' },
+  { path: '/groups/kids-11-16', title: 'Группа 11–16 лет', keywords: 'старшая группа дети 11 12 13 14 15 16 лет' },
+  { path: '/groups/adults',     title: 'Взрослая группа',  keywords: 'взрослые группа 16 лет' },
 ]
 
 function SearchIcon() {
@@ -25,17 +24,17 @@ function SearchIcon() {
 }
 
 export default function Navbar() {
-  const [scrolled,     setScrolled]     = useState(false)
-  const [menuOpen,     setMenuOpen]     = useState(false)
-  const [searchOpen,   setSearchOpen]   = useState(false)
-  const [query,        setQuery]        = useState('')
-  const [results,      setResults]      = useState([])
-  const [searching,    setSearching]    = useState(false)
+  const [scrolled,   setScrolled]   = useState(false)
+  const [menuOpen,   setMenuOpen]   = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [query,      setQuery]      = useState('')
+  const [results,    setResults]    = useState([])
+  const [searching,  setSearching]  = useState(false)
 
-  const location = useLocation()
-  const navigate = useNavigate()
-  const searchRef = useRef(null)
-  const inputRef  = useRef(null)
+  const location    = useLocation()
+  const navigate    = useNavigate()
+  const searchRef   = useRef(null)
+  const inputRef    = useRef(null)
   const debounceRef = useRef(null)
 
   useEffect(() => {
@@ -63,13 +62,9 @@ export default function Navbar() {
   const doSearch = async (q) => {
     if (!q.trim()) { setResults([]); return }
     const low = q.toLowerCase()
-
-    // Статические страницы
     const staticHits = STATIC_INDEX
       .filter(p => p.title.toLowerCase().includes(low) || p.keywords.includes(low))
-      .map(p => ({ type: 'page', path: p.path, title: p.title, sub: 'Страница' }))
-
-    // Динамический поиск по событиям календаря
+      .map(p => ({ path: p.path, title: p.title, sub: 'Страница' }))
     setSearching(true)
     let eventHits = []
     try {
@@ -84,7 +79,6 @@ export default function Navbar() {
           )
           .slice(0, 4)
           .map(e => ({
-            type: 'event',
             path: '/calendar',
             title: e.title,
             sub: new Date(e.event_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }),
@@ -92,7 +86,6 @@ export default function Navbar() {
       }
     } catch {}
     setSearching(false)
-
     setResults([...staticHits, ...eventHits])
   }
 
@@ -130,16 +123,10 @@ export default function Navbar() {
               <Link to={l.to} className={location.pathname === l.to ? 'active' : ''}>{l.label}</Link>
             </li>
           ))}
-          {isAdmin && (
-            <li>
-              <Link to="/cabinet" className={location.pathname === '/cabinet' ? 'active' : ''}>Панель</Link>
-            </li>
-          )}
+          {/* Панель убрана — кнопка Кабинет одна для всех */}
         </ul>
 
         <div className="navbar-actions">
-
-          {/* Поиск */}
           <div className="navbar-search" ref={searchRef}>
             <button
               className={`navbar-search-btn ${searchOpen ? 'active' : ''}`}
@@ -149,7 +136,6 @@ export default function Navbar() {
             >
               <SearchIcon />
             </button>
-
             {searchOpen && (
               <div className="navbar-search-dropdown">
                 <div className="navbar-search-field">
@@ -164,7 +150,6 @@ export default function Navbar() {
                   />
                   {searching && <span className="navbar-search-spin">...</span>}
                 </div>
-
                 {results.length > 0 && (
                   <ul className="navbar-search-results">
                     {results.map((r, i) => (
@@ -177,25 +162,20 @@ export default function Navbar() {
                     ))}
                   </ul>
                 )}
-
                 {query && !searching && results.length === 0 && (
                   <div className="navbar-search-empty">Ничего не найдено</div>
                 )}
-
                 {!query && (
-                  <div className="navbar-search-hint">
-                    Введите запрос — страницы или события
-                  </div>
+                  <div className="navbar-search-hint">Введите запрос — страницы или события</div>
                 )}
               </div>
             )}
           </div>
 
-          {token ? (
-            <Link to="/cabinet" className="btn-primary">Кабинет</Link>
-          ) : (
-            <Link to="/login" className="btn-primary">Войти</Link>
-          )}
+          {token
+            ? <Link to="/cabinet" className="btn-primary">Кабинет</Link>
+            : <Link to="/login"   className="btn-primary">Войти</Link>
+          }
         </div>
 
         <button className={`burger ${menuOpen ? 'open' : ''}`} onClick={() => setMenuOpen(!menuOpen)}>
@@ -203,10 +183,13 @@ export default function Navbar() {
         </button>
       </div>
 
+      {/* Мобильное меню */}
       <div className={`mobile-menu ${menuOpen ? 'open' : ''}`}>
         {links.map(l => <Link key={l.to} to={l.to}>{l.label}</Link>)}
-        {isAdmin && <Link to="/cabinet">Панель</Link>}
-        {token ? <Link to="/cabinet">Кабинет</Link> : <Link to="/login">Войти</Link>}
+        {token
+          ? <Link to="/cabinet" className="mobile-menu-cabinet">Кабинет</Link>
+          : <Link to="/login"   className="mobile-menu-cabinet">Войти</Link>
+        }
       </div>
     </nav>
   )

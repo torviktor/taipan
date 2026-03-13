@@ -5,24 +5,16 @@ export default function Footer() {
   return (
     <footer className="footer">
       <div className="container footer-inner">
-
         <div className="footer-brand">
           <div className="footer-logo">ТАЙПАН</div>
           <p>Спортивный клуб тхэквондо<br/>г. Павловский Посад</p>
           <p className="footer-dev">
             Сайт разработан{' '}
-            <a href="https://github.com/torviktor/taipan" target="_blank" rel="noreferrer">
-              github.com/torviktor/taipan
-            </a>
-            <br/>
-            Собственность{' '}
-            <a href="https://github.com/torviktor/taipan" target="_blank" rel="noreferrer">
-              github.com/torviktor/taipan
-            </a>{' '}
-            и клуба «Тайпан»
+            <a href="https://t.me/TORVIKTOR" target="_blank" rel="noreferrer">t.me/TORVIKTOR</a>
+            {' '}(<a href="https://github.com/torviktor/taipan" target="_blank" rel="noreferrer">github.com/torviktor/taipan</a>).<br/>
+            Собственность клуба «Тайпан»
           </p>
         </div>
-
         <div className="footer-links">
           <h4>Навигация</h4>
           <Link to="/">Главная</Link>
@@ -30,9 +22,8 @@ export default function Footer() {
           <Link to="/schedule">Расписание</Link>
           <Link to="/calendar">Календарь</Link>
           <Link to="/apply">Записаться</Link>
-          <Link to="/login">Личный кабинет</Link>
+          <Link to="/cabinet">Личный кабинет</Link>
         </div>
-
         <div className="footer-contacts">
           <h4>Контакты</h4>
           <p>📍 Павловский Посад, ул. Кирова, 95</p>
@@ -47,10 +38,7 @@ export default function Footer() {
             Открыть на карте →
           </a>
         </div>
-
       </div>
-
-      {/* Рекламный баннер */}
       <div className="footer-ad">
         <div className="container">
           <div className="ad-banner">
@@ -61,7 +49,6 @@ export default function Footer() {
           </div>
         </div>
       </div>
-
       <div className="footer-bottom">
         <div className="container">
           <span>© 2025–2026 Клуб тхэквондо «Тайпан», Павловский Посад. Все права защищены.</span>

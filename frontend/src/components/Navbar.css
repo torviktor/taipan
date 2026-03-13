@@ -220,3 +220,25 @@
   .burger          { display: flex; }
   .mobile-menu     { display: flex; }
 }
+
+/* ── МОБИЛЬНОЕ МЕНЮ — кнопка кабинет/войти ──────────────────────────── */
+.mobile-menu-cabinet {
+  padding: 14px 24px !important;
+  color: var(--white) !important;
+  background: var(--red) !important;
+  font-size: 15px !important;
+  text-align: center;
+  letter-spacing: 2px;
+  border-bottom: none !important;
+}
+.mobile-menu-cabinet:hover {
+  color: var(--white) !important;
+  padding-left: 24px !important;
+  opacity: 0.85;
+}
+
+/* ── МОБИЛЬНЫЙ HERO — не обрезать текст ─────────────────────────────── */
+@media (max-width: 480px) {
+  .navbar-inner { gap: 12px; }
+  .navbar-logo-img { height: 48px; }
+}

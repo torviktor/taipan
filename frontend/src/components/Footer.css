@@ -144,3 +144,30 @@
   .footer-bottom .container { flex-direction: column; gap: 8px; text-align: center; }
   .ad-banner { flex-direction: column; text-align: center; }
 }
+/* ДОБАВИТЬ в Footer.css — отступы внутри footer-inner от линий */
+
+/* Отступы сверху и снизу от border-top/border-bottom */
+.footer-inner {
+  padding-top: 40px !important;
+  padding-bottom: 40px !important;
+}
+
+/* About mobile — одинаковые вкладки */
+@media (max-width: 900px) {
+  .about-nav {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 4px !important;
+  }
+  .about-nav-item {
+    min-width: unset !important;
+    flex: unset !important;
+    padding: 10px 10px !important;
+    justify-content: center;
+  }
+  .about-nav-title {
+    font-size: 10px !important;
+    letter-spacing: 0.5px !important;
+    text-align: center;
+  }
+}
