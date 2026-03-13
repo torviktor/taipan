@@ -327,3 +327,42 @@
   .modal-header, .modal-form { padding-left: 20px; padding-right: 20px; }
   .calendar-wrap { padding: 12px; }
 }
+
+/* ── Просмотр события ─────────────────────────────────────────────── */
+.modal-view { max-width: 480px; }
+.modal-view-body { padding: 0 32px 32px; display: flex; flex-direction: column; gap: 0; }
+.modal-view-row {
+  display: flex; gap: 16px; align-items: baseline;
+  padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.modal-view-row--col { flex-direction: column; gap: 6px; }
+.modal-view-label {
+  font-family: 'Barlow Condensed', sans-serif; font-size: 11px;
+  font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--red); flex-shrink: 0; min-width: 70px;
+}
+.modal-view-value { color: var(--white); font-size: 15px; line-height: 1.6; }
+
+/* ── Мобильный адаптив кнопок календаря ─────────────────────────── */
+@media (max-width: 600px) {
+  .calendar-wrap { padding: 8px; }
+  .calendar-wrap .fc-button {
+    padding: 5px 8px !important;
+    font-size: 10px !important;
+    letter-spacing: 0 !important;
+  }
+  .calendar-wrap .fc-toolbar-title {
+    font-size: 16px !important;
+    letter-spacing: 1px;
+  }
+  .calendar-wrap .fc-toolbar {
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  .calendar-wrap .fc-daygrid-day-number {
+    font-size: 11px;
+    padding: 4px !important;
+  }
+  .modal-view-body, .modal-header { padding-left: 16px; padding-right: 16px; }
+}

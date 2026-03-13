@@ -9,7 +9,7 @@ import Apply from './pages/Apply'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Cabinet from './pages/Cabinet'
-import Admin from './pages/Admin'
+import { Navigate } from 'react-router-dom'
 import About from './pages/About'
 import GroupKids1 from './pages/GroupKids1'
 import GroupKids2 from './pages/GroupKids2'
@@ -30,7 +30,7 @@ export default function App() {
         <Route path="/login"             element={<Login />} />
         <Route path="/register"          element={<Register />} />
         <Route path="/cabinet"           element={<Cabinet />} />
-        <Route path="/admin"             element={<Admin />} />
+        <Route path="/admin"             element={<Navigate to="/cabinet" replace />} />
         <Route path="/groups/kids-6-10"  element={<GroupKids1 />} />
         <Route path="/groups/kids-11-16" element={<GroupKids2 />} />
         <Route path="/groups/adults"     element={<GroupAdults />} />

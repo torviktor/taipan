@@ -42,6 +42,7 @@ export default function CalendarPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [loading, setLoading] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [viewEvent, setViewEvent] = useState(null)
   const calendarRef = useRef(null)
 
   useEffect(() => { loadEvents() }, [])
@@ -66,6 +67,10 @@ export default function CalendarPage() {
 
   function openEdit(clickInfo) {
     const e = clickInfo.event.extendedProps
+    if (!isAdmin()) {
+      setViewEvent(e)
+      return
+    }
     const dt = new Date(e.event_date)
     setForm({
       title: e.title, description: e.description || '',
@@ -77,6 +82,15 @@ export default function CalendarPage() {
     })
     setEditEvent(e)
     setModal(true)
+  }
+
+  function formatViewDate(dt) {
+    if (!dt) return ''
+    return new Date(dt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+  }
+  function formatViewTime(dt) {
+    if (!dt) return ''
+    return new Date(dt).toTimeString().slice(0, 5)
   }
 
   async function saveEvent(e) {
@@ -235,6 +249,40 @@ export default function CalendarPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Просмотр события для обычных пользователей */}
+      {viewEvent && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setViewEvent(null)}>
+          <div className="modal modal-view">
+            <div className="modal-header">
+              <h2>{viewEvent.title}</h2>
+              <button className="modal-close" onClick={() => setViewEvent(null)}>✕</button>
+            </div>
+            <div className="modal-view-body">
+              <div className="modal-view-row">
+                <span className="modal-view-label">Дата</span>
+                <span className="modal-view-value">{formatViewDate(viewEvent.event_date)}</span>
+              </div>
+              <div className="modal-view-row">
+                <span className="modal-view-label">Время</span>
+                <span className="modal-view-value">{formatViewTime(viewEvent.event_date)}</span>
+              </div>
+              {viewEvent.location && (
+                <div className="modal-view-row">
+                  <span className="modal-view-label">Место</span>
+                  <span className="modal-view-value">{viewEvent.location}</span>
+                </div>
+              )}
+              {viewEvent.description && (
+                <div className="modal-view-row modal-view-row--col">
+                  <span className="modal-view-label">Описание</span>
+                  <span className="modal-view-value">{viewEvent.description}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
