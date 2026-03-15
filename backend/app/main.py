@@ -4,12 +4,8 @@ from app.core.database import engine, Base
 from app.routes import auth, applications, schedule, users, payments
 from app.routes import events, telegram
 from app.routes.ai import router as ai_router
-from app.models import user
-from app.models import event
 from app.routes.attendance import router as attendance_router
-from app.models import attendance  # для создания таблиц
-
-app.include_router(attendance_router, prefix="/api", tags=["Посещаемость"])
+from app.models import user, event, attendance
 
 Base.metadata.create_all(bind=engine)
 
@@ -27,14 +23,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router,         prefix="/api/auth",         tags=["Авторизация"])
-app.include_router(users.router,        prefix="/api/users",        tags=["Пользователи"])
-app.include_router(applications.router, prefix="/api/applications", tags=["Заявки"])
-app.include_router(schedule.router,     prefix="/api/schedule",     tags=["Расписание"])
-app.include_router(payments.router,     prefix="/api/payments",     tags=["Оплата"])
-app.include_router(events.router,       prefix="/api/events",       tags=["Календарь"])
-app.include_router(telegram.router,     prefix="/api/telegram",     tags=["Telegram"])
-app.include_router(ai_router,           prefix="/api",              tags=["AI"])
+app.include_router(auth.router,              prefix="/api/auth",         tags=["Авторизация"])
+app.include_router(users.router,             prefix="/api/users",        tags=["Пользователи"])
+app.include_router(applications.router,      prefix="/api/applications", tags=["Заявки"])
+app.include_router(schedule.router,          prefix="/api/schedule",     tags=["Расписание"])
+app.include_router(payments.router,          prefix="/api/payments",     tags=["Оплата"])
+app.include_router(events.router,            prefix="/api/events",       tags=["Календарь"])
+app.include_router(telegram.router,          prefix="/api/telegram",     tags=["Telegram"])
+app.include_router(ai_router,                prefix="/api",              tags=["AI"])
+app.include_router(attendance_router,        prefix="/api",              tags=["Посещаемость"])
 
 @app.get("/")
 def root():
