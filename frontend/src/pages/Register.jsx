@@ -1,33 +1,26 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import './Register.css'
-
 const API = '/api'
-
 const emptyAthlete = () => ({
   full_name: '', birth_date: '', gender: 'male', gup: '', dan: '', has_dan: false
 })
-
-// ── SVG иконки (строгие, без детских эмодзи) ─────────────────────────────────
 const IconParent = () => (
-  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
     <circle cx="11" cy="9" r="4" stroke="currentColor" strokeWidth="1.5"/>
     <path d="M3 26c0-5 3.6-8 8-8s8 3 8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
     <circle cx="22" cy="12" r="3" stroke="currentColor" strokeWidth="1.5"/>
     <path d="M17 26c0-3.5 2.2-6 5-6s5 2.5 5 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 )
-
 const IconAthlete = () => (
-  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
     <circle cx="16" cy="7" r="4" stroke="currentColor" strokeWidth="1.5"/>
     <path d="M8 28l3-8 5 4 5-4 3 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
     <path d="M10 16l2-4h8l2 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
     <path d="M6 20l4-4M26 20l-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 )
-
-// ── Форма одного спортсмена ───────────────────────────────────────────────────
 function AthleteForm({ data, onChange, index, isParent }) {
   const set = (k, v) => onChange({ ...data, [k]: v })
   return (
@@ -75,21 +68,18 @@ function AthleteForm({ data, onChange, index, isParent }) {
     </div>
   )
 }
-
 export default function Register() {
   const navigate  = useNavigate()
   const [step, setStep]       = useState('preview')
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
-  const [modal, setModal]     = useState(null) // { existingChildren: [], newAthlete, phone, password }
-
+  const [modal, setModal]     = useState(null)
+  const [consent, setConsent] = useState(false)   // ← согласие с ПД
   const [form, setForm] = useState({
     full_name: '', phone: '', password: '', password2: '', email: '', role: 'parent',
   })
   const [athletes, setAthletes] = useState([emptyAthlete()])
-
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-
   const formatPhone = (v) => {
     const d = v.replace(/\D/g, '').slice(0, 11)
     if (d.length <= 1) return d ? '+7' : ''
@@ -98,7 +88,6 @@ export default function Register() {
     if (d.length <= 9) return `+7 (${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`
     return `+7 (${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7,9)}-${d.slice(9)}`
   }
-
   const buildAthletePayload = (a) => ({
     full_name:  a.full_name,
     birth_date: a.birth_date,
@@ -106,7 +95,6 @@ export default function Register() {
     gup:  a.has_dan ? null : (a.gup  ? parseInt(a.gup)  : null),
     dan:  a.has_dan ? (a.dan  ? parseInt(a.dan)  : 1)   : null,
   })
-
   const handlePhoneBlur = async () => {
     const phone = form.phone.replace(/\D/g, '')
     if (phone.length < 11 || form.role !== 'parent') return
@@ -114,14 +102,12 @@ export default function Register() {
       const r = await fetch(`${API}/auth/check-phone/${phone}`)
       const data = await r.json()
       if (data.exists && data.athletes_count > 0) {
-        // Телефон уже в БД — переключаемся в режим "добавить ребёнка"
         setForm(f => ({ ...f, _existing: data }))
       } else {
         setForm(f => ({ ...f, _existing: null }))
       }
     } catch { }
   }
-
   const handleSubmit = async () => {
     setError('')
     if (!form.full_name) { setError('Введите ваше ФИО'); return }
@@ -130,30 +116,18 @@ export default function Register() {
     for (const a of athletes) {
       if (!a.full_name || !a.birth_date) { setError('Заполните данные всех спортсменов'); return }
     }
-
+    if (!consent) { setError('Необходимо согласие на обработку персональных данных'); return }
     const phone = form.phone.replace(/\D/g, '')
-
-    // Если телефон уже в БД — показываем модальное окно подтверждения
     if (form._existing?.exists) {
-      setModal({
-        existingChildren: form._existing.athletes,
-        athletes,
-        phone,
-        password: form.password,
-      })
+      setModal({ existingChildren: form._existing.athletes, athletes, phone, password: form.password })
       return
     }
-
     setLoading(true)
     try {
-      // Регистрируем с первым спортсменом
       const body = {
-        full_name: form.full_name,
-        phone,
-        password:  form.password,
-        email:     form.email || undefined,
-        role:      form.role,
-        athlete:   buildAthletePayload(athletes[0]),
+        full_name: form.full_name, phone, password: form.password,
+        email: form.email || undefined, role: form.role,
+        athlete: buildAthletePayload(athletes[0]),
       }
       const res  = await fetch(`${API}/auth/register`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -161,15 +135,12 @@ export default function Register() {
       })
       const data = await res.json()
       if (!res.ok) { setError(data.detail || 'Ошибка регистрации'); return }
-
-      // Если несколько детей — добавляем остальных
       for (let i = 1; i < athletes.length; i++) {
         await fetch(`${API}/auth/add-athlete`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone, password: form.password, athlete: buildAthletePayload(athletes[i]) }),
         })
       }
-
       localStorage.setItem('token', data.access_token)
       localStorage.setItem('role',  data.role)
       localStorage.setItem('full_name', data.full_name)
@@ -180,8 +151,6 @@ export default function Register() {
       setLoading(false)
     }
   }
-
-  // Подтверждение добавления ребёнка к существующему аккаунту
   const confirmAddAthlete = async () => {
     setLoading(true)
     setModal(null)
@@ -204,7 +173,6 @@ export default function Register() {
       setLoading(false)
     }
   }
-
   // ── ПРЕВЬЮ ────────────────────────────────────────────────────────────────
   if (step === 'preview') {
     return (
@@ -238,8 +206,7 @@ export default function Register() {
       </main>
     )
   }
-
-  // ── МОДАЛЬНОЕ ОКНО подтверждения второго/третьего ребёнка ─────────────────
+  // ── МОДАЛЬНОЕ ОКНО ────────────────────────────────────────────────────────
   if (modal) {
     const n = modal.existingChildren.length + 1
     return (
@@ -271,7 +238,6 @@ export default function Register() {
       </main>
     )
   }
-
   // ── ФОРМА РЕГИСТРАЦИИ ─────────────────────────────────────────────────────
   return (
     <main className="register-page">
@@ -283,10 +249,7 @@ export default function Register() {
           <h1>Регистрация</h1>
           <p>Клуб тхэквондо «Тайпан»</p>
         </div>
-
         {error && <div className="register-error">{error}</div>}
-
-        {/* Роль */}
         <div className="register-section">
           <h3>Кто регистрируется?</h3>
           <div className="register-role-btns">
@@ -304,8 +267,6 @@ export default function Register() {
             </button>
           </div>
         </div>
-
-        {/* Данные пользователя */}
         <div className="register-section">
           <h3>{form.role === 'parent' ? 'Данные родителя' : 'Ваши данные'}</h3>
           <div className="register-fields">
@@ -344,8 +305,6 @@ export default function Register() {
             </div>
           </div>
         </div>
-
-        {/* Данные спортсменов */}
         <div className="register-section">
           <h3>{form.role === 'parent' ? 'Данные детей' : 'Данные спортсмена'}</h3>
           {athletes.map((a, i) => (
@@ -362,7 +321,6 @@ export default function Register() {
               )}
             </div>
           ))}
-
           {form.role === 'parent' && athletes.length < 5 && (
             <button className="athlete-add-btn"
               onClick={() => setAthletes(arr => [...arr, emptyAthlete()])}>
@@ -371,10 +329,29 @@ export default function Register() {
           )}
         </div>
 
-        <button className="btn-primary register-submit" onClick={handleSubmit} disabled={loading}>
+        {/* ── Согласие на обработку персональных данных ── */}
+        <div className="register-consent">
+          <label className={`consent-label ${!consent && error.includes('согласие') ? 'consent-label--error' : ''}`}>
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={e => setConsent(e.target.checked)}
+              className="consent-checkbox"
+            />
+            <span>
+              Я даю согласие на обработку персональных данных в соответствии с{' '}
+              <Link to="/privacy" target="_blank" rel="noreferrer">
+                политикой конфиденциальности
+              </Link>{' '}
+              клуба «Тайпан» и требованиями Федерального закона № 152-ФЗ «О персональных данных».
+              {form.role === 'parent' && ' Как законный представитель несовершеннолетнего, я также даю согласие на обработку персональных данных ребёнка.'}
+            </span>
+          </label>
+        </div>
+
+        <button className="btn-primary register-submit" onClick={handleSubmit} disabled={loading || !consent}>
           {loading ? 'Регистрация...' : 'Зарегистрироваться'}
         </button>
-
         <p className="register-login-link">
           Уже есть аккаунт? <Link to="/login">Войти</Link>
         </p>
