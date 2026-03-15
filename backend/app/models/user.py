@@ -54,6 +54,7 @@ class Athlete(Base):
     updated_at   = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = relationship("User", back_populates="athletes")
+    attendance_records = relationship("Attendance", back_populates="athlete")
 
     @property
     def age(self) -> int:

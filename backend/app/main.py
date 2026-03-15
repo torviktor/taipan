@@ -6,6 +6,10 @@ from app.routes import events, telegram
 from app.routes.ai import router as ai_router
 from app.models import user
 from app.models import event
+from app.routes.attendance import router as attendance_router
+from app.models import attendance  # для создания таблиц
+
+app.include_router(attendance_router, prefix="/api", tags=["Посещаемость"])
 
 Base.metadata.create_all(bind=engine)
 

@@ -79,6 +79,222 @@ function ResetPasswordModal({ user, token, onClose }) {
   )
 }
 
+// ── ЖУРНАЛ ПОСЕЩАЕМОСТИ ────────────────────────────────────────────────────────
+function AttendanceTab({ token, athletes }) {
+  const today = new Date().toISOString().split('T')[0]
+  const [date, setDate]           = useState(today)
+  const [group, setGroup]         = useState('junior')
+  const [sessions, setSessions]   = useState([])
+  const [activeSession, setActiveSession] = useState(null)
+  const [marks, setMarks]         = useState({})
+  const [notes, setNotes]         = useState('')
+  const [saving, setSaving]       = useState(false)
+  const [msg, setMsg]             = useState('')
+  const [viewMode, setViewMode]   = useState('create') // 'create' | 'history' | 'session'
+
+  const groupAthletes = useMemo(() =>
+    athletes.filter(a => {
+      const g = a.group || a.auto_group || ''
+      return group === 'junior'
+        ? g.includes('6') || g.includes('Младшая')
+        : g.includes('11') || g.includes('Старшая') || g.includes('Взрослые') || g.includes('16')
+    })
+  , [athletes, group])
+
+  useEffect(() => { loadSessions() }, [group])
+
+  const loadSessions = async () => {
+    try {
+      const r = await fetch(`${API}/attendance/sessions?group_name=${group}&limit=20`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (r.ok) setSessions(await r.json())
+    } catch {}
+  }
+
+  const initMarks = (athleteList, existingMarks = {}) => {
+    const m = {}
+    athleteList.forEach(a => { m[a.id] = existingMarks[a.id] ?? false })
+    setMarks(m)
+  }
+
+  const startNewSession = () => {
+    initMarks(groupAthletes)
+    setNotes('')
+    setActiveSession(null)
+    setViewMode('create')
+    setMsg('')
+  }
+
+  const openSession = async (s) => {
+    try {
+      const r = await fetch(`${API}/attendance/sessions/${s.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (r.ok) {
+        const data = await r.json()
+        const existingMarks = {}
+        data.athletes.forEach(a => { existingMarks[a.id] = a.present })
+        initMarks(data.athletes, existingMarks)
+        setActiveSession(data)
+        setNotes(data.notes || '')
+        setViewMode('session')
+      }
+    } catch {}
+  }
+
+  const saveSession = async () => {
+    setSaving(true)
+    setMsg('')
+    try {
+      let sessionId = activeSession?.id
+
+      if (!sessionId) {
+        // Создаём новую тренировку
+        const cr = await fetch(`${API}/attendance/sessions`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date, group_name: group, notes })
+        })
+        if (!cr.ok) {
+          const e = await cr.json()
+          setMsg(e.detail || 'Ошибка создания тренировки')
+          setSaving(false)
+          return
+        }
+        const created = await cr.json()
+        sessionId = created.id
+      }
+
+      // Отмечаем посещаемость
+      const records = Object.entries(marks).map(([athlete_id, present]) => ({
+        athlete_id: parseInt(athlete_id), present
+      }))
+      await fetch(`${API}/attendance/sessions/${sessionId}/mark`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ records })
+      })
+
+      setMsg(`Сохранено! Присутствовало: ${records.filter(r => r.present).length} из ${records.length}`)
+      loadSessions()
+    } catch {
+      setMsg('Ошибка сохранения')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const toggleAll = (val) => {
+    const m = {}
+    Object.keys(marks).forEach(id => { m[id] = val })
+    setMarks(m)
+  }
+
+  const presentCount = Object.values(marks).filter(Boolean).length
+  const totalCount   = Object.keys(marks).length
+
+  return (
+    <div className="attendance-wrap">
+      {/* Шапка */}
+      <div className="attendance-header">
+        <div className="attendance-group-tabs">
+          <button className={`att-group-btn ${group === 'junior' ? 'active' : ''}`}
+            onClick={() => { setGroup('junior'); startNewSession() }}>
+            Младшая (6–10 лет)
+          </button>
+          <button className={`att-group-btn ${group === 'senior' ? 'active' : ''}`}
+            onClick={() => { setGroup('senior'); startNewSession() }}>
+            Старшая (11+)
+          </button>
+        </div>
+        <div className="attendance-view-tabs">
+          <button className={`att-view-btn ${viewMode !== 'history' ? 'active' : ''}`}
+            onClick={startNewSession}>+ Новая тренировка</button>
+          <button className={`att-view-btn ${viewMode === 'history' ? 'active' : ''}`}
+            onClick={() => setViewMode('history')}>История ({sessions.length})</button>
+        </div>
+      </div>
+
+      {/* История тренировок */}
+      {viewMode === 'history' && (
+        <div className="att-history">
+          {sessions.length === 0 && <div className="cabinet-empty">Тренировок пока нет</div>}
+          {sessions.map(s => (
+            <div key={s.id} className="att-session-row" onClick={() => openSession(s)}>
+              <span className="att-session-date">{new Date(s.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              <span className="att-session-stat">
+                {s.present} / {s.total} присутствовали
+                {s.total > 0 && <span className="att-pct"> ({Math.round(s.present/s.total*100)}%)</span>}
+              </span>
+              {s.notes && <span className="att-session-notes">{s.notes}</span>}
+              <span className="att-session-edit">Открыть →</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Форма новой / редактирование тренировки */}
+      {viewMode !== 'history' && (
+        <div className="att-form">
+          <div className="att-form-top">
+            {viewMode === 'create' ? (
+              <div className="att-date-row">
+                <label>Дата тренировки</label>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                  className="att-date-input" />
+              </div>
+            ) : (
+              <div className="att-session-title">
+                Тренировка: {new Date(activeSession.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </div>
+            )}
+            <div className="att-date-row">
+              <label>Заметка к тренировке</label>
+              <input type="text" placeholder="Например: открытая тренировка..." value={notes}
+                onChange={e => setNotes(e.target.value)} className="att-notes-input" />
+            </div>
+          </div>
+
+          {/* Счётчик + кнопки выбора всех */}
+          <div className="att-counter-row">
+            <span className="att-counter">
+              Присутствует: <strong>{presentCount}</strong> из <strong>{totalCount}</strong>
+            </span>
+            <button className="att-all-btn" onClick={() => toggleAll(true)}>Все пришли</button>
+            <button className="att-all-btn" onClick={() => toggleAll(false)}>Сбросить</button>
+          </div>
+
+          {/* Список спортсменов */}
+          <div className="att-list">
+            {groupAthletes.length === 0 && (
+              <div className="cabinet-empty">Нет спортсменов в этой группе</div>
+            )}
+            {groupAthletes.map(a => (
+              <div
+                key={a.id}
+                className={`att-athlete-row ${marks[a.id] ? 'present' : 'absent'}`}
+                onClick={() => setMarks(m => ({ ...m, [a.id]: !m[a.id] }))}
+              >
+                <div className="att-check">{marks[a.id] ? '✓' : '—'}</div>
+                <div className="att-athlete-name">{a.full_name}</div>
+                <div className="att-athlete-age">{a.age} лет · {a.group || a.auto_group}</div>
+              </div>
+            ))}
+          </div>
+
+          {msg && <div className="att-msg">{msg}</div>}
+
+          <button className="btn-primary att-save-btn" onClick={saveSession} disabled={saving}>
+            {saving ? 'Сохранение...' : 'Сохранить тренировку'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── СТАТУСЫ ЗАЯВОК ─────────────────────────────────────────────────────────────
 const STATUS_LABELS = {
   new:        { label: 'Новая',        color: '#FFD700' },
   processing: { label: 'В обработке',  color: '#4caf50' },
@@ -86,6 +302,7 @@ const STATUS_LABELS = {
   rejected:   { label: 'Отклонена',    color: '#CC0000' },
 }
 
+// ── ГЛАВНЫЙ КОМПОНЕНТ ──────────────────────────────────────────────────────────
 export default function Cabinet() {
   const navigate = useNavigate()
   const token    = localStorage.getItem('token')
@@ -172,19 +389,9 @@ export default function Cabinet() {
     loadApplications()
   }
 
-  const uniqueGroups = useMemo(() =>
-    [...new Set(athletes.map(a => a.group || a.auto_group).filter(Boolean))].sort()
-  , [athletes])
-
-  const uniqueGupDan = useMemo(() => {
-    const vals = new Set()
-    athletes.forEach(a => { if (a.dan) vals.add(`${a.dan} дан`); else if (a.gup) vals.add(`${a.gup} гып`) })
-    return [...vals].sort()
-  }, [athletes])
-
-  const uniqueParents = useMemo(() =>
-    [...new Set(athletes.map(a => a.parent_name).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru'))
-  , [athletes])
+  const uniqueGroups  = useMemo(() => [...new Set(athletes.map(a => a.group || a.auto_group).filter(Boolean))].sort(), [athletes])
+  const uniqueGupDan  = useMemo(() => { const v = new Set(); athletes.forEach(a => { if (a.dan) v.add(`${a.dan} дан`); else if (a.gup) v.add(`${a.gup} гып`) }); return [...v].sort() }, [athletes])
+  const uniqueParents = useMemo(() => [...new Set(athletes.map(a => a.parent_name).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')), [athletes])
 
   const filteredAthletes = useMemo(() => athletes.filter(a => {
     const s = search.toLowerCase()
@@ -213,19 +420,19 @@ export default function Cabinet() {
     p.parent_name.toLowerCase().includes(search.toLowerCase()) ||
     p.children.join(' ').toLowerCase().includes(search.toLowerCase())
   )
-
   const filteredApps = applications.filter(a =>
     a.full_name.toLowerCase().includes(search.toLowerCase()) ||
     (a.phone || '').includes(search)
   )
 
-  const { sorted: sortedAthletes, sort: sortA, toggle: toggleA } = useSorted(filteredAthletes)
-  const { sorted: sortedParents,  sort: sortP, toggle: toggleP  } = useSorted(filteredParents)
+  const { sorted: sortedAthletes, sort: sortA,  toggle: toggleA  } = useSorted(filteredAthletes)
+  const { sorted: sortedParents,  sort: sortP,  toggle: toggleP  } = useSorted(filteredParents)
   const { sorted: sortedApps,     sort: sortAp, toggle: toggleAp } = useSorted(filteredApps)
 
   const activeFiltersCount = Object.values(cf).filter(Boolean).length + (search ? 1 : 0)
   const logout = () => { localStorage.clear(); navigate('/login') }
 
+  // ── КАБИНЕТ РОДИТЕЛЯ ────────────────────────────────────────────────────────
   if (!isAdmin) {
     return (
       <main className="cabinet-page">
@@ -271,6 +478,7 @@ export default function Cabinet() {
     )
   }
 
+  // ── КАБИНЕТ АДМИНА ──────────────────────────────────────────────────────────
   return (
     <main className="cabinet-page">
       {resetUser && (
@@ -294,28 +502,39 @@ export default function Cabinet() {
             Родители ({parents.length})
           </button>
           <button className={`cabinet-tab ${view === 'applications' ? 'active' : ''}`} onClick={() => setView('applications')}>
-            Заявки на вступление
+            Заявки
             {applications.filter(a => a.status === 'new').length > 0 && (
               <span className="tab-badge">{applications.filter(a => a.status === 'new').length}</span>
             )}
           </button>
+          <button className={`cabinet-tab ${view === 'attendance' ? 'active' : ''}`} onClick={() => setView('attendance')}>
+            Журнал посещаемости
+          </button>
         </div>
 
-        <div className="cabinet-toolbar">
-          <div className="cabinet-search">
-            <input type="text" placeholder="Поиск..."
-              value={search} onChange={e => setSearch(e.target.value)} />
-            {search && <button className="cabinet-search-clear" onClick={() => setSearch('')}>✕</button>}
+        {view !== 'attendance' && (
+          <div className="cabinet-toolbar">
+            <div className="cabinet-search">
+              <input type="text" placeholder="Поиск..."
+                value={search} onChange={e => setSearch(e.target.value)} />
+              {search && <button className="cabinet-search-clear" onClick={() => setSearch('')}>✕</button>}
+            </div>
+            {activeFiltersCount > 0 && (
+              <button className="cabinet-reset-filters" onClick={resetFilters}>
+                Сбросить фильтры ({activeFiltersCount})
+              </button>
+            )}
           </div>
-          {activeFiltersCount > 0 && (
-            <button className="cabinet-reset-filters" onClick={resetFilters}>
-              Сбросить фильтры ({activeFiltersCount})
-            </button>
-          )}
-        </div>
+        )}
 
         {loading && <div className="cabinet-loading">Загрузка...</div>}
 
+        {/* ── Журнал посещаемости ── */}
+        {view === 'attendance' && (
+          <AttendanceTab token={token} athletes={athletes} />
+        )}
+
+        {/* ── Спортсмены ── */}
         {view === 'athletes' && (
           <div className="athletes-table-wrap">
             <table className="athletes-table">
@@ -380,6 +599,7 @@ export default function Cabinet() {
           </div>
         )}
 
+        {/* ── Родители ── */}
         {view === 'parents' && (
           <div className="athletes-table-wrap">
             <table className="athletes-table">
@@ -406,6 +626,7 @@ export default function Cabinet() {
           </div>
         )}
 
+        {/* ── Заявки ── */}
         {view === 'applications' && (
           <div className="athletes-table-wrap">
             <table className="athletes-table">
@@ -446,7 +667,6 @@ export default function Cabinet() {
             {sortedApps.length === 0 && !loading && <div className="cabinet-empty">Заявок нет</div>}
           </div>
         )}
-
       </div>
     </main>
   )
