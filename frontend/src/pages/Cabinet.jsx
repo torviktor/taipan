@@ -83,6 +83,36 @@ function ResetPasswordModal({ user, token, onClose }) {
   )
 }
 
+// ── Простой линейный SVG-график ───────────────────────────────────────────────
+function LineChart({ data, xKey, yKey, color = 'var(--red)', height = 180 }) {
+  if (!data || data.length === 0) return <div className="cabinet-empty">Нет данных</div>
+  const vals = data.map(d => d[yKey])
+  const max  = Math.max(...vals, 1)
+  const W = 600, H = height
+  const PAD = { t: 20, r: 20, b: 36, l: 36 }
+  const iw = W - PAD.l - PAD.r
+  const ih = H - PAD.t - PAD.b
+  const px = i => PAD.l + (i / (data.length - 1 || 1)) * iw
+  const py = v => PAD.t + ih - (v / max) * ih
+  const pts = data.map((d, i) => `${px(i)},${py(d[yKey])}`).join(' ')
+  const area = `M${px(0)},${py(0)} ` + data.map((d,i) => `L${px(i)},${py(d[yKey])}`).join(' ') + ` L${px(data.length-1)},${PAD.t+ih} L${px(0)},${PAD.t+ih} Z`
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', maxWidth:W, display:'block' }}>
+      {[0,0.5,1].map(f => <line key={f} x1={PAD.l} x2={W-PAD.r} y1={PAD.t+ih*(1-f)} y2={PAD.t+ih*(1-f)} stroke="var(--gray-dim)" strokeDasharray="4 3"/>)}
+      <path d={area} fill={color} fillOpacity="0.1"/>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
+      {data.map((d, i) => (
+        <g key={i}>
+          <circle cx={px(i)} cy={py(d[yKey])} r="4" fill={color}/>
+          <text x={px(i)} y={py(d[yKey])-8} textAnchor="middle" fontSize="11" fill="var(--white)">{d[yKey]}</text>
+          <text x={px(i)} y={H-6} textAnchor="middle" fontSize="10" fill="var(--gray)">{d[xKey]}</text>
+        </g>
+      ))}
+      {[0, Math.round(max/2), max].map(v => <text key={v} x={PAD.l-4} y={py(v)+4} textAnchor="end" fontSize="10" fill="var(--gray)">{v}</text>)}
+    </svg>
+  )
+}
+
 // ── ЖУРНАЛ ПОСЕЩАЕМОСТИ ────────────────────────────────────────────────────────
 function AttendanceTab({ token, athletes }) {
   const today = new Date().toISOString().split('T')[0]
@@ -94,7 +124,9 @@ function AttendanceTab({ token, athletes }) {
   const [notes, setNotes]       = useState('')
   const [saving, setSaving]     = useState(false)
   const [msg, setMsg]           = useState('')
-  const [viewMode, setViewMode] = useState('create')
+  const [viewMode, setViewMode] = useState('history')
+  const [showChart, setShowChart] = useState(false)
+  const [chartData, setChartData] = useState([])
 
   const groupAthletes = useMemo(() =>
     athletes.filter(a => {
@@ -106,11 +138,29 @@ function AttendanceTab({ token, athletes }) {
   , [athletes, group])
 
   useEffect(() => { loadSessions() }, [group])
+  useEffect(() => { if (showChart) loadChartData() }, [showChart, group])
 
   const loadSessions = async () => {
     try {
-      const r = await fetch(`${API}/attendance/sessions?group_name=${group}&limit=20`, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await fetch(`${API}/attendance/sessions?group_name=${group}&limit=50`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) setSessions(await r.json())
+    } catch {}
+  }
+
+  const loadChartData = async () => {
+    try {
+      const r = await fetch(`${API}/attendance/sessions?group_name=${group}&limit=200`, { headers: { Authorization: `Bearer ${token}` } })
+      if (!r.ok) return
+      const data = await r.json()
+      const monthly = {}
+      data.forEach(s => {
+        const month = s.date.substring(0, 7)
+        if (!monthly[month]) monthly[month] = { month, sessions: 0, present: 0, total: 0 }
+        monthly[month].sessions += 1
+        monthly[month].present  += s.present || 0
+        monthly[month].total    += s.total   || 0
+      })
+      setChartData(Object.values(monthly).sort((a, b) => a.month.localeCompare(b.month)))
     } catch {}
   }
 
@@ -168,15 +218,25 @@ function AttendanceTab({ token, athletes }) {
     <div className="attendance-wrap">
       <div className="attendance-header">
         <div className="attendance-group-tabs">
-          <button className={`att-group-btn ${group === 'junior' ? 'active' : ''}`} onClick={() => { setGroup('junior'); startNewSession() }}>Младшая (6–10 лет)</button>
-          <button className={`att-group-btn ${group === 'senior' ? 'active' : ''}`} onClick={() => { setGroup('senior'); startNewSession() }}>Старшая (11+)</button>
+          <button className={`att-group-btn ${group === 'junior' ? 'active' : ''}`} onClick={() => { setGroup('junior'); setViewMode('history'); setShowChart(false) }}>Младшая (6–10 лет)</button>
+          <button className={`att-group-btn ${group === 'senior' ? 'active' : ''}`} onClick={() => { setGroup('senior'); setViewMode('history'); setShowChart(false) }}>Старшая (11+)</button>
+          <button className={`att-group-btn ${showChart ? 'active' : ''}`} onClick={() => setShowChart(v => !v)}>График</button>
         </div>
         <div className="attendance-view-tabs">
           <button className={`att-view-btn ${viewMode !== 'history' ? 'active' : ''}`} onClick={startNewSession}>+ Новая тренировка</button>
           <button className={`att-view-btn ${viewMode === 'history' ? 'active' : ''}`} onClick={() => setViewMode('history')}>История ({sessions.length})</button>
         </div>
       </div>
-      {viewMode === 'history' && (
+      {showChart && (
+        <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderRadius:10, padding:20, marginBottom:16 }}>
+          <div style={{ marginBottom:8, fontSize:'0.85rem', color:'var(--gray)' }}>Тренировок в месяц</div>
+          <LineChart data={chartData} xKey="month" yKey="sessions" color="var(--red)" height={180}/>
+          <div style={{ marginTop:20, marginBottom:8, fontSize:'0.85rem', color:'var(--gray)' }}>Присутствовало (чел.) в месяц</div>
+          <LineChart data={chartData} xKey="month" yKey="present" color="#6cba6c" height={160}/>
+          {chartData.length === 0 && <div className="cabinet-empty">Нет данных для графика</div>}
+        </div>
+      )}
+      {viewMode === 'history' && !showChart && (
         <div className="att-history">
           {sessions.length === 0 && <div className="cabinet-empty">Тренировок пока нет</div>}
           {sessions.map(s => (
@@ -189,7 +249,7 @@ function AttendanceTab({ token, athletes }) {
           ))}
         </div>
       )}
-      {viewMode !== 'history' && (
+      {viewMode !== 'history' && !showChart && (
         <div className="att-form">
           <div className="att-form-top">
             {viewMode === 'create' ? (
@@ -224,7 +284,7 @@ function AttendanceTab({ token, athletes }) {
 
 // ── ПОСЕЩАЕМОСТЬ ДЛЯ РОДИТЕЛЯ ──────────────────────────────────────────────────
 function ParentAttendanceTab({ token, athletes }) {
-  const [data, setData]     = useState([])
+  const [data, setData]       = useState([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => { loadAll() }, [])
@@ -234,7 +294,6 @@ function ParentAttendanceTab({ token, athletes }) {
     const results = []
     for (const a of athletes) {
       try {
-        // Единственный роут: GET /attendance/athlete/{id}?months=6
         const r = await fetch(`${API}/attendance/athlete/${a.id}?months=6`, {
           headers: { Authorization: `Bearer ${token}` }
         })
@@ -258,21 +317,21 @@ function ParentAttendanceTab({ token, athletes }) {
               {a.percent}%
             </span>
           </div>
-          <div className="my-athlete-details" style={{ marginTop: 8 }}>
+          <div className="my-athlete-details" style={{ marginTop:8 }}>
             <span>Тренировок за 6 мес.: {a.total}</span>
             <span style={{ color:'#6cba6c' }}>Присутствовал: {a.present}</span>
             <span style={{ color:'var(--gray)' }}>Пропустил: {a.absent}</span>
           </div>
           {a.monthly && a.monthly.length > 0 && (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontSize:'0.78rem', color:'var(--gray)', marginBottom: 8 }}>По месяцам:</div>
+            <div style={{ marginTop:12 }}>
+              <div style={{ fontSize:'0.78rem', color:'var(--gray)', marginBottom:6 }}>По месяцам:</div>
               {a.monthly.map((m, i) => (
                 <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'4px 0', fontSize:'0.84rem' }}>
                   <span style={{ color:'var(--gray)', minWidth:60 }}>{m.month}</span>
                   <div style={{ flex:1, height:6, background:'var(--gray-dim)', borderRadius:3, overflow:'hidden' }}>
                     <div style={{ height:'100%', width: m.total ? `${Math.round(m.present/m.total*100)}%` : '0%', background:'var(--red)', borderRadius:3 }}/>
                   </div>
-                  <span style={{ color:'var(--white)', minWidth:60, textAlign:'right' }}>{m.present}/{m.total}</span>
+                  <span style={{ color:'var(--white)', minWidth:50, textAlign:'right' }}>{m.present}/{m.total}</span>
                 </div>
               ))}
             </div>
@@ -283,7 +342,7 @@ function ParentAttendanceTab({ token, athletes }) {
   )
 }
 
-// ParentRatingTab удалён — используем CompetitionsTab с readOnly={true}
+// ── РЕЙТИНГ ДЛЯ РОДИТЕЛЯ — используем CompetitionsTab с readOnly ───────────────
 
 // ── СОРЕВНОВАНИЯ ───────────────────────────────────────────────────────────────
 
@@ -655,13 +714,13 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
                 {rows.map(r => (
                   <tr key={r.athlete_id}>
                     <td className="td-name">{r.full_name}</td>
-                    <td>{readOnly ? (r.sparring_place || '—') : <select className="td-input td-input-sm" value={r.sparring_place} onChange={e => updateRow(r.athlete_id,'sparring_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
+                    <td>{readOnly ? (r.sparring_place||'—') : <select className="td-input td-input-sm" value={r.sparring_place} onChange={e => updateRow(r.athlete_id,'sparring_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
                     <td>{readOnly ? r.sparring_fights : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.sparring_fights} onChange={e=>updateRow(r.athlete_id,'sparring_fights',e.target.value)}/>}</td>
-                    <td>{readOnly ? (r.stopball_place || '—') : <select className="td-input td-input-sm" value={r.stopball_place} onChange={e=>updateRow(r.athlete_id,'stopball_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
+                    <td>{readOnly ? (r.stopball_place||'—') : <select className="td-input td-input-sm" value={r.stopball_place} onChange={e=>updateRow(r.athlete_id,'stopball_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
                     <td>{readOnly ? r.stopball_fights : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.stopball_fights} onChange={e=>updateRow(r.athlete_id,'stopball_fights',e.target.value)}/>}</td>
-                    <td>{readOnly ? (r.tegtim_place || '—') : <select className="td-input td-input-sm" value={r.tegtim_place} onChange={e=>updateRow(r.athlete_id,'tegtim_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
+                    <td>{readOnly ? (r.tegtim_place||'—') : <select className="td-input td-input-sm" value={r.tegtim_place} onChange={e=>updateRow(r.athlete_id,'tegtim_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
                     <td>{readOnly ? r.tegtim_fights : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.tegtim_fights} onChange={e=>updateRow(r.athlete_id,'tegtim_fights',e.target.value)}/>}</td>
-                    <td>{readOnly ? (r.tuli_place || '—') : <select className="td-input td-input-sm" value={r.tuli_place} onChange={e=>updateRow(r.athlete_id,'tuli_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
+                    <td>{readOnly ? (r.tuli_place||'—') : <select className="td-input td-input-sm" value={r.tuli_place} onChange={e=>updateRow(r.athlete_id,'tuli_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
                     <td>{readOnly ? r.tuli_perfs : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.tuli_perfs} onChange={e=>updateRow(r.athlete_id,'tuli_perfs',e.target.value)}/>}</td>
                     <td className="comp-rating-val">{calcRatingPreview(r, detail.significance||1)}</td>
                     {!readOnly && <td><button className="td-btn td-btn-del" onClick={() => removeRow(r.athlete_id)} title="Убрать из списка">✕</button></td>}
@@ -1013,7 +1072,7 @@ export default function Cabinet() {
           )}
 
           {parentView === 'rating' && !loading && (
-            <CompetitionsTab token={token} athletes={myAthletes} readOnly={true} />
+            <ParentRatingTab token={token} athletes={myAthletes} />
           )}
         </div>
       </main>
