@@ -5,22 +5,6 @@ const API = '/api'
 const emptyAthlete = () => ({
   full_name: '', birth_date: '', gender: 'male', gup: '', dan: '', has_dan: false
 })
-const IconParent = () => (
-  <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-    <circle cx="11" cy="9" r="4" stroke="currentColor" strokeWidth="1.5"/>
-    <path d="M3 26c0-5 3.6-8 8-8s8 3 8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-    <circle cx="22" cy="12" r="3" stroke="currentColor" strokeWidth="1.5"/>
-    <path d="M17 26c0-3.5 2.2-6 5-6s5 2.5 5 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-  </svg>
-)
-const IconAthlete = () => (
-  <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-    <circle cx="16" cy="7" r="4" stroke="currentColor" strokeWidth="1.5"/>
-    <path d="M8 28l3-8 5 4 5-4 3 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M10 16l2-4h8l2 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-    <path d="M6 20l4-4M26 20l-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-  </svg>
-)
 function AthleteForm({ data, onChange, index, isParent }) {
   const set = (k, v) => onChange({ ...data, [k]: v })
   return (
@@ -261,13 +245,11 @@ export default function Register() {
           <div className="register-role-btns">
             <button className={`role-btn ${form.role === 'parent' ? 'active' : ''}`}
               onClick={() => { set('role', 'parent'); setAthletes([emptyAthlete()]) }}>
-              <span className="role-btn-icon"><IconParent /></span>
               <strong>Родитель</strong>
               <small>Регистрирую ребёнка</small>
             </button>
             <button className={`role-btn ${form.role === 'athlete' ? 'active' : ''}`}
               onClick={() => { set('role', 'athlete'); setAthletes([emptyAthlete()]) }}>
-              <span className="role-btn-icon"><IconAthlete /></span>
               <strong>Спортсмен клуба</strong>
               <small>Взрослый участник</small>
             </button>
