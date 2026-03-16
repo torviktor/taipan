@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import * as XLSX from 'xlsx'
 import './Cabinet.css'
 import './Competitions.css'
 
 const API = '/api'
+
+const GROUPS = ['Младшая группа (6–10 лет)', 'Старшая группа (11+)']
 
 function useSorted(data) {
   const [sort, setSort] = useState({ key: null, dir: 'asc' })
@@ -83,15 +86,15 @@ function ResetPasswordModal({ user, token, onClose }) {
 // ── ЖУРНАЛ ПОСЕЩАЕМОСТИ ────────────────────────────────────────────────────────
 function AttendanceTab({ token, athletes }) {
   const today = new Date().toISOString().split('T')[0]
-  const [date, setDate]           = useState(today)
-  const [group, setGroup]         = useState('junior')
-  const [sessions, setSessions]   = useState([])
+  const [date, setDate]         = useState(today)
+  const [group, setGroup]       = useState('junior')
+  const [sessions, setSessions] = useState([])
   const [activeSession, setActiveSession] = useState(null)
-  const [marks, setMarks]         = useState({})
-  const [notes, setNotes]         = useState('')
-  const [saving, setSaving]       = useState(false)
-  const [msg, setMsg]             = useState('')
-  const [viewMode, setViewMode]   = useState('create')
+  const [marks, setMarks]       = useState({})
+  const [notes, setNotes]       = useState('')
+  const [saving, setSaving]     = useState(false)
+  const [msg, setMsg]           = useState('')
+  const [viewMode, setViewMode] = useState('create')
 
   const groupAthletes = useMemo(() =>
     athletes.filter(a => {
@@ -106,87 +109,58 @@ function AttendanceTab({ token, athletes }) {
 
   const loadSessions = async () => {
     try {
-      const r = await fetch(`${API}/attendance/sessions?group_name=${group}&limit=20`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      const r = await fetch(`${API}/attendance/sessions?group_name=${group}&limit=20`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) setSessions(await r.json())
     } catch {}
   }
 
-  const initMarks = (athleteList, existingMarks = {}) => {
+  const initMarks = (list, existing = {}) => {
     const m = {}
-    athleteList.forEach(a => { m[a.id] = existingMarks[a.id] ?? false })
+    list.forEach(a => { m[a.id] = existing[a.id] ?? false })
     setMarks(m)
   }
 
-  const startNewSession = () => {
-    initMarks(groupAthletes)
-    setNotes('')
-    setActiveSession(null)
-    setViewMode('create')
-    setMsg('')
-  }
+  const startNewSession = () => { initMarks(groupAthletes); setNotes(''); setActiveSession(null); setViewMode('create'); setMsg('') }
 
   const openSession = async (s) => {
     try {
-      const r = await fetch(`${API}/attendance/sessions/${s.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      const r = await fetch(`${API}/attendance/sessions/${s.id}`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) {
         const data = await r.json()
-        const existingMarks = {}
-        data.athletes.forEach(a => { existingMarks[a.id] = a.present })
-        initMarks(data.athletes, existingMarks)
-        setActiveSession(data)
-        setNotes(data.notes || '')
-        setViewMode('session')
+        const em = {}
+        data.athletes.forEach(a => { em[a.id] = a.present })
+        initMarks(data.athletes, em)
+        setActiveSession(data); setNotes(data.notes || ''); setViewMode('session')
       }
     } catch {}
   }
 
   const saveSession = async () => {
-    setSaving(true)
-    setMsg('')
+    setSaving(true); setMsg('')
     try {
-      let sessionId = activeSession?.id
-      if (!sessionId) {
+      let sid = activeSession?.id
+      if (!sid) {
         const cr = await fetch(`${API}/attendance/sessions`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ date, group_name: group, notes })
         })
-        if (!cr.ok) {
-          const e = await cr.json()
-          setMsg(e.detail || 'Ошибка создания тренировки')
-          setSaving(false)
-          return
-        }
-        const created = await cr.json()
-        sessionId = created.id
+        if (!cr.ok) { const e = await cr.json(); setMsg(e.detail || 'Ошибка'); setSaving(false); return }
+        sid = (await cr.json()).id
       }
-      const records = Object.entries(marks).map(([athlete_id, present]) => ({
-        athlete_id: parseInt(athlete_id), present
-      }))
-      await fetch(`${API}/attendance/sessions/${sessionId}/mark`, {
+      const records = Object.entries(marks).map(([athlete_id, present]) => ({ athlete_id: parseInt(athlete_id), present }))
+      await fetch(`${API}/attendance/sessions/${sid}/mark`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ records })
       })
       setMsg(`Сохранено! Присутствовало: ${records.filter(r => r.present).length} из ${records.length}`)
       loadSessions()
-    } catch {
-      setMsg('Ошибка сохранения')
-    } finally {
-      setSaving(false)
-    }
+    } catch { setMsg('Ошибка сохранения') }
+    setSaving(false)
   }
 
-  const toggleAll = (val) => {
-    const m = {}
-    Object.keys(marks).forEach(id => { m[id] = val })
-    setMarks(m)
-  }
-
+  const toggleAll = (val) => { const m = {}; Object.keys(marks).forEach(id => { m[id] = val }); setMarks(m) }
   const presentCount = Object.values(marks).filter(Boolean).length
   const totalCount   = Object.keys(marks).length
 
@@ -194,93 +168,166 @@ function AttendanceTab({ token, athletes }) {
     <div className="attendance-wrap">
       <div className="attendance-header">
         <div className="attendance-group-tabs">
-          <button className={`att-group-btn ${group === 'junior' ? 'active' : ''}`}
-            onClick={() => { setGroup('junior'); startNewSession() }}>
-            Младшая (6–10 лет)
-          </button>
-          <button className={`att-group-btn ${group === 'senior' ? 'active' : ''}`}
-            onClick={() => { setGroup('senior'); startNewSession() }}>
-            Старшая (11+)
-          </button>
+          <button className={`att-group-btn ${group === 'junior' ? 'active' : ''}`} onClick={() => { setGroup('junior'); startNewSession() }}>Младшая (6–10 лет)</button>
+          <button className={`att-group-btn ${group === 'senior' ? 'active' : ''}`} onClick={() => { setGroup('senior'); startNewSession() }}>Старшая (11+)</button>
         </div>
         <div className="attendance-view-tabs">
-          <button className={`att-view-btn ${viewMode !== 'history' ? 'active' : ''}`}
-            onClick={startNewSession}>+ Новая тренировка</button>
-          <button className={`att-view-btn ${viewMode === 'history' ? 'active' : ''}`}
-            onClick={() => setViewMode('history')}>История ({sessions.length})</button>
+          <button className={`att-view-btn ${viewMode !== 'history' ? 'active' : ''}`} onClick={startNewSession}>+ Новая тренировка</button>
+          <button className={`att-view-btn ${viewMode === 'history' ? 'active' : ''}`} onClick={() => setViewMode('history')}>История ({sessions.length})</button>
         </div>
       </div>
-
       {viewMode === 'history' && (
         <div className="att-history">
           {sessions.length === 0 && <div className="cabinet-empty">Тренировок пока нет</div>}
           {sessions.map(s => (
             <div key={s.id} className="att-session-row" onClick={() => openSession(s)}>
               <span className="att-session-date">{new Date(s.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-              <span className="att-session-stat">
-                {s.present} / {s.total} присутствовали
-                {s.total > 0 && <span className="att-pct"> ({Math.round(s.present/s.total*100)}%)</span>}
-              </span>
+              <span className="att-session-stat">{s.present} / {s.total} присутствовали{s.total > 0 && <span className="att-pct"> ({Math.round(s.present/s.total*100)}%)</span>}</span>
               {s.notes && <span className="att-session-notes">{s.notes}</span>}
               <span className="att-session-edit">Открыть →</span>
             </div>
           ))}
         </div>
       )}
-
       {viewMode !== 'history' && (
         <div className="att-form">
           <div className="att-form-top">
             {viewMode === 'create' ? (
-              <div className="att-date-row">
-                <label>Дата тренировки</label>
-                <input type="date" value={date} onChange={e => setDate(e.target.value)}
-                  className="att-date-input" />
-              </div>
+              <div className="att-date-row"><label>Дата тренировки</label><input type="date" value={date} onChange={e => setDate(e.target.value)} className="att-date-input" /></div>
             ) : (
-              <div className="att-session-title">
-                Тренировка: {new Date(activeSession.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
-              </div>
+              <div className="att-session-title">Тренировка: {new Date(activeSession.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
             )}
-            <div className="att-date-row">
-              <label>Заметка к тренировке</label>
-              <input type="text" placeholder="Например: открытая тренировка..." value={notes}
-                onChange={e => setNotes(e.target.value)} className="att-notes-input" />
-            </div>
+            <div className="att-date-row"><label>Заметка к тренировке</label><input type="text" placeholder="Например: открытая тренировка..." value={notes} onChange={e => setNotes(e.target.value)} className="att-notes-input" /></div>
           </div>
-
           <div className="att-counter-row">
-            <span className="att-counter">
-              Присутствует: <strong>{presentCount}</strong> из <strong>{totalCount}</strong>
-            </span>
+            <span className="att-counter">Присутствует: <strong>{presentCount}</strong> из <strong>{totalCount}</strong></span>
             <button className="att-all-btn" onClick={() => toggleAll(true)}>Все пришли</button>
             <button className="att-all-btn" onClick={() => toggleAll(false)}>Сбросить</button>
           </div>
-
           <div className="att-list">
-            {groupAthletes.length === 0 && (
-              <div className="cabinet-empty">Нет спортсменов в этой группе</div>
-            )}
+            {groupAthletes.length === 0 && <div className="cabinet-empty">Нет спортсменов в этой группе</div>}
             {groupAthletes.map(a => (
-              <div
-                key={a.id}
-                className={`att-athlete-row ${marks[a.id] ? 'present' : 'absent'}`}
-                onClick={() => setMarks(m => ({ ...m, [a.id]: !m[a.id] }))}
-              >
+              <div key={a.id} className={`att-athlete-row ${marks[a.id] ? 'present' : 'absent'}`} onClick={() => setMarks(m => ({ ...m, [a.id]: !m[a.id] }))}>
                 <div className="att-check">{marks[a.id] ? '✓' : '—'}</div>
                 <div className="att-athlete-name">{a.full_name}</div>
                 <div className="att-athlete-age">{a.age} лет · {a.group || a.auto_group}</div>
               </div>
             ))}
           </div>
-
           {msg && <div className="att-msg">{msg}</div>}
-
-          <button className="btn-primary att-save-btn" onClick={saveSession} disabled={saving}>
-            {saving ? 'Сохранение...' : 'Сохранить тренировку'}
-          </button>
+          <button className="btn-primary att-save-btn" onClick={saveSession} disabled={saving}>{saving ? 'Сохранение...' : 'Сохранить тренировку'}</button>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── ПОСЕЩАЕМОСТЬ ДЛЯ РОДИТЕЛЯ ──────────────────────────────────────────────────
+function ParentAttendanceTab({ token, athletes }) {
+  const [stats, setStats] = useState([])
+  const [sessions, setSessions] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => { loadAll() }, [])
+
+  const loadAll = async () => {
+    setLoading(true)
+    try {
+      for (const a of athletes) {
+        const r = await fetch(`${API}/attendance/athlete/${a.id}/stats`, { headers: { Authorization: `Bearer ${token}` } })
+        if (r.ok) {
+          const d = await r.json()
+          setStats(prev => [...prev.filter(s => s.athlete_id !== a.id), { athlete_id: a.id, full_name: a.full_name, ...d }])
+        }
+        const r2 = await fetch(`${API}/attendance/athlete/${a.id}/sessions?limit=10`, { headers: { Authorization: `Bearer ${token}` } })
+        if (r2.ok) {
+          const d2 = await r2.json()
+          setSessions(prev => [...prev.filter(s => s.athlete_id !== a.id), ...d2.map(s => ({ ...s, athlete_id: a.id, athlete_name: a.full_name }))])
+        }
+      }
+    } catch {}
+    setLoading(false)
+  }
+
+  if (loading) return <div className="cabinet-loading">Загрузка...</div>
+
+  return (
+    <div>
+      {stats.map(s => (
+        <div key={s.athlete_id} className="my-athlete-card" style={{ marginBottom: 16 }}>
+          <div className="my-athlete-name">{s.full_name}</div>
+          <div className="my-athlete-details">
+            <span>Всего тренировок: {s.total || 0}</span>
+            <span>Присутствовал: {s.present || 0}</span>
+            <span>Посещаемость: {s.total ? Math.round((s.present / s.total) * 100) : 0}%</span>
+          </div>
+          <div style={{ marginTop: 10 }}>
+            {sessions.filter(ss => ss.athlete_id === s.athlete_id).slice(0, 5).map((ss, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, padding: '6px 0', borderBottom: '1px solid var(--gray-dim)', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--gray)' }}>{new Date(ss.date).toLocaleDateString('ru-RU')}</span>
+                <span style={{ color: ss.present ? '#6cba6c' : 'var(--gray)' }}>{ss.present ? 'Присутствовал' : 'Отсутствовал'}</span>
+                {ss.notes && <span style={{ color: 'var(--gray)' }}>{ss.notes}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      {stats.length === 0 && <div className="cabinet-empty">Данные о посещаемости пока недоступны.</div>}
+    </div>
+  )
+}
+
+// ── РЕЙТИНГ ДЛЯ РОДИТЕЛЯ ───────────────────────────────────────────────────────
+function ParentRatingTab({ token, athletes }) {
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => { loadAll() }, [])
+
+  const loadAll = async () => {
+    setLoading(true)
+    try {
+      for (const a of athletes) {
+        const r = await fetch(`${API}/competitions/rating/athlete/${a.id}`, { headers: { Authorization: `Bearer ${token}` } })
+        if (r.ok) {
+          const d = await r.json()
+          setData(prev => [...prev.filter(x => x.athlete_id !== a.id), d])
+        }
+      }
+    } catch {}
+    setLoading(false)
+  }
+
+  if (loading) return <div className="cabinet-loading">Загрузка...</div>
+
+  return (
+    <div>
+      {data.map(a => (
+        <div key={a.athlete_id} className="my-athlete-card" style={{ marginBottom: 20 }}>
+          <div className="my-athlete-name" style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>{a.full_name}</span>
+            <span className="comp-rating-val">{a.total_rating} pts</span>
+          </div>
+          {a.results.length === 0 && <div style={{ color: 'var(--gray)', fontSize: '0.85rem', marginTop: 8 }}>Соревнований пока нет</div>}
+          {a.results.map((r, i) => (
+            <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid var(--gray-dim)', fontSize: '0.85rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontWeight: 600, color: 'var(--white)' }}>{r.competition_name}</span>
+                <span className="comp-rating-val" style={{ fontSize: '1rem' }}>{r.rating}</span>
+              </div>
+              <div style={{ color: 'var(--gray)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <span>{new Date(r.competition_date).toLocaleDateString('ru-RU')}</span>
+                <span>{r.level} · {r.comp_type}</span>
+                {r.sparring_place && <span>Спарринг: {r.sparring_place} место</span>}
+                {r.stopball_place && <span>Стоп-балл: {r.stopball_place} место</span>}
+                {r.tegtim_place   && <span>Тег-тим: {r.tegtim_place} место</span>}
+                {r.tuli_place     && <span>Тули: {r.tuli_place} место</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+      {data.length === 0 && <div className="cabinet-empty">Данные о соревнованиях пока недоступны.</div>}
     </div>
   )
 }
@@ -298,9 +345,9 @@ const LEVELS = Object.keys(SIG_TABLE)
 
 const PLACE_OPTS = [
   { value: '', label: '—' },
-  { value: 1,  label: '🥇 1' },
-  { value: 2,  label: '🥈 2' },
-  { value: 3,  label: '🥉 3' },
+  { value: 1,  label: '1 место' },
+  { value: 2,  label: '2 место' },
+  { value: 3,  label: '3 место' },
 ]
 
 const LEVEL_BADGE = {
@@ -311,58 +358,60 @@ const LEVEL_BADGE = {
   'Международный': 'cbadge-international',
 }
 
+const AGE_CATEGORIES = ['6-7', '8-9', '10-11', '12-14', '15-17', '18+']
+
 function calcRatingPreview(row, sig) {
-  const pb = (p, b1, b2, b3) => p === 1 ? b1 : p === 2 ? b2 : p === 3 ? b3 : 0
+  const pb = (p, b1, b2, b3) => p==1?b1:p==2?b2:p==3?b3:0
   const sp  = Number(row.sparring_place)  || 0
   const sf  = Number(row.sparring_fights) || 0
   const sbp = Number(row.stopball_place)  || 0
   const sbf = Number(row.stopball_fights) || 0
+  const tgp = Number(row.tegtim_place)    || 0
+  const tgf = Number(row.tegtim_fights)   || 0
   const tp  = Number(row.tuli_place)      || 0
   const tf  = Number(row.tuli_perfs)      || 0
   const spts  = sf  * 3   + pb(sp,  40, 24, 14)
   const sbpts = sbf * 2.5 + pb(sbp, 40, 24, 14)
+  const tgpts = tgf * 2.5 + pb(tgp, 40, 24, 14)
   const tpts  = tf  * 2   + pb(tp,  25, 15,  9)
-  let gold = 0, silver = 0, bronze = 0
-  ;[sp, sbp, tp].forEach(p => { if (p===1) gold++; else if (p===2) silver++; else if (p===3) bronze++ })
-  const total = gold + silver + bronze
+  let gold=0, silver=0, bronze=0
+  ;[sp, sbp, tgp, tp].forEach(p => { if(p===1)gold++; else if(p===2)silver++; else if(p===3)bronze++ })
+  const total = gold+silver+bronze
   let mb = 0
-  if (gold >= 2) mb = 55
-  else if (gold === 1 && total === 1) mb = 30
-  else if (total >= 2) mb = 40
-  else if (silver === 1 && total === 1) mb = 18
-  else if (bronze === 1 && total === 1) mb = 10
-  const raw = spts + sbpts + tpts + mb
-  return raw > 0 ? (sig * Math.log(raw + 1)).toFixed(2) : '—'
+  if(gold>=2) mb=55
+  else if(gold===1&&total===1) mb=30
+  else if(total>=2) mb=40
+  else if(silver===1&&total===1) mb=18
+  else if(bronze===1&&total===1) mb=10
+  const raw = spts+sbpts+tgpts+tpts+mb
+  return raw>0 ? (sig*Math.log(raw+1)).toFixed(2) : '—'
 }
 
-function CompetitionsTab({ token, athletes }) {
-  const [compView,    setCompView]   = useState('list')   // 'list' | 'detail' | 'rating'
-  const [comps,       setComps]      = useState([])
-  const [seasons,     setSeasons]    = useState([])
-  const [season,      setSeason]     = useState('')
-  const [detail,      setDetail]     = useState(null)
-  const [rows,        setRows]       = useState([])
-  const [rating,      setRating]     = useState([])
-  const [ratingFilter,setRatingFilter] = useState('all')
-  const [loading,     setLoading]    = useState(false)
-  const [saving,      setSaving]     = useState(false)
-  const [showForm,    setShowForm]   = useState(false)
-  const [msg,         setMsg]        = useState('')
-  const [form, setForm] = useState({
-    name: '', date: '', location: '', level: 'Местный', comp_type: 'Турнир', notes: ''
-  })
+function CompetitionsTab({ token, athletes, onTabChange }) {
+  const [compView,     setCompView]     = useState('list')
+  const [comps,        setComps]        = useState([])
+  const [seasons,      setSeasons]      = useState([])
+  const [season,       setSeason]       = useState('')
+  const [detail,       setDetail]       = useState(null)
+  const [rows,         setRows]         = useState([])
+  const [allAthletes,  setAllAthletes]  = useState([]) // все спортсмены для добавления
+  const [rating,       setRating]       = useState([])
+  const [ratingFilter, setRatingFilter] = useState('all')
+  const [loading,      setLoading]      = useState(false)
+  const [saving,       setSaving]       = useState(false)
+  const [showForm,     setShowForm]     = useState(false)
+  const [showAddAthlete, setShowAddAthlete] = useState(false)
+  const [msg,          setMsg]          = useState('')
+  const [form, setForm] = useState({ name:'', date:'', location:'', level:'Местный', comp_type:'Турнир', notes:'' })
 
-  const h = { Authorization: `Bearer ${token}` }
+  const h  = { Authorization: `Bearer ${token}` }
   const hj = { ...h, 'Content-Type': 'application/json' }
 
   useEffect(() => { loadSeasons(); loadComps() }, [])
   useEffect(() => { loadComps() }, [season])
 
   const loadSeasons = async () => {
-    try {
-      const r = await fetch(`${API}/competitions/seasons`, { headers: h })
-      if (r.ok) setSeasons(await r.json())
-    } catch {}
+    try { const r = await fetch(`${API}/competitions/seasons`, { headers: h }); if (r.ok) setSeasons(await r.json()) } catch {}
   }
 
   const loadComps = async () => {
@@ -384,7 +433,10 @@ function CompetitionsTab({ token, athletes }) {
       setDetail(d)
       const existingMap = {}
       ;(d.results || []).forEach(res => { existingMap[res.athlete_id] = res })
-      setRows(athletes.map(a => {
+      // Показываем только тех у кого уже есть результаты ИЛИ всех спортсменов клуба
+      // Начинаем с тех у кого есть результаты + все остальные
+      const participantIds = new Set(Object.keys(existingMap).map(Number))
+      const baseList = athletes.map(a => {
         const ex = existingMap[a.id] || {}
         return {
           athlete_id:      a.id,
@@ -393,39 +445,66 @@ function CompetitionsTab({ token, athletes }) {
           sparring_fights: ex.sparring_fights ?? 0,
           stopball_place:  ex.stopball_place  ?? '',
           stopball_fights: ex.stopball_fights ?? 0,
+          tegtim_place:    ex.tegtim_place    ?? '',
+          tegtim_fights:   ex.tegtim_fights   ?? 0,
           tuli_place:      ex.tuli_place      ?? '',
           tuli_perfs:      ex.tuli_perfs      ?? 0,
           saved_rating:    ex.rating          ?? null,
+          _inList:         true,
         }
-      }))
+      })
+      setRows(baseList)
+      setAllAthletes(athletes)
       setCompView('detail')
     } catch {}
     setLoading(false)
   }
 
+  const removeRow = (athleteId) => {
+    setRows(prev => prev.filter(r => r.athlete_id !== athleteId))
+  }
+
+  const addAthleteToList = (a) => {
+    if (rows.find(r => r.athlete_id === a.id)) return
+    setRows(prev => [...prev, {
+      athlete_id: a.id, full_name: a.full_name,
+      sparring_place: '', sparring_fights: 0,
+      stopball_place: '', stopball_fights: 0,
+      tegtim_place: '',   tegtim_fights: 0,
+      tuli_place: '',     tuli_perfs: 0,
+      saved_rating: null, _inList: true,
+    }])
+    setShowAddAthlete(false)
+  }
+
   const saveResults = async () => {
     if (!detail) return
-    setSaving(true)
-    setMsg('')
+    setSaving(true); setMsg('')
     try {
       const payload = rows
         .filter(r => r.sparring_place !== '' || r.sparring_fights > 0 ||
                      r.stopball_place !== '' || r.stopball_fights > 0 ||
-                     r.tuli_place !== '' || r.tuli_perfs > 0)
+                     r.tegtim_place   !== '' || r.tegtim_fights   > 0 ||
+                     r.tuli_place     !== '' || r.tuli_perfs      > 0)
         .map(r => ({
           athlete_id:      r.athlete_id,
           sparring_place:  r.sparring_place  !== '' ? Number(r.sparring_place)  : null,
           sparring_fights: Number(r.sparring_fights) || 0,
           stopball_place:  r.stopball_place  !== '' ? Number(r.stopball_place)  : null,
           stopball_fights: Number(r.stopball_fights) || 0,
+          tegtim_place:    r.tegtim_place    !== '' ? Number(r.tegtim_place)    : null,
+          tegtim_fights:   Number(r.tegtim_fights)   || 0,
           tuli_place:      r.tuli_place      !== '' ? Number(r.tuli_place)      : null,
-          tuli_perfs:      Number(r.tuli_perfs) || 0,
+          tuli_perfs:      Number(r.tuli_perfs)      || 0,
         }))
       const r = await fetch(`${API}/competitions/${detail.id}/results`, {
         method: 'PUT', headers: hj, body: JSON.stringify({ results: payload })
       })
-      if (r.ok) { setMsg('Результаты сохранены'); await openDetail(detail) }
-      else setMsg('Ошибка сохранения')
+      if (r.ok) {
+        setMsg('Результаты сохранены')
+        // Остаёмся на странице, обновляем сохранённые значения
+        await openDetail(detail)
+      } else setMsg('Ошибка сохранения')
     } catch { setMsg('Ошибка сохранения') }
     setSaving(false)
   }
@@ -435,14 +514,14 @@ function CompetitionsTab({ token, athletes }) {
     try {
       const r = await fetch(`${API}/competitions`, {
         method: 'POST', headers: hj,
-        body: JSON.stringify({ name: form.name, date: form.date, location: form.location || null,
-          level: form.level, comp_type: form.comp_type, notes: form.notes || null })
+        body: JSON.stringify({ name: form.name, date: form.date, location: form.location || null, level: form.level, comp_type: form.comp_type, notes: form.notes || null })
       })
       if (r.ok) {
         setShowForm(false)
-        setForm({ name: '', date: '', location: '', level: 'Местный', comp_type: 'Турнир', notes: '' })
+        setForm({ name:'', date:'', location:'', level:'Местный', comp_type:'Турнир', notes:'' })
         setMsg('')
         await loadComps(); await loadSeasons()
+        setCompView('list') // п.5 — возвращаем на список
       } else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка создания') }
   }
@@ -458,27 +537,53 @@ function CompetitionsTab({ token, athletes }) {
   const loadRating = async () => {
     setLoading(true)
     try {
-      const url = season
-        ? `${API}/competitions/rating/overall?season=${season}`
-        : `${API}/competitions/rating/overall`
+      const url = season ? `${API}/competitions/rating/overall?season=${season}` : `${API}/competitions/rating/overall`
       const r = await fetch(url, { headers: h })
       if (r.ok) { setRating(await r.json()); setCompView('rating') }
     } catch {}
     setLoading(false)
   }
 
-  const exportCsv = () => {
-    const data = ratingFilter === 'all' ? rating : rating
-    const lines = [['Место','ФИО','Группа','Гып','Пол','Турниров','🥇','🥈','🥉','Рейтинг'].join(';')]
-    data.forEach((r, i) => {
-      lines.push([i+1, r.full_name, r.group||'', r.gup||'', r.gender||'',
-        r.tournaments_count, r.gold, r.silver, r.bronze, r.total_rating].join(';'))
+  const exportXlsx = () => {
+    const getFilteredData = () => {
+      if (ratingFilter === 'all') return { 'Общий рейтинг': rating }
+      const groups = {}
+      rating.forEach(r => {
+        const key = r[ratingFilter] || 'Не указано'
+        if (!groups[key]) groups[key] = []
+        groups[key].push(r)
+      })
+      return groups
+    }
+
+    const wb = XLSX.utils.book_new()
+    const sheets = getFilteredData()
+    Object.entries(sheets).forEach(([name, data]) => {
+      const wsData = [
+        ['Место', 'ФИО', 'Возраст', 'Возр. категория', 'Группа', 'Гып', 'Пол', 'Вес', 'Турниров', 'Рейтинг'],
+        ...data.map((r, i) => [i+1, r.full_name, r.age||'', r.age_category||'', r.group||'', r.gup||'', r.gender||'', r.weight||'', r.tournaments_count, r.total_rating])
+      ]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), name.substring(0, 31))
     })
-    const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `Рейтинг_Тайпан_${season || 'все'}.csv`
-    a.click()
+    XLSX.writeFile(wb, `Рейтинг_Тайпан_${season || 'все'}.xlsx`)
+  }
+
+  const exportResultsXlsx = () => {
+    if (!detail) return
+    const wsData = [
+      ['Спортсмен', 'Спарринг место', 'Спарринг бои', 'Стоп-балл место', 'Стоп-балл бои', 'Тег-тим место', 'Тег-тим бои', 'Тули место', 'Тули выступлений', 'Рейтинг'],
+      ...rows.map(r => [
+        r.full_name,
+        r.sparring_place || '—', r.sparring_fights,
+        r.stopball_place || '—', r.stopball_fights,
+        r.tegtim_place   || '—', r.tegtim_fights,
+        r.tuli_place     || '—', r.tuli_perfs,
+        calcRatingPreview(r, detail.significance || 1)
+      ])
+    ]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), 'Результаты')
+    XLSX.writeFile(wb, `${detail.name}_${detail.date}.xlsx`)
   }
 
   const updateRow = (athleteId, field, value) =>
@@ -497,28 +602,24 @@ function CompetitionsTab({ token, athletes }) {
     return groups
   }
 
+  const notInList = allAthletes.filter(a => !rows.find(r => r.athlete_id === a.id))
+
   return (
     <div className="comp-wrap">
-
       {/* Шапка */}
       <div className="comp-top">
         <div className="comp-top-left">
-          <select className="att-date-input" value={season}
-            onChange={e => setSeason(e.target.value)} style={{ width: 'auto' }}>
+          <select className="att-date-input" value={season} onChange={e => setSeason(e.target.value)} style={{ width: 'auto' }}>
             <option value="">Все сезоны</option>
             {seasons.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           {compView !== 'list' && (
-            <button className="att-all-btn"
-              onClick={() => { setCompView('list'); setDetail(null); setMsg('') }}>
-              ← К списку
-            </button>
+            <button className="att-all-btn" onClick={() => { setCompView('list'); setDetail(null); setMsg('') }}>← К списку</button>
           )}
         </div>
         <div className="comp-top-right">
-          <button className="att-all-btn" onClick={loadRating}>🏆 Рейтинг сезона</button>
-          <button className="btn-primary" style={{ padding: '8px 18px', fontSize: '14px' }}
-            onClick={() => { setShowForm(true); setMsg('') }}>
+          <button className="att-all-btn" onClick={loadRating}>Рейтинг сезона</button>
+          <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={() => { setShowForm(true); setMsg('') }}>
             + Соревнование
           </button>
         </div>
@@ -527,31 +628,24 @@ function CompetitionsTab({ token, athletes }) {
       {msg && <div className="att-msg">{msg}</div>}
       {loading && <div className="cabinet-loading">Загрузка...</div>}
 
-      {/* ── Список соревнований ── */}
+      {/* ── Список ── */}
       {!loading && compView === 'list' && (
         <div className="comp-list">
-          {comps.length === 0 && (
-            <div className="cabinet-empty">
-              Соревнований пока нет{season ? ` в ${season} году` : ''}.
-            </div>
-          )}
+          {comps.length === 0 && <div className="cabinet-empty">Соревнований пока нет{season ? ` в ${season} году` : ''}.</div>}
           {comps.map(c => (
             <div key={c.id} className="comp-card" onClick={() => openDetail(c)}>
               <div className="comp-card-body">
                 <div className="comp-card-name">{c.name}</div>
                 <div className="comp-card-meta">
-                  <span className="comp-card-date">
-                    {new Date(c.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
-                  </span>
-                  {c.location && <span className="comp-card-date">📍 {c.location}</span>}
+                  <span className="comp-card-date">{new Date(c.date).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}</span>
+                  {c.location && <span className="comp-card-date">/ {c.location}</span>}
                   <span className={`comp-badge ${LEVEL_BADGE[c.level] || ''}`}>{c.level}</span>
                   <span className="comp-badge">{c.comp_type}</span>
                 </div>
               </div>
               <div className="comp-card-right">
                 <span className="comp-sig">×{c.significance}</span>
-                <button className="td-btn td-btn-del"
-                  onClick={e => deleteComp(c.id, e)}>Удал.</button>
+                <button className="td-btn td-btn-del" onClick={e => deleteComp(c.id, e)}>Удал.</button>
               </div>
             </div>
           ))}
@@ -564,20 +658,18 @@ function CompetitionsTab({ token, athletes }) {
           <div className="comp-detail-head">
             <div>
               <div className="comp-detail-name">{detail.name}</div>
-              <div className="comp-card-meta" style={{ marginTop: 4 }}>
-                <span className="comp-card-date">
-                  {new Date(detail.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </span>
-                {detail.location && <span className="comp-card-date">📍 {detail.location}</span>}
-                <span className={`comp-badge ${LEVEL_BADGE[detail.level] || ''}`}>{detail.level}</span>
+              <div className="comp-card-meta" style={{ marginTop:4 }}>
+                <span className="comp-card-date">{new Date(detail.date).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}</span>
+                {detail.location && <span className="comp-card-date">/ {detail.location}</span>}
+                <span className={`comp-badge ${LEVEL_BADGE[detail.level]||''}`}>{detail.level}</span>
                 <span className="comp-badge">{detail.comp_type}</span>
                 <span className="comp-sig">×{detail.significance}</span>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <button className="att-all-btn" onClick={exportCsv}>↓ CSV</button>
-              <button className="btn-primary" style={{ padding: '8px 18px', fontSize: '14px' }}
-                onClick={saveResults} disabled={saving}>
+            <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+              <button className="att-all-btn" onClick={() => setShowAddAthlete(true)}>+ Добавить бойца</button>
+              <button className="att-all-btn" onClick={exportResultsXlsx}>Экспорт xlsx</button>
+              <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={saveResults} disabled={saving}>
                 {saving ? 'Сохранение...' : 'Сохранить'}
               </button>
             </div>
@@ -587,13 +679,16 @@ function CompetitionsTab({ token, athletes }) {
             <table className="athletes-table comp-results-table">
               <thead>
                 <tr>
-                  <th rowSpan="2" style={{ textAlign: 'left' }}>Спортсмен</th>
+                  <th rowSpan="2" style={{ textAlign:'left' }}>Спортсмен</th>
                   <th colSpan="2">Спарринг</th>
                   <th colSpan="2">Стоп-балл</th>
+                  <th colSpan="2">Тег-тим</th>
                   <th colSpan="2">Тули</th>
                   <th rowSpan="2">Рейтинг</th>
+                  <th rowSpan="2"></th>
                 </tr>
                 <tr>
+                  <th>Место</th><th>Бои</th>
                   <th>Место</th><th>Бои</th>
                   <th>Место</th><th>Бои</th>
                   <th>Место</th><th>Выст.</th>
@@ -603,47 +698,21 @@ function CompetitionsTab({ token, athletes }) {
                 {rows.map(r => (
                   <tr key={r.athlete_id}>
                     <td className="td-name">{r.full_name}</td>
-                    <td>
-                      <select className="td-input td-input-sm" value={r.sparring_place}
-                        onChange={e => updateRow(r.athlete_id, 'sparring_place', e.target.value)}>
-                        {PLACE_OPTS.map(o => <option key={o.label} value={o.value}>{o.label}</option>)}
-                      </select>
-                    </td>
-                    <td>
-                      <input type="number" min="0" max="99" className="td-input td-input-sm"
-                        value={r.sparring_fights}
-                        onChange={e => updateRow(r.athlete_id, 'sparring_fights', e.target.value)} />
-                    </td>
-                    <td>
-                      <select className="td-input td-input-sm" value={r.stopball_place}
-                        onChange={e => updateRow(r.athlete_id, 'stopball_place', e.target.value)}>
-                        {PLACE_OPTS.map(o => <option key={o.label} value={o.value}>{o.label}</option>)}
-                      </select>
-                    </td>
-                    <td>
-                      <input type="number" min="0" max="99" className="td-input td-input-sm"
-                        value={r.stopball_fights}
-                        onChange={e => updateRow(r.athlete_id, 'stopball_fights', e.target.value)} />
-                    </td>
-                    <td>
-                      <select className="td-input td-input-sm" value={r.tuli_place}
-                        onChange={e => updateRow(r.athlete_id, 'tuli_place', e.target.value)}>
-                        {PLACE_OPTS.map(o => <option key={o.label} value={o.value}>{o.label}</option>)}
-                      </select>
-                    </td>
-                    <td>
-                      <input type="number" min="0" max="99" className="td-input td-input-sm"
-                        value={r.tuli_perfs}
-                        onChange={e => updateRow(r.athlete_id, 'tuli_perfs', e.target.value)} />
-                    </td>
-                    <td className="comp-rating-val">
-                      {calcRatingPreview(r, detail.significance || 1)}
-                    </td>
+                    <td><select className="td-input td-input-sm" value={r.sparring_place} onChange={e => updateRow(r.athlete_id,'sparring_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select></td>
+                    <td><input type="number" min="0" max="99" className="td-input td-input-sm" value={r.sparring_fights} onChange={e=>updateRow(r.athlete_id,'sparring_fights',e.target.value)}/></td>
+                    <td><select className="td-input td-input-sm" value={r.stopball_place} onChange={e=>updateRow(r.athlete_id,'stopball_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select></td>
+                    <td><input type="number" min="0" max="99" className="td-input td-input-sm" value={r.stopball_fights} onChange={e=>updateRow(r.athlete_id,'stopball_fights',e.target.value)}/></td>
+                    <td><select className="td-input td-input-sm" value={r.tegtim_place} onChange={e=>updateRow(r.athlete_id,'tegtim_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select></td>
+                    <td><input type="number" min="0" max="99" className="td-input td-input-sm" value={r.tegtim_fights} onChange={e=>updateRow(r.athlete_id,'tegtim_fights',e.target.value)}/></td>
+                    <td><select className="td-input td-input-sm" value={r.tuli_place} onChange={e=>updateRow(r.athlete_id,'tuli_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select></td>
+                    <td><input type="number" min="0" max="99" className="td-input td-input-sm" value={r.tuli_perfs} onChange={e=>updateRow(r.athlete_id,'tuli_perfs',e.target.value)}/></td>
+                    <td className="comp-rating-val">{calcRatingPreview(r, detail.significance||1)}</td>
+                    <td><button className="td-btn td-btn-del" onClick={() => removeRow(r.athlete_id)} title="Убрать из списка">✕</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {rows.length === 0 && <div className="cabinet-empty">Нет спортсменов</div>}
+            {rows.length === 0 && <div className="cabinet-empty">Нет участников. Нажмите «+ Добавить бойца».</div>}
           </div>
         </div>
       )}
@@ -653,29 +722,25 @@ function CompetitionsTab({ token, athletes }) {
         <div>
           <div className="comp-rating-filters">
             {[
-              { key: 'all',    label: 'Общий' },
-              { key: 'group',  label: 'По группе' },
-              { key: 'gender', label: 'По полу' },
-              { key: 'gup',    label: 'По гыпу' },
+              { key: 'all',          label: 'Общий' },
+              { key: 'age_category', label: 'По возрасту' },
+              { key: 'group',        label: 'По группе' },
+              { key: 'gender',       label: 'По полу' },
+              { key: 'gup',          label: 'По гыпу' },
+              { key: 'weight',       label: 'По весу' },
             ].map(f => (
-              <button key={f.key}
-                className={`att-group-btn ${ratingFilter === f.key ? 'active' : ''}`}
-                onClick={() => setRatingFilter(f.key)}>
-                {f.label}
-              </button>
+              <button key={f.key} className={`att-group-btn ${ratingFilter===f.key?'active':''}`} onClick={() => setRatingFilter(f.key)}>{f.label}</button>
             ))}
-            <button className="att-all-btn" onClick={exportCsv}>↓ CSV</button>
+            <button className="att-all-btn" onClick={exportXlsx}>Экспорт xlsx</button>
           </div>
 
-          {rating.length === 0 && (
-            <div className="cabinet-empty">Результатов пока нет{season ? ` за ${season} год` : ''}.</div>
-          )}
+          {rating.length === 0 && <div className="cabinet-empty">Результатов пока нет{season?` за ${season} год`:''}.</div>}
 
           {ratingFilter === 'all' ? (
             renderRatingTable(rating)
           ) : (
             Object.entries(getRatingGroups()).map(([group, rows_g]) => (
-              <div key={group} style={{ marginBottom: 28 }}>
+              <div key={group} style={{ marginBottom:28 }}>
                 <div className="comp-group-label">{group}</div>
                 {renderRatingTable(rows_g)}
               </div>
@@ -684,7 +749,7 @@ function CompetitionsTab({ token, athletes }) {
         </div>
       )}
 
-      {/* ── Форма создания ── */}
+      {/* ── Модал: создание соревнования ── */}
       {showForm && (
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
           <div className="modal-box comp-modal" onClick={e => e.stopPropagation()}>
@@ -692,39 +757,29 @@ function CompetitionsTab({ token, athletes }) {
             <div className="comp-form-grid">
               <div className="comp-field comp-field-full">
                 <label>Название *</label>
-                <input type="text" className="modal-input"
-                  placeholder="Открытое первенство Московской области..."
-                  value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+                <input type="text" className="modal-input" placeholder="Открытое первенство..." value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} />
               </div>
               <div className="comp-field">
                 <label>Дата *</label>
-                <input type="date" className="modal-input"
-                  value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
+                <input type="date" className="modal-input" value={form.date} onChange={e=>setForm(p=>({...p,date:e.target.value}))} />
               </div>
               <div className="comp-field">
                 <label>Место проведения</label>
-                <input type="text" className="modal-input" placeholder="Москва, СК «Олимп»"
-                  value={form.location} onChange={e => setForm(p => ({ ...p, location: e.target.value }))} />
+                <input type="text" className="modal-input" placeholder="Москва, СК «Олимп»" value={form.location} onChange={e=>setForm(p=>({...p,location:e.target.value}))} />
               </div>
               <div className="comp-field">
                 <label>Уровень</label>
-                <select className="modal-input" value={form.level}
-                  onChange={e => {
-                    const lvl = e.target.value
-                    const types = typesForLevel(lvl)
-                    setForm(p => ({ ...p, level: lvl, comp_type: types.includes(p.comp_type) ? p.comp_type : types[0] }))
-                  }}>
-                  {LEVELS.map(l => <option key={l}>{l}</option>)}
+                <select className="modal-input" value={form.level} onChange={e=>{const l=e.target.value;const t=typesForLevel(l);setForm(p=>({...p,level:l,comp_type:t.includes(p.comp_type)?p.comp_type:t[0]}))}}>
+                  {LEVELS.map(l=><option key={l}>{l}</option>)}
                 </select>
               </div>
               <div className="comp-field">
                 <label>Тип</label>
-                <select className="modal-input" value={form.comp_type}
-                  onChange={e => setForm(p => ({ ...p, comp_type: e.target.value }))}>
-                  {typesForLevel(form.level).map(t => <option key={t}>{t}</option>)}
+                <select className="modal-input" value={form.comp_type} onChange={e=>setForm(p=>({...p,comp_type:e.target.value}))}>
+                  {typesForLevel(form.level).map(t=><option key={t}>{t}</option>)}
                 </select>
               </div>
-              <div className="comp-field comp-field-sig">
+              <div className="comp-field">
                 <label>Коэффициент значимости</label>
                 <div className="comp-sig-preview">
                   <span>{form.level} · {form.comp_type}</span>
@@ -733,14 +788,34 @@ function CompetitionsTab({ token, athletes }) {
               </div>
               <div className="comp-field comp-field-full">
                 <label>Примечание</label>
-                <input type="text" className="modal-input" placeholder="Дополнительно..."
-                  value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} />
+                <input type="text" className="modal-input" placeholder="Дополнительно..." value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))} />
               </div>
             </div>
             {msg && <div className="modal-msg">{msg}</div>}
             <div className="modal-btns-row">
               <button className="btn-primary" onClick={createComp}>Создать</button>
               <button className="btn-outline" onClick={() => setShowForm(false)}>Отмена</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Модал: добавить бойца ── */}
+      {showAddAthlete && (
+        <div className="modal-overlay" onClick={() => setShowAddAthlete(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <h3>Добавить бойца</h3>
+            {notInList.length === 0
+              ? <p style={{ color:'var(--gray)' }}>Все спортсмены уже в списке.</p>
+              : notInList.map(a => (
+                  <div key={a.id} className="att-athlete-row absent" style={{ cursor:'pointer' }} onClick={() => addAthleteToList(a)}>
+                    <div className="att-athlete-name">{a.full_name}</div>
+                    <div className="att-athlete-age">{a.age} лет · {a.group || a.auto_group}</div>
+                  </div>
+                ))
+            }
+            <div className="modal-btns-row" style={{ marginTop:12 }}>
+              <button className="btn-outline" onClick={() => setShowAddAthlete(false)}>Закрыть</button>
             </div>
           </div>
         </div>
@@ -754,11 +829,13 @@ function CompetitionsTab({ token, athletes }) {
         <table className="athletes-table">
           <thead>
             <tr>
-              <th>Место</th>
-              <th style={{ textAlign: 'left' }}>Спортсмен</th>
+              <th style={{ width:50 }}>Место</th>
+              <th style={{ textAlign:'left' }}>Спортсмен</th>
+              <th>Возраст</th>
               <th>Группа</th>
               <th>Гып</th>
-              <th>Медали</th>
+              <th>Вес</th>
+              <th>Пол</th>
               <th>Турниров</th>
               <th>Рейтинг</th>
             </tr>
@@ -766,19 +843,14 @@ function CompetitionsTab({ token, athletes }) {
           <tbody>
             {data.map((r, i) => (
               <tr key={r.athlete_id}>
-                <td style={{ textAlign: 'center', fontWeight: 700 }}>
-                  {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
-                </td>
+                <td style={{ textAlign:'center', fontWeight:700, fontFamily:'Bebas Neue' }}>{i+1}</td>
                 <td className="td-name">{r.full_name}</td>
+                <td style={{ textAlign:'center' }}>{r.age || '—'}<br/><span style={{ fontSize:'0.75rem', color:'var(--gray)' }}>{r.age_category}</span></td>
                 <td>{r.group || '—'}</td>
-                <td>{r.gup || '—'}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>
-                  {r.gold   > 0 && <span>🥇{r.gold} </span>}
-                  {r.silver > 0 && <span>🥈{r.silver} </span>}
-                  {r.bronze > 0 && <span>🥉{r.bronze}</span>}
-                  {r.gold + r.silver + r.bronze === 0 && '—'}
-                </td>
-                <td style={{ textAlign: 'center' }}>{r.tournaments_count}</td>
+                <td style={{ textAlign:'center' }}>{r.gup || '—'}</td>
+                <td style={{ textAlign:'center' }}>{r.weight ? `${r.weight} кг` : '—'}</td>
+                <td style={{ textAlign:'center' }}>{r.gender === 'male' ? 'М' : r.gender === 'female' ? 'Ж' : '—'}</td>
+                <td style={{ textAlign:'center' }}>{r.tournaments_count}</td>
                 <td className="comp-rating-val">{r.total_rating}</td>
               </tr>
             ))}
@@ -814,9 +886,10 @@ export default function Cabinet() {
   const [search,       setSearch]       = useState('')
   const [view,         setView]         = useState('athletes')
   const [resetUser,    setResetUser]    = useState(null)
-  const [cf, setCfState] = useState({ gender: '', group: '', gup_dan: '', parent_name: '' })
+  const [parentView,   setParentView]   = useState('athletes') // для кабинета родителя
+  const [cf, setCfState] = useState({ gender:'', group:'', gup_dan:'', parent_name:'' })
   const setCf = (k, v) => setCfState(f => ({ ...f, [k]: v }))
-  const resetFilters = () => { setSearch(''); setCfState({ gender: '', group: '', gup_dan: '', parent_name: '' }) }
+  const resetFilters = () => { setSearch(''); setCfState({ gender:'', group:'', gup_dan:'', parent_name:'' }) }
 
   useEffect(() => {
     if (!token) { navigate('/login'); return }
@@ -851,7 +924,7 @@ export default function Cabinet() {
 
   const startEdit = (a) => {
     setEditing(a.id)
-    setEditData({ weight: a.weight || '', group: a.group || '', gup: a.gup || '', dan: a.dan || '' })
+    setEditData({ weight: a.weight||'', group: a.group||'', gup: a.gup||'', dan: a.dan||'' })
   }
 
   const saveEdit = async (id) => {
@@ -865,8 +938,7 @@ export default function Cabinet() {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    setEditing(null)
-    loadAthletes()
+    setEditing(null); loadAthletes()
   }
 
   const deleteAthlete = async (id) => {
@@ -884,13 +956,13 @@ export default function Cabinet() {
     loadApplications()
   }
 
-  const uniqueGroups  = useMemo(() => [...new Set(athletes.map(a => a.group || a.auto_group).filter(Boolean))].sort(), [athletes])
+  const uniqueGroups  = useMemo(() => GROUPS, [])  // п.7 — фиксированный справочник
   const uniqueGupDan  = useMemo(() => { const v = new Set(); athletes.forEach(a => { if (a.dan) v.add(`${a.dan} дан`); else if (a.gup) v.add(`${a.gup} гып`) }); return [...v].sort() }, [athletes])
-  const uniqueParents = useMemo(() => [...new Set(athletes.map(a => a.parent_name).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')), [athletes])
+  const uniqueParents = useMemo(() => [...new Set(athletes.map(a => a.parent_name).filter(Boolean))].sort((a,b) => a.localeCompare(b,'ru')), [athletes])
 
   const filteredAthletes = useMemo(() => athletes.filter(a => {
     const s = search.toLowerCase()
-    if (s && !a.full_name.toLowerCase().includes(s) && !(a.parent_name || '').toLowerCase().includes(s)) return false
+    if (s && !a.full_name.toLowerCase().includes(s) && !(a.parent_name||'').toLowerCase().includes(s)) return false
     if (cf.gender && a.gender !== cf.gender) return false
     if (cf.group) { const g = a.group || a.auto_group || ''; if (g !== cf.group) return false }
     if (cf.gup_dan) { const val = a.dan ? `${a.dan} дан` : a.gup ? `${a.gup} гып` : ''; if (val !== cf.gup_dan) return false }
@@ -917,7 +989,7 @@ export default function Cabinet() {
   )
   const filteredApps = applications.filter(a =>
     a.full_name.toLowerCase().includes(search.toLowerCase()) ||
-    (a.phone || '').includes(search)
+    (a.phone||'').includes(search)
   )
 
   const { sorted: sortedAthletes, sort: sortA,  toggle: toggleA  } = useSorted(filteredAthletes)
@@ -937,36 +1009,54 @@ export default function Cabinet() {
               <p className="section-label">Личный кабинет</p>
               <h1 className="cabinet-title">{name}</h1>
             </div>
-            <div style={{display:'flex',gap:'12px',alignItems:'center',flexWrap:'wrap'}}>
-              <a href="/register?add=1" className="btn-outline" style={{fontSize:'13px',padding:'8px 16px'}}>
-                + Добавить ребёнка
-              </a>
+            <div style={{ display:'flex', gap:'12px', alignItems:'center', flexWrap:'wrap' }}>
+              <a href="/register?add=1" className="btn-outline" style={{ fontSize:'13px', padding:'8px 16px' }}>+ Добавить ребёнка</a>
               <button className="btn-outline cabinet-logout" onClick={logout}>Выйти</button>
             </div>
           </div>
+
+          {/* п.8 — вкладки родителя */}
+          <div className="cabinet-tabs">
+            <button className={`cabinet-tab ${parentView==='athletes'?'active':''}`} onClick={() => setParentView('athletes')}>Спортсмены</button>
+            <button className={`cabinet-tab ${parentView==='attendance'?'active':''}`} onClick={() => setParentView('attendance')}>Посещаемость</button>
+            <button className={`cabinet-tab ${parentView==='rating'?'active':''}`} onClick={() => setParentView('rating')}>Рейтинг</button>
+          </div>
+
           {loading && <div className="cabinet-loading">Загрузка...</div>}
-          {!loading && myAthletes.length > 0 && (
-            <div className="my-athletes">
-              <p className="section-label" style={{ marginBottom: '16px' }}>Спортсмены</p>
-              {myAthletes.map(a => (
-                <div className="my-athlete-card" key={a.id}>
-                  <div className="my-athlete-name">{a.full_name}</div>
-                  <div className="my-athlete-details">
-                    <span>Дата рождения: {a.birth_date}</span>
-                    <span>{a.age} лет</span>
-                    <span>{a.gender === 'male' ? 'Мужской' : 'Женский'}</span>
-                    <span>{a.group || a.auto_group}</span>
-                    <span>{a.dan ? `${a.dan} дан` : a.gup ? `${a.gup} гып` : 'Пояс не указан'}</span>
-                  </div>
+
+          {parentView === 'athletes' && !loading && (
+            <>
+              {myAthletes.length > 0 ? (
+                <div className="my-athletes">
+                  <p className="section-label" style={{ marginBottom:'16px' }}>Спортсмены</p>
+                  {myAthletes.map(a => (
+                    <div className="my-athlete-card" key={a.id}>
+                      <div className="my-athlete-name">{a.full_name}</div>
+                      <div className="my-athlete-details">
+                        <span>Дата рождения: {a.birth_date}</span>
+                        <span>{a.age} лет</span>
+                        <span>{a.gender === 'male' ? 'Мужской' : 'Женский'}</span>
+                        <span>{a.group || a.auto_group}</span>
+                        <span>{a.dan ? `${a.dan} дан` : a.gup ? `${a.gup} гып` : 'Пояс не указан'}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              ) : (
+                <div className="cabinet-coming">
+                  <p>Данные о спортсменах пока не добавлены.</p>
+                  <p>Если вы регистрировали ребёнка — обратитесь к тренеру.</p>
+                </div>
+              )}
+            </>
           )}
-          {!loading && myAthletes.length === 0 && (
-            <div className="cabinet-coming">
-              <p>Данные о спортсменах пока не добавлены.</p>
-              <p>Если вы регистрировали ребёнка — обратитесь к тренеру.</p>
-            </div>
+
+          {parentView === 'attendance' && !loading && (
+            <ParentAttendanceTab token={token} athletes={myAthletes} />
+          )}
+
+          {parentView === 'rating' && !loading && (
+            <ParentRatingTab token={token} athletes={myAthletes} />
           )}
         </div>
       </main>
@@ -976,9 +1066,7 @@ export default function Cabinet() {
   // ── КАБИНЕТ АДМИНА ──────────────────────────────────────────────────────────
   return (
     <main className="cabinet-page">
-      {resetUser && (
-        <ResetPasswordModal user={resetUser} token={token} onClose={() => setResetUser(null)} />
-      )}
+      {resetUser && <ResetPasswordModal user={resetUser} token={token} onClose={() => setResetUser(null)} />}
       <div className="container cabinet-container">
         <div className="cabinet-header">
           <div>
@@ -989,53 +1077,36 @@ export default function Cabinet() {
           <button className="btn-outline cabinet-logout" onClick={logout}>Выйти</button>
         </div>
 
+        {/* п.5 — вкладка Соревнования кликабельна, сбрасывает состояние */}
         <div className="cabinet-tabs">
-          <button className={`cabinet-tab ${view === 'athletes' ? 'active' : ''}`} onClick={() => setView('athletes')}>
-            Спортсмены ({athletes.length})
-          </button>
-          <button className={`cabinet-tab ${view === 'parents' ? 'active' : ''}`} onClick={() => setView('parents')}>
-            Родители ({parents.length})
-          </button>
-          <button className={`cabinet-tab ${view === 'applications' ? 'active' : ''}`} onClick={() => setView('applications')}>
+          <button className={`cabinet-tab ${view==='athletes'?'active':''}`} onClick={() => setView('athletes')}>Спортсмены ({athletes.length})</button>
+          <button className={`cabinet-tab ${view==='parents'?'active':''}`} onClick={() => setView('parents')}>Родители ({parents.length})</button>
+          <button className={`cabinet-tab ${view==='applications'?'active':''}`} onClick={() => setView('applications')}>
             Заявки
-            {applications.filter(a => a.status === 'new').length > 0 && (
-              <span className="tab-badge">{applications.filter(a => a.status === 'new').length}</span>
+            {applications.filter(a => a.status==='new').length > 0 && (
+              <span className="tab-badge">{applications.filter(a => a.status==='new').length}</span>
             )}
           </button>
-          <button className={`cabinet-tab ${view === 'attendance' ? 'active' : ''}`} onClick={() => setView('attendance')}>
-            Журнал посещаемости
-          </button>
-          <button className={`cabinet-tab ${view === 'competitions' ? 'active' : ''}`} onClick={() => setView('competitions')}>
-            Соревнования
-          </button>
+          <button className={`cabinet-tab ${view==='attendance'?'active':''}`} onClick={() => setView('attendance')}>Журнал посещаемости</button>
+          <button className={`cabinet-tab ${view==='competitions'?'active':''}`} onClick={() => setView('competitions')}>Соревнования</button>
         </div>
 
         {view !== 'attendance' && view !== 'competitions' && (
           <div className="cabinet-toolbar">
             <div className="cabinet-search">
-              <input type="text" placeholder="Поиск..."
-                value={search} onChange={e => setSearch(e.target.value)} />
+              <input type="text" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} />
               {search && <button className="cabinet-search-clear" onClick={() => setSearch('')}>✕</button>}
             </div>
             {activeFiltersCount > 0 && (
-              <button className="cabinet-reset-filters" onClick={resetFilters}>
-                Сбросить фильтры ({activeFiltersCount})
-              </button>
+              <button className="cabinet-reset-filters" onClick={resetFilters}>Сбросить фильтры ({activeFiltersCount})</button>
             )}
           </div>
         )}
 
         {loading && <div className="cabinet-loading">Загрузка...</div>}
 
-        {/* ── Журнал посещаемости ── */}
-        {view === 'attendance' && (
-          <AttendanceTab token={token} athletes={athletes} />
-        )}
-
-        {/* ── Соревнования ── */}
-        {view === 'competitions' && (
-          <CompetitionsTab token={token} athletes={athletes} />
-        )}
+        {view === 'attendance'   && <AttendanceTab token={token} athletes={athletes} />}
+        {view === 'competitions' && <CompetitionsTab token={token} athletes={athletes} />}
 
         {/* ── Спортсмены ── */}
         {view === 'athletes' && (
@@ -1046,15 +1117,12 @@ export default function Cabinet() {
                   <Th colKey="full_name"   sort={sortA} toggle={toggleA}>ФИО</Th>
                   <Th colKey="birth_date"  sort={sortA} toggle={toggleA}>Дата рожд.</Th>
                   <Th colKey="age"         sort={sortA} toggle={toggleA}>Возраст</Th>
-                  <Th colKey="gender"      sort={sortA} toggle={toggleA}
-                    filter={<ColFilter value={cf.gender} onChange={v => setCf('gender', v)} options={['male','female']} />}>Пол</Th>
-                  <Th colKey="group"       sort={sortA} toggle={toggleA}
-                    filter={<ColFilter value={cf.group} onChange={v => setCf('group', v)} options={uniqueGroups} />}>Группа</Th>
-                  <Th colKey="gup"         sort={sortA} toggle={toggleA}
-                    filter={<ColFilter value={cf.gup_dan} onChange={v => setCf('gup_dan', v)} options={uniqueGupDan} />}>Гып / Дан</Th>
+                  <Th colKey="gender"      sort={sortA} toggle={toggleA} filter={<ColFilter value={cf.gender} onChange={v=>setCf('gender',v)} options={['male','female']} />}>Пол</Th>
+                  {/* п.7 — группа только из справочника */}
+                  <Th colKey="group"       sort={sortA} toggle={toggleA} filter={<ColFilter value={cf.group} onChange={v=>setCf('group',v)} options={GROUPS} />}>Группа</Th>
+                  <Th colKey="gup"         sort={sortA} toggle={toggleA} filter={<ColFilter value={cf.gup_dan} onChange={v=>setCf('gup_dan',v)} options={uniqueGupDan} />}>Гып / Дан</Th>
                   <Th colKey="weight"      sort={sortA} toggle={toggleA}>Вес (кг)</Th>
-                  <Th colKey="parent_name" sort={sortA} toggle={toggleA}
-                    filter={<ColFilter value={cf.parent_name} onChange={v => setCf('parent_name', v)} options={uniqueParents} />}>Родитель</Th>
+                  <Th colKey="parent_name" sort={sortA} toggle={toggleA} filter={<ColFilter value={cf.parent_name} onChange={v=>setCf('parent_name',v)} options={uniqueParents} />}>Родитель</Th>
                   <th>Действия</th>
                 </tr>
               </thead>
@@ -1065,11 +1133,17 @@ export default function Cabinet() {
                     <td>{a.birth_date}</td>
                     <td>{a.age}</td>
                     <td>{a.gender === 'male' ? 'М' : 'Ж'}</td>
+                    <td>
+                      {editing === a.id
+                        /* п.7 — select вместо свободного ввода */
+                        ? <select value={editData.group} onChange={e=>setEditData(d=>({...d,group:e.target.value}))} className="td-input">
+                            <option value="">—</option>
+                            {GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+                          </select>
+                        : (a.group || a.auto_group)}
+                    </td>
                     <td>{editing === a.id
-                      ? <input value={editData.group} onChange={e=>setEditData(d=>({...d,group:e.target.value}))} className="td-input"/>
-                      : (a.group || a.auto_group)}</td>
-                    <td>{editing === a.id
-                      ? <div style={{display:'flex',gap:'4px'}}>
+                      ? <div style={{ display:'flex', gap:'4px' }}>
                           <input placeholder="Гып" value={editData.gup} onChange={e=>setEditData(d=>({...d,gup:e.target.value,dan:''}))} className="td-input td-input-sm"/>
                           <input placeholder="Дан" value={editData.dan} onChange={e=>setEditData(d=>({...d,dan:e.target.value,gup:''}))} className="td-input td-input-sm"/>
                         </div>
@@ -1083,15 +1157,9 @@ export default function Cabinet() {
                     </td>
                     <td className="td-actions">
                       {editing === a.id ? (
-                        <>
-                          <button className="td-btn td-btn-save" onClick={() => saveEdit(a.id)}>✓</button>
-                          <button className="td-btn td-btn-cancel" onClick={() => setEditing(null)}>✕</button>
-                        </>
+                        <><button className="td-btn td-btn-save" onClick={() => saveEdit(a.id)}>✓</button><button className="td-btn td-btn-cancel" onClick={() => setEditing(null)}>✕</button></>
                       ) : (
-                        <>
-                          <button className="td-btn td-btn-edit" onClick={() => startEdit(a)}>Ред.</button>
-                          <button className="td-btn td-btn-del" onClick={() => deleteAthlete(a.id)}>Удал.</button>
-                        </>
+                        <><button className="td-btn td-btn-edit" onClick={() => startEdit(a)}>Ред.</button><button className="td-btn td-btn-del" onClick={() => deleteAthlete(a.id)}>Удал.</button></>
                       )}
                     </td>
                   </tr>
@@ -1148,14 +1216,13 @@ export default function Cabinet() {
                   const st = STATUS_LABELS[a.status] || { label: a.status, color: 'var(--gray)' }
                   return (
                     <tr key={a.id}>
-                      <td style={{whiteSpace:'nowrap'}}>{new Date(a.created_at).toLocaleDateString('ru')}</td>
+                      <td style={{ whiteSpace:'nowrap' }}>{new Date(a.created_at).toLocaleDateString('ru')}</td>
                       <td className="td-name">{a.full_name}</td>
                       <td>{a.phone}</td>
-                      <td style={{fontSize:'13px',color:'var(--gray)',maxWidth:'200px'}}>{a.comment || '—'}</td>
-                      <td><span style={{color:st.color,fontWeight:700,fontSize:'13px'}}>{st.label}</span></td>
+                      <td style={{ fontSize:'13px', color:'var(--gray)', maxWidth:'200px' }}>{a.comment || '—'}</td>
+                      <td><span style={{ color:st.color, fontWeight:700, fontSize:'13px' }}>{st.label}</span></td>
                       <td>
-                        <select className="td-status-select" value={a.status}
-                          onChange={e => updateAppStatus(a.id, e.target.value)}>
+                        <select className="td-status-select" value={a.status} onChange={e => updateAppStatus(a.id, e.target.value)}>
                           <option value="new">Новая</option>
                           <option value="processing">В обработке</option>
                           <option value="confirmed">Подтверждена</option>
