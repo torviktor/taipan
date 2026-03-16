@@ -40,21 +40,25 @@ class Athlete(Base):
     id           = Column(Integer, primary_key=True, index=True)
     user_id      = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    full_name    = Column(String(200), nullable=False)   # ФИО спортсмена
-    birth_date   = Column(Date, nullable=False)          # Дата рождения
-    gender       = Column(Enum(Gender), nullable=False)  # Пол
-    gup          = Column(Integer, nullable=True)        # Гып (1-10, None если дан)
-    dan          = Column(Integer, nullable=True)        # Дан (1+, None если гып)
+    full_name    = Column(String(200), nullable=False)
+    birth_date   = Column(Date, nullable=False)
+    gender       = Column(Enum(Gender), nullable=False)
+    gup          = Column(Integer, nullable=True)
+    dan          = Column(Integer, nullable=True)
 
-    # Поля заполняемые тренером
-    weight       = Column(Numeric(5, 2), nullable=True)  # Весовая категория
-    group        = Column(String(100), nullable=True)    # Группа (авто + ручная коррекция)
+    weight       = Column(Numeric(5, 2), nullable=True)
+    group        = Column(String(100), nullable=True)
 
     created_at   = Column(DateTime, default=datetime.utcnow)
     updated_at   = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    user = relationship("User", back_populates="athletes")
+    user               = relationship("User", back_populates="athletes")
     attendance_records = relationship("Attendance", back_populates="athlete")
+    competition_results = relationship(
+        "CompetitionResult",
+        back_populates="athlete",
+        cascade="all, delete-orphan"
+    )
 
     @property
     def age(self) -> int:

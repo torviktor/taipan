@@ -5,7 +5,8 @@ from app.routes import auth, applications, schedule, users, payments
 from app.routes import events, telegram
 from app.routes.ai import router as ai_router
 from app.routes.attendance import router as attendance_router
-from app.models import user, event, attendance
+from app.routes.competitions import router as competitions_router
+from app.models import user, event, attendance, competition
 
 Base.metadata.create_all(bind=engine)
 
@@ -32,6 +33,7 @@ app.include_router(events.router,            prefix="/api/events",       tags=["
 app.include_router(telegram.router,          prefix="/api/telegram",     tags=["Telegram"])
 app.include_router(ai_router,                prefix="/api",              tags=["AI"])
 app.include_router(attendance_router,        prefix="/api",              tags=["Посещаемость"])
+app.include_router(competitions_router,      prefix="/api",              tags=["Соревнования"])
 
 @app.get("/")
 def root():

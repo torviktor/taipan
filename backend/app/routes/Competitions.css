@@ -1,0 +1,435 @@
+/* frontend/src/pages/Competitions.css */
+/* Стили вкладки соревнований — вписаны в дизайн-систему Тайпан */
+
+/* ── Шапка вкладки ────────────────────────────────────────────── */
+.comp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.comp-header h2 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2rem;
+  letter-spacing: 0.06em;
+  color: var(--white);
+  margin: 0;
+}
+
+/* ── Кнопки ───────────────────────────────────────────────────── */
+.comp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 20px;
+  border-radius: 6px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  border: none;
+  transition: background 0.18s, transform 0.12s;
+}
+
+.comp-btn:active { transform: scale(0.97); }
+
+.comp-btn-primary {
+  background: var(--red);
+  color: var(--white);
+}
+.comp-btn-primary:hover { background: var(--red-hot); }
+
+.comp-btn-secondary {
+  background: var(--dark2);
+  color: var(--white);
+  border: 1px solid var(--gray-dim);
+}
+.comp-btn-secondary:hover { border-color: var(--gray); }
+
+.comp-btn-ghost {
+  background: transparent;
+  color: var(--gray);
+  border: 1px solid var(--gray-dim);
+  padding: 6px 12px;
+  font-size: 0.82rem;
+}
+.comp-btn-ghost:hover { color: var(--white); border-color: var(--gray); }
+
+.comp-btn-danger {
+  background: transparent;
+  color: #cc4444;
+  border: 1px solid #552222;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+}
+.comp-btn-danger:hover { background: #2a0000; }
+
+/* ── Фильтры / сезоны ─────────────────────────────────────────── */
+.comp-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.comp-season-select {
+  background: var(--dark2);
+  color: var(--white);
+  border: 1px solid var(--gray-dim);
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 0.9rem;
+  cursor: pointer;
+  outline: none;
+}
+.comp-season-select:focus { border-color: var(--red); }
+
+.comp-filter-btn {
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--gray-dim);
+  background: transparent;
+  color: var(--gray);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.comp-filter-btn:hover { color: var(--white); border-color: var(--gray); }
+.comp-filter-btn.active {
+  background: var(--red);
+  color: var(--white);
+  border-color: var(--red);
+}
+
+/* ── Список соревнований ──────────────────────────────────────── */
+.comp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.comp-card {
+  background: var(--dark2);
+  border: 1px solid var(--gray-dim);
+  border-radius: 10px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s;
+}
+.comp-card:hover { border-color: var(--gray); background: #222; }
+.comp-card.active { border-color: var(--red); }
+
+.comp-card-left { flex: 1; min-width: 0; }
+
+.comp-card-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--white);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comp-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 5px;
+  flex-wrap: wrap;
+}
+
+.comp-card-date {
+  font-size: 0.82rem;
+  color: var(--gray);
+}
+
+.comp-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  background: var(--gray-dim);
+  color: var(--white);
+}
+
+.comp-badge-local     { background: #1c2a1c; color: #6cba6c; }
+.comp-badge-regional  { background: #1a1a2e; color: #6a8ecb; }
+.comp-badge-district  { background: #2a1e0a; color: #c8962a; }
+.comp-badge-national  { background: #2a0a1e; color: #cc6a9a; }
+.comp-badge-international { background: #1a0a2a; color: #a06ae0; }
+
+.comp-card-sig {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.5rem;
+  color: var(--red);
+  white-space: nowrap;
+}
+.comp-card-sig span {
+  font-family: 'Barlow', sans-serif;
+  font-size: 0.7rem;
+  color: var(--gray);
+  display: block;
+  text-align: center;
+}
+
+.comp-card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ── Детальный вид турнира ────────────────────────────────────── */
+.comp-detail {
+  margin-top: 20px;
+  background: var(--dark);
+  border: 1px solid var(--gray-dim);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.comp-detail-header {
+  background: var(--dark2);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--gray-dim);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.comp-detail-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.4rem;
+  letter-spacing: 0.05em;
+  color: var(--white);
+}
+
+/* ── Таблица результатов ─────────────────────────────────────── */
+.comp-table-wrap {
+  overflow-x: auto;
+  padding: 0 0 4px 0;
+}
+
+.comp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.comp-table th {
+  background: #161616;
+  color: var(--gray);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 10px 12px;
+  text-align: center;
+  border-bottom: 1px solid var(--gray-dim);
+  white-space: nowrap;
+}
+.comp-table th:first-child { text-align: left; padding-left: 20px; }
+
+.comp-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #1e1e1e;
+  text-align: center;
+  color: var(--white);
+  vertical-align: middle;
+}
+.comp-table td:first-child { text-align: left; padding-left: 20px; }
+
+.comp-table tr:last-child td { border-bottom: none; }
+.comp-table tr:hover td { background: #1a1a1a; }
+
+/* Инлайн-инпуты таблицы */
+.comp-table select,
+.comp-table input[type="number"] {
+  background: var(--dark);
+  color: var(--white);
+  border: 1px solid var(--gray-dim);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 0.85rem;
+  text-align: center;
+  outline: none;
+  width: 100%;
+  min-width: 50px;
+}
+.comp-table select:focus,
+.comp-table input:focus { border-color: var(--red); }
+.comp-table input[type="number"] { max-width: 62px; }
+
+/* Рейтинговое число */
+.comp-rating-cell {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.2rem;
+  color: var(--red-hot);
+}
+
+/* Медали */
+.medal { font-size: 1.1rem; }
+
+/* ── Рейтинговая таблица (общий рейтинг) ────────────────────── */
+.comp-rating-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.comp-place-cell {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.3rem;
+  color: var(--white);
+}
+.comp-place-gold   { color: #f0c040; }
+.comp-place-silver { color: #aaaaaa; }
+.comp-place-bronze { color: #c87833; }
+
+.comp-medals-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--gray);
+}
+
+/* ── Форма создания соревнования ─────────────────────────────── */
+.comp-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.comp-modal {
+  background: var(--dark2);
+  border: 1px solid var(--gray-dim);
+  border-radius: 12px;
+  padding: 28px;
+  width: 100%;
+  max-width: 540px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.comp-modal h3 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.5rem;
+  letter-spacing: 0.05em;
+  color: var(--white);
+  margin: 0 0 20px 0;
+}
+
+.comp-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.comp-form-grid .full-width { grid-column: 1 / -1; }
+
+.comp-field label {
+  display: block;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--gray);
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.comp-field input,
+.comp-field select,
+.comp-field textarea {
+  width: 100%;
+  background: var(--dark);
+  color: var(--white);
+  border: 1px solid var(--gray-dim);
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.comp-field input:focus,
+.comp-field select:focus,
+.comp-field textarea:focus { border-color: var(--red); }
+
+.comp-sig-preview {
+  background: var(--dark);
+  border: 1px solid var(--gray-dim);
+  border-radius: 6px;
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.comp-sig-preview .sig-val {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.6rem;
+  color: var(--red);
+}
+
+.comp-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 22px;
+}
+
+/* ── Пустые состояния ────────────────────────────────────────── */
+.comp-empty {
+  text-align: center;
+  padding: 50px 20px;
+  color: var(--gray);
+}
+.comp-empty svg { opacity: 0.25; margin-bottom: 12px; }
+.comp-empty p { font-size: 0.95rem; }
+
+/* ── Сохранение ──────────────────────────────────────────────── */
+.comp-save-bar {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(to top, var(--dark) 70%, transparent);
+  padding: 16px 20px 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* ── Адаптив ─────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .comp-form-grid { grid-template-columns: 1fr; }
+  .comp-card { flex-direction: column; align-items: flex-start; }
+  .comp-card-sig { font-size: 1.2rem; }
+  .comp-detail-header { flex-direction: column; align-items: flex-start; }
+}
