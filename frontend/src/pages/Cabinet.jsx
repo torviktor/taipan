@@ -1072,7 +1072,7 @@ export default function Cabinet() {
           )}
 
           {parentView === 'rating' && !loading && (
-            <CompetitionsTab token={token} athletes={myAthletes} readOnly={true} />
+            <ParentRatingTab token={token} athletes={myAthletes} />
           )}
         </div>
       </main>
