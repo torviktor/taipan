@@ -345,7 +345,7 @@ function ParentAttendanceTab({ token, athletes }) {
 // ── РЕЙТИНГ ДЛЯ РОДИТЕЛЯ — используем CompetitionsTab с readOnly ───────────────
 
 // ── РЕЙТИНГ (отдельная вкладка) ───────────────────────────────────────────────
-function RatingTab({ token }) {
+function RatingTab({ token, myAthleteIds = [] }) {
   const [rating,       setRating]       = useState([])
   const [seasons,      setSeasons]      = useState([])
   const [season,       setSeason]       = useState('')
@@ -409,10 +409,15 @@ function RatingTab({ token }) {
           <th>Возраст</th><th>Группа</th><th>Гып</th><th>Вес</th><th>Пол</th><th>Турниров</th><th>Рейтинг</th>
         </tr></thead>
         <tbody>
-          {data.map((r,i) => (
-            <tr key={r.athlete_id}>
+          {data.map((r,i) => {
+            const isMyChild = myAthleteIds.includes(r.athlete_id)
+            return (
+            <tr key={r.athlete_id} style={isMyChild ? { background:'#1a1500', outline:'1px solid #c8962a' } : {}}>
               <td style={{textAlign:'center',fontWeight:700,fontFamily:'Bebas Neue'}}>{i+1}</td>
-              <td className="td-name">{r.full_name}</td>
+              <td className="td-name">
+                {isMyChild && <span style={{color:'#c8962a',fontWeight:700,marginRight:6}}>▶</span>}
+                {r.full_name}
+              </td>
               <td style={{textAlign:'center'}}>{r.age||'—'}<br/><span style={{fontSize:'0.72rem',color:'var(--gray)'}}>{r.age_category}</span></td>
               <td>{r.group||'—'}</td>
               <td style={{textAlign:'center'}}>{r.gup||'—'}</td>
@@ -421,7 +426,8 @@ function RatingTab({ token }) {
               <td style={{textAlign:'center'}}>{r.tournaments_count}</td>
               <td className="comp-rating-val">{r.total_rating}</td>
             </tr>
-          ))}
+            )
+          })}
         </tbody>
       </table>
     </div>
@@ -526,20 +532,22 @@ function calcRatingPreview(row, sig) {
 }
 
 function CompetitionsTab({ token, athletes, readOnly = false }) {
-  const [compView,     setCompView]     = useState('list')
-  const [comps,        setComps]        = useState([])
-  const [seasons,      setSeasons]      = useState([])
-  const [season,       setSeason]       = useState('')
-  const [detail,       setDetail]       = useState(null)
-  const [rows,         setRows]         = useState([])
-  const [allAthletes,  setAllAthletes]  = useState([]) // все спортсмены для добавления
-  const [rating,       setRating]       = useState([])
-  const [ratingFilter, setRatingFilter] = useState('all')
-  const [loading,      setLoading]      = useState(false)
-  const [saving,       setSaving]       = useState(false)
-  const [showForm,     setShowForm]     = useState(false)
+  const [compView,       setCompView]       = useState('list')
+  const [comps,          setComps]          = useState([])
+  const [seasons,        setSeasons]        = useState([])
+  const [season,         setSeason]         = useState('')
+  const [detail,         setDetail]         = useState(null)
+  const [rows,           setRows]           = useState([])
+  const [allAthletes,    setAllAthletes]    = useState([])
+  const [rating,         setRating]         = useState([])
+  const [ratingFilter,   setRatingFilter]   = useState('all')
+  const [loading,        setLoading]        = useState(false)
+  const [saving,         setSaving]         = useState(false)
+  const [showForm,       setShowForm]       = useState(false)
   const [showAddAthlete, setShowAddAthlete] = useState(false)
-  const [msg,          setMsg]          = useState('')
+  const [showChart,      setShowChart]      = useState(false)
+  const [chartData,      setChartData]      = useState([])
+  const [msg,            setMsg]            = useState('')
   const [form, setForm] = useState({ name:'', date:'', location:'', level:'Местный', comp_type:'Турнир', notes:'' })
 
   const h  = { Authorization: `Bearer ${token}` }
@@ -547,6 +555,7 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
 
   useEffect(() => { loadSeasons(); loadComps() }, [])
   useEffect(() => { loadComps() }, [season])
+  useEffect(() => { if (showChart && comps.length > 0) buildChartData() }, [showChart, comps])
 
   const loadSeasons = async () => {
     try { const r = await fetch(`${API}/competitions/seasons`, { headers: h }); if (r.ok) setSeasons(await r.json()) } catch {}
@@ -560,6 +569,20 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
       if (r.ok) setComps(await r.json())
     } catch {}
     setLoading(false)
+  }
+
+  const buildChartData = async () => {
+    const data = []
+    for (const c of comps) {
+      try {
+        const r = await fetch(`${API}/competitions/${c.id}`, { headers: h })
+        if (r.ok) {
+          const d = await r.json()
+          data.push({ name: c.name.length > 18 ? c.name.substring(0,18)+'…' : c.name, date: c.date, participants: (d.results||[]).length })
+        }
+      } catch {}
+    }
+    setChartData(data.sort((a,b) => a.date.localeCompare(b.date)))
   }
 
   const openDetail = async (comp) => {
@@ -756,6 +779,7 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
           )}
         </div>
         <div className="comp-top-right">
+          <button className={`att-all-btn ${showChart?'active':''}`} onClick={() => setShowChart(v=>!v)}>График</button>
           {!readOnly && (
             <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={() => { setShowForm(true); setMsg('') }}>
               + Соревнование
@@ -763,6 +787,16 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
           )}
         </div>
       </div>
+
+      {showChart && (
+        <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderRadius:10, padding:20, marginBottom:16 }}>
+          <div style={{ marginBottom:8, fontSize:'0.85rem', color:'var(--gray)' }}>Количество участников по соревнованиям</div>
+          {chartData.length === 0
+            ? <div className="cabinet-empty">Загрузка данных...</div>
+            : <LineChart data={chartData} xKey="name" yKey="participants" color="var(--red)" height={200}/>
+          }
+        </div>
+      )}
 
       {msg && <div className="att-msg">{msg}</div>}
       {loading && <div className="cabinet-loading">Загрузка...</div>}
@@ -1197,7 +1231,7 @@ export default function Cabinet() {
           )}
 
           {parentView === 'rating' && !loading && (
-            <RatingTab token={token} />
+            <RatingTab token={token} myAthleteIds={myAthletes.map(a => a.id)} />
           )}
         </div>
       </main>
