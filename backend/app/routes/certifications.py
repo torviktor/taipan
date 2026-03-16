@@ -210,12 +210,22 @@ def send_notifications(
         elif r.target_gup:
             target_str = f"{r.target_gup} гып"
 
+        # Определяем роль пользователя
+        user_role = r.athlete.user.role if r.athlete.user else "parent"
+
         title = f"Аттестация — {cert.name}"
-        body  = (
-            f"Ваш спортсмен {r.athlete.full_name} отобран для сдачи экзамена "
-            f"на {target_str}. "
-            f"Дата: {cert.date.strftime('%d.%m.%Y')}."
-        )
+        if user_role == "athlete":
+            body = (
+                f"Вы отобраны для сдачи экзамена "
+                f"на {target_str}. "
+                f"Дата: {cert.date.strftime('%d.%m.%Y')}."
+            )
+        else:
+            body = (
+                f"Ваш спортсмен {r.athlete.full_name} отобран для сдачи экзамена "
+                f"на {target_str}. "
+                f"Дата: {cert.date.strftime('%d.%m.%Y')}."
+            )
         if cert.location:
             body += f" Место: {cert.location}."
         if cert.notes:

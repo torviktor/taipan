@@ -113,8 +113,11 @@ export default function Register() {
     if (!form.full_name) { setError('Введите ваше ФИО'); return }
     if (form.password !== form.password2) { setError('Пароли не совпадают'); return }
     if (form.password.length < 6) { setError('Пароль минимум 6 символов'); return }
-    for (const a of athletes) {
-      if (!a.full_name || !a.birth_date) { setError('Заполните данные всех спортсменов'); return }
+    if (form.role === 'athlete' && !athletes[0].birth_date) { setError('Укажите дату рождения'); return }
+    if (form.role === 'parent') {
+      for (const a of athletes) {
+        if (!a.full_name || !a.birth_date) { setError('Заполните данные всех детей'); return }
+      }
     }
     if (!consent) { setError('Необходимо согласие на обработку персональных данных'); return }
     const phone = form.phone.replace(/\D/g, '')
@@ -127,7 +130,10 @@ export default function Register() {
       const body = {
         full_name: form.full_name, phone, password: form.password,
         email: form.email || undefined, role: form.role,
-        athlete: buildAthletePayload(athletes[0]),
+        athlete: buildAthletePayload(form.role === 'athlete'
+          ? { ...athletes[0], full_name: form.full_name }
+          : athletes[0]
+        ),
       }
       const res  = await fetch(`${API}/auth/register`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -303,14 +309,57 @@ export default function Register() {
               <input type="password" placeholder="Повторите пароль"
                 value={form.password2} onChange={e => set('password2', e.target.value)} />
             </div>
+            {/* Для спортсмена — поля прямо здесь */}
+            {form.role === 'athlete' && (
+              <>
+                <div className="register-field">
+                  <label>Дата рождения</label>
+                  <input type="date" value={athletes[0].birth_date}
+                    onChange={e => setAthletes([{ ...athletes[0], birth_date: e.target.value }])} />
+                </div>
+                <div className="register-field">
+                  <label>Пол</label>
+                  <select value={athletes[0].gender}
+                    onChange={e => setAthletes([{ ...athletes[0], gender: e.target.value }])}>
+                    <option value="male">Мужской</option>
+                    <option value="female">Женский</option>
+                  </select>
+                </div>
+                <div className="register-field">
+                  <label>Пояс</label>
+                  <div className="register-belt">
+                    <label className="register-check">
+                      <input type="checkbox" checked={athletes[0].has_dan}
+                        onChange={e => setAthletes([{ ...athletes[0], has_dan: e.target.checked }])} />
+                      Чёрный пояс (дан)
+                    </label>
+                    {athletes[0].has_dan ? (
+                      <select value={athletes[0].dan}
+                        onChange={e => setAthletes([{ ...athletes[0], dan: e.target.value }])}>
+                        <option value="">Выберите дан</option>
+                        {[1,2,3,4,5,6,7,8,9].map(d => <option key={d} value={d}>{d} дан</option>)}
+                      </select>
+                    ) : (
+                      <select value={athletes[0].gup}
+                        onChange={e => setAthletes([{ ...athletes[0], gup: e.target.value }])}>
+                        <option value="">Выберите гып</option>
+                        {[10,9,8,7,6,5,4,3,2,1].map(g => <option key={g} value={g}>{g} гып</option>)}
+                      </select>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
+        {/* Для родителя — отдельная секция с детьми */}
+        {form.role === 'parent' && (
         <div className="register-section">
-          <h3>{form.role === 'parent' ? 'Данные детей' : 'Данные спортсмена'}</h3>
+          <h3>Данные детей</h3>
           {athletes.map((a, i) => (
             <div key={i} style={{ position: 'relative' }}>
               <AthleteForm
-                data={a} index={i} isParent={form.role === 'parent'}
+                data={a} index={i} isParent={true}
                 onChange={v => setAthletes(arr => arr.map((x, j) => j === i ? v : x))}
               />
               {athletes.length > 1 && (
@@ -321,13 +370,14 @@ export default function Register() {
               )}
             </div>
           ))}
-          {form.role === 'parent' && athletes.length < 5 && (
+          {athletes.length < 5 && (
             <button className="athlete-add-btn"
               onClick={() => setAthletes(arr => [...arr, emptyAthlete()])}>
               + Добавить ещё ребёнка
             </button>
           )}
         </div>
+        )}
 
         {/* ── Согласие на обработку персональных данных ── */}
         <div className="register-consent">
