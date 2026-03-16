@@ -224,113 +224,66 @@ function AttendanceTab({ token, athletes }) {
 
 // ── ПОСЕЩАЕМОСТЬ ДЛЯ РОДИТЕЛЯ ──────────────────────────────────────────────────
 function ParentAttendanceTab({ token, athletes }) {
-  const [stats, setStats] = useState([])
-  const [sessions, setSessions] = useState([])
+  const [data, setData]     = useState([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => { loadAll() }, [])
 
   const loadAll = async () => {
     setLoading(true)
-    try {
-      for (const a of athletes) {
-        const r = await fetch(`${API}/attendance/athlete/${a.id}/stats`, { headers: { Authorization: `Bearer ${token}` } })
-        if (r.ok) {
-          const d = await r.json()
-          setStats(prev => [...prev.filter(s => s.athlete_id !== a.id), { athlete_id: a.id, full_name: a.full_name, ...d }])
-        }
-        const r2 = await fetch(`${API}/attendance/athlete/${a.id}/sessions?limit=10`, { headers: { Authorization: `Bearer ${token}` } })
-        if (r2.ok) {
-          const d2 = await r2.json()
-          setSessions(prev => [...prev.filter(s => s.athlete_id !== a.id), ...d2.map(s => ({ ...s, athlete_id: a.id, athlete_name: a.full_name }))])
-        }
-      }
-    } catch {}
+    const results = []
+    for (const a of athletes) {
+      try {
+        // Единственный роут: GET /attendance/athlete/{id}?months=6
+        const r = await fetch(`${API}/attendance/athlete/${a.id}?months=6`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (r.ok) results.push(await r.json())
+      } catch {}
+    }
+    setData(results)
     setLoading(false)
   }
 
   if (loading) return <div className="cabinet-loading">Загрузка...</div>
-
-  return (
-    <div>
-      {stats.map(s => (
-        <div key={s.athlete_id} className="my-athlete-card" style={{ marginBottom: 16 }}>
-          <div className="my-athlete-name">{s.full_name}</div>
-          <div className="my-athlete-details">
-            <span>Всего тренировок: {s.total || 0}</span>
-            <span>Присутствовал: {s.present || 0}</span>
-            <span>Посещаемость: {s.total ? Math.round((s.present / s.total) * 100) : 0}%</span>
-          </div>
-          <div style={{ marginTop: 10 }}>
-            {sessions.filter(ss => ss.athlete_id === s.athlete_id).slice(0, 5).map((ss, i) => (
-              <div key={i} style={{ display: 'flex', gap: 12, padding: '6px 0', borderBottom: '1px solid var(--gray-dim)', fontSize: '0.85rem' }}>
-                <span style={{ color: 'var(--gray)' }}>{new Date(ss.date).toLocaleDateString('ru-RU')}</span>
-                <span style={{ color: ss.present ? '#6cba6c' : 'var(--gray)' }}>{ss.present ? 'Присутствовал' : 'Отсутствовал'}</span>
-                {ss.notes && <span style={{ color: 'var(--gray)' }}>{ss.notes}</span>}
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-      {stats.length === 0 && <div className="cabinet-empty">Данные о посещаемости пока недоступны.</div>}
-    </div>
-  )
-}
-
-// ── РЕЙТИНГ ДЛЯ РОДИТЕЛЯ ───────────────────────────────────────────────────────
-function ParentRatingTab({ token, athletes }) {
-  const [data, setData] = useState([])
-  const [loading, setLoading] = useState(false)
-
-  useEffect(() => { loadAll() }, [])
-
-  const loadAll = async () => {
-    setLoading(true)
-    try {
-      for (const a of athletes) {
-        const r = await fetch(`${API}/competitions/rating/athlete/${a.id}`, { headers: { Authorization: `Bearer ${token}` } })
-        if (r.ok) {
-          const d = await r.json()
-          setData(prev => [...prev.filter(x => x.athlete_id !== a.id), d])
-        }
-      }
-    } catch {}
-    setLoading(false)
-  }
-
-  if (loading) return <div className="cabinet-loading">Загрузка...</div>
+  if (data.length === 0) return <div className="cabinet-empty">Данные о посещаемости пока недоступны.</div>
 
   return (
     <div>
       {data.map(a => (
         <div key={a.athlete_id} className="my-athlete-card" style={{ marginBottom: 20 }}>
-          <div className="my-athlete-name" style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div className="my-athlete-name" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <span>{a.full_name}</span>
-            <span className="comp-rating-val">{a.total_rating} pts</span>
+            <span style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', color: a.percent >= 70 ? '#6cba6c' : a.percent >= 50 ? '#c8962a' : 'var(--red)' }}>
+              {a.percent}%
+            </span>
           </div>
-          {a.results.length === 0 && <div style={{ color: 'var(--gray)', fontSize: '0.85rem', marginTop: 8 }}>Соревнований пока нет</div>}
-          {a.results.map((r, i) => (
-            <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid var(--gray-dim)', fontSize: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontWeight: 600, color: 'var(--white)' }}>{r.competition_name}</span>
-                <span className="comp-rating-val" style={{ fontSize: '1rem' }}>{r.rating}</span>
-              </div>
-              <div style={{ color: 'var(--gray)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <span>{new Date(r.competition_date).toLocaleDateString('ru-RU')}</span>
-                <span>{r.level} · {r.comp_type}</span>
-                {r.sparring_place && <span>Спарринг: {r.sparring_place} место</span>}
-                {r.stopball_place && <span>Стоп-балл: {r.stopball_place} место</span>}
-                {r.tegtim_place   && <span>Тег-тим: {r.tegtim_place} место</span>}
-                {r.tuli_place     && <span>Тули: {r.tuli_place} место</span>}
-              </div>
+          <div className="my-athlete-details" style={{ marginTop: 8 }}>
+            <span>Тренировок за 6 мес.: {a.total}</span>
+            <span style={{ color:'#6cba6c' }}>Присутствовал: {a.present}</span>
+            <span style={{ color:'var(--gray)' }}>Пропустил: {a.absent}</span>
+          </div>
+          {a.monthly && a.monthly.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize:'0.78rem', color:'var(--gray)', marginBottom: 8 }}>По месяцам:</div>
+              {a.monthly.map((m, i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'4px 0', fontSize:'0.84rem' }}>
+                  <span style={{ color:'var(--gray)', minWidth:60 }}>{m.month}</span>
+                  <div style={{ flex:1, height:6, background:'var(--gray-dim)', borderRadius:3, overflow:'hidden' }}>
+                    <div style={{ height:'100%', width: m.total ? `${Math.round(m.present/m.total*100)}%` : '0%', background:'var(--red)', borderRadius:3 }}/>
+                  </div>
+                  <span style={{ color:'var(--white)', minWidth:60, textAlign:'right' }}>{m.present}/{m.total}</span>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       ))}
-      {data.length === 0 && <div className="cabinet-empty">Данные о соревнованиях пока недоступны.</div>}
     </div>
   )
 }
+
+// ParentRatingTab удалён — используем CompetitionsTab с readOnly={true}
 
 // ── СОРЕВНОВАНИЯ ───────────────────────────────────────────────────────────────
 
@@ -387,7 +340,7 @@ function calcRatingPreview(row, sig) {
   return raw>0 ? (sig*Math.log(raw+1)).toFixed(2) : '—'
 }
 
-function CompetitionsTab({ token, athletes, onTabChange }) {
+function CompetitionsTab({ token, athletes, readOnly = false }) {
   const [compView,     setCompView]     = useState('list')
   const [comps,        setComps]        = useState([])
   const [seasons,      setSeasons]      = useState([])
@@ -619,9 +572,11 @@ function CompetitionsTab({ token, athletes, onTabChange }) {
         </div>
         <div className="comp-top-right">
           <button className="att-all-btn" onClick={loadRating}>Рейтинг сезона</button>
-          <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={() => { setShowForm(true); setMsg('') }}>
-            + Соревнование
-          </button>
+          {!readOnly && (
+            <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={() => { setShowForm(true); setMsg('') }}>
+              + Соревнование
+            </button>
+          )}
         </div>
       </div>
 
@@ -645,7 +600,7 @@ function CompetitionsTab({ token, athletes, onTabChange }) {
               </div>
               <div className="comp-card-right">
                 <span className="comp-sig">×{c.significance}</span>
-                <button className="td-btn td-btn-del" onClick={e => deleteComp(c.id, e)}>Удал.</button>
+                {!readOnly && <button className="td-btn td-btn-del" onClick={e => deleteComp(c.id, e)}>Удал.</button>}
               </div>
             </div>
           ))}
@@ -667,11 +622,13 @@ function CompetitionsTab({ token, athletes, onTabChange }) {
               </div>
             </div>
             <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-              <button className="att-all-btn" onClick={() => setShowAddAthlete(true)}>+ Добавить бойца</button>
+              {!readOnly && <button className="att-all-btn" onClick={() => setShowAddAthlete(true)}>+ Добавить бойца</button>}
               <button className="att-all-btn" onClick={exportResultsXlsx}>Экспорт xlsx</button>
-              <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={saveResults} disabled={saving}>
-                {saving ? 'Сохранение...' : 'Сохранить'}
-              </button>
+              {!readOnly && (
+                <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={saveResults} disabled={saving}>
+                  {saving ? 'Сохранение...' : 'Сохранить'}
+                </button>
+              )}
             </div>
           </div>
 
@@ -698,16 +655,16 @@ function CompetitionsTab({ token, athletes, onTabChange }) {
                 {rows.map(r => (
                   <tr key={r.athlete_id}>
                     <td className="td-name">{r.full_name}</td>
-                    <td><select className="td-input td-input-sm" value={r.sparring_place} onChange={e => updateRow(r.athlete_id,'sparring_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select></td>
-                    <td><input type="number" min="0" max="99" className="td-input td-input-sm" value={r.sparring_fights} onChange={e=>updateRow(r.athlete_id,'sparring_fights',e.target.value)}/></td>
-                    <td><select className="td-input td-input-sm" value={r.stopball_place} onChange={e=>updateRow(r.athlete_id,'stopball_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select></td>
-                    <td><input type="number" min="0" max="99" className="td-input td-input-sm" value={r.stopball_fights} onChange={e=>updateRow(r.athlete_id,'stopball_fights',e.target.value)}/></td>
-                    <td><select className="td-input td-input-sm" value={r.tegtim_place} onChange={e=>updateRow(r.athlete_id,'tegtim_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select></td>
-                    <td><input type="number" min="0" max="99" className="td-input td-input-sm" value={r.tegtim_fights} onChange={e=>updateRow(r.athlete_id,'tegtim_fights',e.target.value)}/></td>
-                    <td><select className="td-input td-input-sm" value={r.tuli_place} onChange={e=>updateRow(r.athlete_id,'tuli_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select></td>
-                    <td><input type="number" min="0" max="99" className="td-input td-input-sm" value={r.tuli_perfs} onChange={e=>updateRow(r.athlete_id,'tuli_perfs',e.target.value)}/></td>
+                    <td>{readOnly ? (r.sparring_place || '—') : <select className="td-input td-input-sm" value={r.sparring_place} onChange={e => updateRow(r.athlete_id,'sparring_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
+                    <td>{readOnly ? r.sparring_fights : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.sparring_fights} onChange={e=>updateRow(r.athlete_id,'sparring_fights',e.target.value)}/>}</td>
+                    <td>{readOnly ? (r.stopball_place || '—') : <select className="td-input td-input-sm" value={r.stopball_place} onChange={e=>updateRow(r.athlete_id,'stopball_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
+                    <td>{readOnly ? r.stopball_fights : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.stopball_fights} onChange={e=>updateRow(r.athlete_id,'stopball_fights',e.target.value)}/>}</td>
+                    <td>{readOnly ? (r.tegtim_place || '—') : <select className="td-input td-input-sm" value={r.tegtim_place} onChange={e=>updateRow(r.athlete_id,'tegtim_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
+                    <td>{readOnly ? r.tegtim_fights : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.tegtim_fights} onChange={e=>updateRow(r.athlete_id,'tegtim_fights',e.target.value)}/>}</td>
+                    <td>{readOnly ? (r.tuli_place || '—') : <select className="td-input td-input-sm" value={r.tuli_place} onChange={e=>updateRow(r.athlete_id,'tuli_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
+                    <td>{readOnly ? r.tuli_perfs : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.tuli_perfs} onChange={e=>updateRow(r.athlete_id,'tuli_perfs',e.target.value)}/>}</td>
                     <td className="comp-rating-val">{calcRatingPreview(r, detail.significance||1)}</td>
-                    <td><button className="td-btn td-btn-del" onClick={() => removeRow(r.athlete_id)} title="Убрать из списка">✕</button></td>
+                    {!readOnly && <td><button className="td-btn td-btn-del" onClick={() => removeRow(r.athlete_id)} title="Убрать из списка">✕</button></td>}
                   </tr>
                 ))}
               </tbody>
@@ -1056,7 +1013,7 @@ export default function Cabinet() {
           )}
 
           {parentView === 'rating' && !loading && (
-            <ParentRatingTab token={token} athletes={myAthletes} />
+            <CompetitionsTab token={token} athletes={myAthletes} readOnly={true} />
           )}
         </div>
       </main>
