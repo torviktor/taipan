@@ -6,7 +6,8 @@ from app.routes import events, telegram
 from app.routes.ai import router as ai_router
 from app.routes.attendance import router as attendance_router
 from app.routes.competitions import router as competitions_router
-from app.models import user, event, attendance, competition
+from app.routes.certifications import router as certifications_router, notif_router as notifications_router
+from app.models import user, event, attendance, competition, certification
 
 Base.metadata.create_all(bind=engine)
 
@@ -34,6 +35,8 @@ app.include_router(telegram.router,          prefix="/api/telegram",     tags=["
 app.include_router(ai_router,                prefix="/api",              tags=["AI"])
 app.include_router(attendance_router,        prefix="/api",              tags=["Посещаемость"])
 app.include_router(competitions_router,      prefix="/api",              tags=["Соревнования"])
+app.include_router(certifications_router,    prefix="/api",              tags=["Аттестация"])
+app.include_router(notifications_router,     prefix="/api",              tags=["Уведомления"])
 
 @app.get("/")
 def root():

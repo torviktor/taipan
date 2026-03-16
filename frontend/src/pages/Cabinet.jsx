@@ -1042,6 +1042,390 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
   }
 }
 
+// ── БЕЙДЖ НЕПРОЧИТАННЫХ УВЕДОМЛЕНИЙ ──────────────────────────────────────────
+
+function UnreadBadge({ token }) {
+  const [count, setCount] = useState(0)
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const r = await fetch(`${API}/notifications/unread-count`, { headers: { Authorization: `Bearer ${token}` } })
+        if (r.ok) { const d = await r.json(); setCount(d.count) }
+      } catch {}
+    }
+    load()
+    const interval = setInterval(load, 60000) // обновляем каждую минуту
+    return () => clearInterval(interval)
+  }, [token])
+  if (count === 0) return null
+  return <span className="tab-badge">{count}</span>
+}
+
+// ── АТТЕСТАЦИЯ ────────────────────────────────────────────────────────────────
+
+function CertificationTab({ token, athletes }) {
+  const [certs,       setCerts]       = useState([])
+  const [detail,      setDetail]      = useState(null)
+  const [rows,        setRows]        = useState([])
+  const [loading,     setLoading]     = useState(false)
+  const [saving,      setSaving]      = useState(false)
+  const [showForm,    setShowForm]    = useState(false)
+  const [showAdd,     setShowAdd]     = useState(false)
+  const [msg,         setMsg]         = useState('')
+  const [form, setForm] = useState({ name: '', date: '', location: '', notes: '' })
+
+  const h  = { Authorization: `Bearer ${token}` }
+  const hj = { ...h, 'Content-Type': 'application/json' }
+
+  useEffect(() => { loadCerts() }, [])
+
+  const loadCerts = async () => {
+    setLoading(true)
+    try {
+      const r = await fetch(`${API}/certifications`, { headers: h })
+      if (r.ok) setCerts(await r.json())
+    } catch {}
+    setLoading(false)
+  }
+
+  const openDetail = async (cert) => {
+    setLoading(true)
+    try {
+      const r = await fetch(`${API}/certifications/${cert.id}`, { headers: h })
+      if (!r.ok) return
+      const d = await r.json()
+      setDetail(d)
+      const existingMap = {}
+      ;(d.results || []).forEach(res => { existingMap[res.athlete_id] = res })
+      setRows(Object.values(existingMap))
+    } catch {}
+    setLoading(false)
+  }
+
+  const saveRows = async () => {
+    if (!detail) return
+    setSaving(true); setMsg('')
+    try {
+      const payload = rows.map(r => ({
+        athlete_id: r.athlete_id,
+        target_gup: r.target_gup || null,
+        target_dan: r.target_dan || null,
+        passed:     r.passed ?? null,
+      }))
+      const r = await fetch(`${API}/certifications/${detail.id}/results`, {
+        method: 'PUT', headers: hj, body: JSON.stringify({ results: payload })
+      })
+      if (r.ok) { setMsg('Список сохранён'); await openDetail(detail) }
+      else setMsg('Ошибка сохранения')
+    } catch { setMsg('Ошибка сохранения') }
+    setSaving(false)
+  }
+
+  const finalize = async () => {
+    if (!detail) return
+    if (!window.confirm('Завершить аттестацию? Гыпы/даны будут обновлены у сдавших спортсменов.')) return
+    try {
+      const r = await fetch(`${API}/certifications/${detail.id}/finalize`, { method: 'POST', headers: hj })
+      if (r.ok) {
+        const d = await r.json()
+        setMsg(`Завершено. Обновлено спортсменов: ${d.updated_athletes}`)
+        await loadCerts(); await openDetail(detail)
+      }
+    } catch { setMsg('Ошибка') }
+  }
+
+  const sendNotify = async () => {
+    if (!detail) return
+    try {
+      const r = await fetch(`${API}/certifications/${detail.id}/notify`, { method: 'POST', headers: hj })
+      if (r.ok) { const d = await r.json(); setMsg(`Уведомлений отправлено: ${d.sent}`) }
+    } catch { setMsg('Ошибка отправки') }
+  }
+
+  const createCert = async () => {
+    if (!form.name.trim() || !form.date) { setMsg('Заполните название и дату'); return }
+    try {
+      const r = await fetch(`${API}/certifications`, {
+        method: 'POST', headers: hj,
+        body: JSON.stringify({ name: form.name, date: form.date, location: form.location || null, notes: form.notes || null })
+      })
+      if (r.ok) {
+        setShowForm(false)
+        setForm({ name: '', date: '', location: '', notes: '' })
+        await loadCerts()
+      } else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
+    } catch { setMsg('Ошибка создания') }
+  }
+
+  const deleteCert = async (id, e) => {
+    e.stopPropagation()
+    if (!window.confirm('Удалить аттестацию?')) return
+    await fetch(`${API}/certifications/${id}`, { method: 'DELETE', headers: h })
+    if (detail?.id === id) { setDetail(null); setRows([]) }
+    await loadCerts()
+  }
+
+  const addAthlete = (a) => {
+    if (rows.find(r => r.athlete_id === a.id)) return
+    const nextGup = a.gup && a.gup > 1 ? a.gup - 1 : null
+    setRows(prev => [...prev, {
+      athlete_id: a.id, full_name: a.full_name, group: a.group || a.auto_group,
+      current_gup: a.gup, current_dan: a.dan,
+      target_gup: nextGup, target_dan: null, passed: null
+    }])
+    setShowAdd(false)
+  }
+
+  const removeRow = (id) => setRows(prev => prev.filter(r => r.athlete_id !== id))
+  const updateRow = (id, field, val) => setRows(prev => prev.map(r => r.athlete_id === id ? { ...r, [field]: val } : r))
+
+  const notInList = athletes.filter(a => !rows.find(r => r.athlete_id === a.id))
+
+  const statusLabel = (s) => s === 'planned' ? 'Планируется' : s === 'active' ? 'Идёт' : 'Завершена'
+  const statusColor = (s) => s === 'completed' ? '#6cba6c' : s === 'active' ? '#c8962a' : 'var(--gray)'
+
+  return (
+    <div className="comp-wrap">
+      <div className="comp-top">
+        <div className="comp-top-left">
+          {detail && <button className="att-all-btn" onClick={() => { setDetail(null); setRows([]); setMsg('') }}>← К списку</button>}
+        </div>
+        <div className="comp-top-right">
+          {!detail && <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={() => { setShowForm(true); setMsg('') }}>+ Аттестация</button>}
+          {detail && detail.status !== 'completed' && (
+            <>
+              <button className="att-all-btn" onClick={sendNotify} title={detail.notify_sent ? 'Уведомления уже отправлены' : 'Уведомить родителей'}>
+                {detail.notify_sent ? 'Уведомлено' : 'Уведомить'}
+              </button>
+              <button className="att-all-btn" onClick={() => setShowAdd(true)}>+ Добавить</button>
+              <button className="att-all-btn" onClick={finalize}>Завершить аттестацию</button>
+              <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={saveRows} disabled={saving}>
+                {saving ? 'Сохранение...' : 'Сохранить'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {msg && <div className="att-msg">{msg}</div>}
+      {loading && <div className="cabinet-loading">Загрузка...</div>}
+
+      {/* Список аттестаций */}
+      {!loading && !detail && (
+        <div className="comp-list">
+          {certs.length === 0 && <div className="cabinet-empty">Аттестаций пока нет.</div>}
+          {certs.map(c => (
+            <div key={c.id} className="comp-card" onClick={() => openDetail(c)}>
+              <div className="comp-card-body">
+                <div className="comp-card-name">{c.name}</div>
+                <div className="comp-card-meta">
+                  <span className="comp-card-date">{new Date(c.date).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}</span>
+                  {c.location && <span className="comp-card-date">/ {c.location}</span>}
+                  <span style={{ fontSize:'0.75rem', color: statusColor(c.status), fontWeight:600 }}>{statusLabel(c.status)}</span>
+                  {c.notify_sent && <span className="comp-badge" style={{ background:'#1a2a1a', color:'#6cba6c' }}>Уведомлено</span>}
+                </div>
+              </div>
+              <div className="comp-card-right">
+                <button className="td-btn td-btn-del" onClick={e => deleteCert(c.id, e)}>Удал.</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Список кандидатов */}
+      {!loading && detail && (
+        <div className="comp-detail">
+          <div className="comp-detail-head">
+            <div>
+              <div className="comp-detail-name">{detail.name}</div>
+              <div className="comp-card-meta" style={{ marginTop:4 }}>
+                <span className="comp-card-date">{new Date(detail.date).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}</span>
+                {detail.location && <span className="comp-card-date">/ {detail.location}</span>}
+                <span style={{ fontSize:'0.75rem', color: statusColor(detail.status), fontWeight:600 }}>{statusLabel(detail.status)}</span>
+              </div>
+            </div>
+          </div>
+          <div className="athletes-table-wrap">
+            <table className="athletes-table">
+              <thead><tr>
+                <th style={{ textAlign:'left' }}>Спортсмен</th>
+                <th>Группа</th>
+                <th>Текущий</th>
+                <th>Целевой гып/дан</th>
+                <th>Результат</th>
+                <th></th>
+              </tr></thead>
+              <tbody>
+                {rows.map(r => (
+                  <tr key={r.athlete_id} style={r.passed === true ? { background:'#0d1f0d' } : r.passed === false ? { background:'#1f0d0d' } : {}}>
+                    <td className="td-name">{r.full_name}</td>
+                    <td style={{ fontSize:'0.82rem', color:'var(--gray)' }}>{r.group || '—'}</td>
+                    <td style={{ textAlign:'center' }}>
+                      {r.current_dan ? `${r.current_dan} дан` : r.current_gup ? `${r.current_gup} гып` : '—'}
+                    </td>
+                    <td>
+                      {detail.status !== 'completed' ? (
+                        <div style={{ display:'flex', gap:4 }}>
+                          <input type="number" min="1" max="10" placeholder="гып" className="td-input td-input-sm"
+                            value={r.target_gup || ''} onChange={e => updateRow(r.athlete_id, 'target_gup', e.target.value ? parseInt(e.target.value) : null)} style={{ width:52 }}/>
+                          <input type="number" min="1" max="9" placeholder="дан" className="td-input td-input-sm"
+                            value={r.target_dan || ''} onChange={e => updateRow(r.athlete_id, 'target_dan', e.target.value ? parseInt(e.target.value) : null)} style={{ width:52 }}/>
+                        </div>
+                      ) : (
+                        r.target_dan ? `${r.target_dan} дан` : r.target_gup ? `${r.target_gup} гып` : '—'
+                      )}
+                    </td>
+                    <td>
+                      {detail.status !== 'completed' ? (
+                        <select className="td-input" value={r.passed === null ? '' : r.passed ? 'true' : 'false'}
+                          onChange={e => updateRow(r.athlete_id, 'passed', e.target.value === '' ? null : e.target.value === 'true')}>
+                          <option value="">Не отмечено</option>
+                          <option value="true">Сдал</option>
+                          <option value="false">Не сдал</option>
+                        </select>
+                      ) : (
+                        <span style={{ color: r.passed ? '#6cba6c' : 'var(--red)', fontWeight:600 }}>
+                          {r.passed === null ? '—' : r.passed ? 'Сдал' : 'Не сдал'}
+                        </span>
+                      )}
+                    </td>
+                    <td>{detail.status !== 'completed' && <button className="td-btn td-btn-del" onClick={() => removeRow(r.athlete_id)}>✕</button>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {rows.length === 0 && <div className="cabinet-empty">Нет кандидатов. Нажмите «+ Добавить».</div>}
+          </div>
+        </div>
+      )}
+
+      {/* Модал создания */}
+      {showForm && (
+        <div className="modal-overlay" onClick={() => setShowForm(false)}>
+          <div className="modal-box comp-modal" onClick={e => e.stopPropagation()}>
+            <h3>Новая аттестация</h3>
+            <div className="comp-form-grid">
+              <div className="comp-field comp-field-full"><label>Название *</label>
+                <input type="text" className="modal-input" placeholder="Аттестация апрель 2026" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}/>
+              </div>
+              <div className="comp-field"><label>Дата *</label>
+                <input type="date" className="modal-input" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))}/>
+              </div>
+              <div className="comp-field"><label>Место</label>
+                <input type="text" className="modal-input" placeholder="Зал клуба" value={form.location} onChange={e => setForm(p => ({ ...p, location: e.target.value }))}/>
+              </div>
+              <div className="comp-field comp-field-full"><label>Примечание</label>
+                <input type="text" className="modal-input" value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}/>
+              </div>
+            </div>
+            {msg && <div className="modal-msg">{msg}</div>}
+            <div className="modal-btns-row">
+              <button className="btn-primary" onClick={createCert}>Создать</button>
+              <button className="btn-outline" onClick={() => setShowForm(false)}>Отмена</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модал добавления спортсмена */}
+      {showAdd && (
+        <div className="modal-overlay" onClick={() => setShowAdd(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <h3>Добавить кандидата</h3>
+            {notInList.length === 0
+              ? <p style={{ color:'var(--gray)' }}>Все спортсмены уже в списке.</p>
+              : notInList.map(a => (
+                  <div key={a.id} className="att-athlete-row absent" style={{ cursor:'pointer' }} onClick={() => addAthlete(a)}>
+                    <div className="att-athlete-name">{a.full_name}</div>
+                    <div className="att-athlete-age">
+                      {a.age} лет · {a.dan ? `${a.dan} дан` : a.gup ? `${a.gup} гып` : 'пояс не указан'}
+                    </div>
+                  </div>
+                ))
+            }
+            <div className="modal-btns-row" style={{ marginTop:12 }}>
+              <button className="btn-outline" onClick={() => setShowAdd(false)}>Закрыть</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── УВЕДОМЛЕНИЯ ───────────────────────────────────────────────────────────────
+
+function NotificationsTab({ token }) {
+  const [notifs,  setNotifs]  = useState([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => { loadNotifs() }, [])
+
+  const loadNotifs = async () => {
+    setLoading(true)
+    try {
+      const r = await fetch(`${API}/notifications`, { headers: { Authorization: `Bearer ${token}` } })
+      if (r.ok) setNotifs(await r.json())
+    } catch {}
+    setLoading(false)
+  }
+
+  const markRead = async (id) => {
+    await fetch(`${API}/notifications/${id}/read`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
+    setNotifs(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
+  }
+
+  const markAllRead = async () => {
+    await fetch(`${API}/notifications/read-all`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
+    setNotifs(prev => prev.map(n => ({ ...n, is_read: true })))
+  }
+
+  const typeIcon = (t) => t === 'certification' ? '🥋' : t === 'competition' ? '🏆' : t === 'camp' ? '🏕️' : '📢'
+  const unreadCount = notifs.filter(n => !n.is_read).length
+
+  return (
+    <div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, flexWrap:'wrap', gap:10 }}>
+        <span style={{ color:'var(--gray)', fontSize:'0.9rem' }}>
+          {unreadCount > 0 ? `Непрочитанных: ${unreadCount}` : 'Все уведомления прочитаны'}
+        </span>
+        {unreadCount > 0 && <button className="att-all-btn" onClick={markAllRead}>Прочитать все</button>}
+      </div>
+
+      {loading && <div className="cabinet-loading">Загрузка...</div>}
+      {!loading && notifs.length === 0 && <div className="cabinet-empty">Уведомлений пока нет.</div>}
+
+      {notifs.map(n => (
+        <div key={n.id} onClick={() => !n.is_read && markRead(n.id)}
+          style={{
+            background: n.is_read ? 'var(--dark2)' : '#1a1500',
+            border: `1px solid ${n.is_read ? 'var(--gray-dim)' : '#c8962a'}`,
+            borderRadius: 8, padding: '14px 16px', marginBottom: 10,
+            cursor: n.is_read ? 'default' : 'pointer',
+            transition: 'background 0.15s'
+          }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12 }}>
+            <div style={{ display:'flex', gap:10, alignItems:'flex-start', flex:1 }}>
+              <span style={{ fontSize:'1.2rem', flexShrink:0 }}>{typeIcon(n.type)}</span>
+              <div>
+                <div style={{ fontWeight:600, color: n.is_read ? 'var(--gray)' : 'var(--white)', marginBottom:4 }}>{n.title}</div>
+                <div style={{ fontSize:'0.85rem', color:'var(--gray)', lineHeight:1.5 }}>{n.body}</div>
+              </div>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6, flexShrink:0 }}>
+              <span style={{ fontSize:'0.75rem', color:'var(--gray)' }}>
+                {new Date(n.created_at).toLocaleDateString('ru-RU', { day:'numeric', month:'short' })}
+              </span>
+              {!n.is_read && <span style={{ width:8, height:8, borderRadius:'50%', background:'#c8962a', display:'block' }}/>}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── СТАТУСЫ ЗАЯВОК ─────────────────────────────────────────────────────────────
 const STATUS_LABELS = {
   new:        { label: 'Новая',        color: '#FFD700' },
@@ -1198,9 +1582,13 @@ export default function Cabinet() {
 
           {/* п.8 — вкладки родителя */}
           <div className="cabinet-tabs">
-            <button className={`cabinet-tab ${parentView==='athletes'?'active':''}`} onClick={() => setParentView('athletes')}>Спортсмены</button>
-            <button className={`cabinet-tab ${parentView==='attendance'?'active':''}`} onClick={() => setParentView('attendance')}>Посещаемость</button>
-            <button className={`cabinet-tab ${parentView==='rating'?'active':''}`} onClick={() => setParentView('rating')}>Рейтинг</button>
+            <button className={`cabinet-tab ${parentView==='athletes'?'active':''}`}    onClick={() => setParentView('athletes')}>Спортсмены</button>
+            <button className={`cabinet-tab ${parentView==='attendance'?'active':''}`}  onClick={() => setParentView('attendance')}>Посещаемость</button>
+            <button className={`cabinet-tab ${parentView==='rating'?'active':''}`}      onClick={() => setParentView('rating')}>Рейтинг</button>
+            <button className={`cabinet-tab ${parentView==='notifications'?'active':''}`} onClick={() => setParentView('notifications')}>
+              Уведомления
+              <UnreadBadge token={token}/>
+            </button>
           </div>
 
           {loading && <div className="cabinet-loading">Загрузка...</div>}
@@ -1232,13 +1620,9 @@ export default function Cabinet() {
             </>
           )}
 
-          {parentView === 'attendance' && !loading && (
-            <ParentAttendanceTab token={token} athletes={myAthletes} />
-          )}
-
-          {parentView === 'rating' && !loading && (
-            <RatingTab token={token} myAthleteIds={myAthletes.map(a => a.id)} />
-          )}
+          {parentView === 'attendance'    && !loading && <ParentAttendanceTab token={token} athletes={myAthletes}/>}
+          {parentView === 'rating'        && !loading && <RatingTab token={token} myAthleteIds={myAthletes.map(a=>a.id)}/>}
+          {parentView === 'notifications' && <NotificationsTab token={token}/>}
         </div>
       </main>
     )
@@ -1271,9 +1655,10 @@ export default function Cabinet() {
           <button className={`cabinet-tab ${view==='attendance'?'active':''}`} onClick={() => setView('attendance')}>Журнал посещаемости</button>
           <button className={`cabinet-tab ${view==='competitions'?'active':''}`} onClick={() => setView('competitions')}>Соревнования</button>
           <button className={`cabinet-tab ${view==='rating'?'active':''}`} onClick={() => setView('rating')}>Рейтинг</button>
+          <button className={`cabinet-tab ${view==='certification'?'active':''}`} onClick={() => setView('certification')}>Аттестация</button>
         </div>
 
-        {view !== 'attendance' && view !== 'competitions' && view !== 'rating' && (
+        {view !== 'attendance' && view !== 'competitions' && view !== 'rating' && view !== 'certification' && (
           <div className="cabinet-toolbar">
             <div className="cabinet-search">
               <input type="text" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} />
@@ -1287,9 +1672,10 @@ export default function Cabinet() {
 
         {loading && <div className="cabinet-loading">Загрузка...</div>}
 
-        {view === 'attendance'   && <AttendanceTab   token={token} athletes={athletes} />}
-        {view === 'competitions' && <CompetitionsTab token={token} athletes={athletes} />}
-        {view === 'rating'       && <RatingTab       token={token} />}
+        {view === 'attendance'   && <AttendanceTab    token={token} athletes={athletes} />}
+        {view === 'competitions' && <CompetitionsTab  token={token} athletes={athletes} />}
+        {view === 'rating'       && <RatingTab        token={token} />}
+        {view === 'certification'&& <CertificationTab token={token} athletes={athletes} />}
 
         {/* ── Спортсмены ── */}
         {view === 'athletes' && (
