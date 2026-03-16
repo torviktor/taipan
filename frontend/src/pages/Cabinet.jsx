@@ -1042,20 +1042,42 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
   }
 }
 
+// ── КАСТОМНОЕ ПОДТВЕРЖДЕНИЕ ───────────────────────────────────────────────────
+
+function ConfirmModal({ message, onConfirm, onCancel, confirmText = 'Подтвердить', danger = false }) {
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+        <p style={{ color:'var(--white)', fontSize:'0.95rem', lineHeight:1.6, marginBottom:20 }}>{message}</p>
+        <div className="modal-btns-row">
+          <button
+            className={danger ? 'btn-primary' : 'btn-primary'}
+            style={danger ? { background:'var(--red)' } : {}}
+            onClick={onConfirm}
+          >{confirmText}</button>
+          <button className="btn-outline" onClick={onCancel}>Отмена</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── БЕЙДЖ НЕПРОЧИТАННЫХ УВЕДОМЛЕНИЙ ──────────────────────────────────────────
 
 function UnreadBadge({ token }) {
   const [count, setCount] = useState(0)
+  const load = async () => {
+    try {
+      const r = await fetch(`${API}/notifications/unread-count`, { headers: { Authorization: `Bearer ${token}` } })
+      if (r.ok) { const d = await r.json(); setCount(d.count) }
+    } catch {}
+  }
   useEffect(() => {
-    const load = async () => {
-      try {
-        const r = await fetch(`${API}/notifications/unread-count`, { headers: { Authorization: `Bearer ${token}` } })
-        if (r.ok) { const d = await r.json(); setCount(d.count) }
-      } catch {}
-    }
     load()
-    const interval = setInterval(load, 60000) // обновляем каждую минуту
-    return () => clearInterval(interval)
+    const interval = setInterval(load, 30000)
+    // Обновляем когда пользователь читает уведомления
+    window.addEventListener('notifications-read', load)
+    return () => { clearInterval(interval); window.removeEventListener('notifications-read', load) }
   }, [token])
   if (count === 0) return null
   return <span className="tab-badge">{count}</span>
@@ -1072,6 +1094,7 @@ function CertificationTab({ token, athletes }) {
   const [showForm,    setShowForm]    = useState(false)
   const [showAdd,     setShowAdd]     = useState(false)
   const [msg,         setMsg]         = useState('')
+  const [confirm,     setConfirm]     = useState(null)  // { message, onConfirm, confirmText, danger }
   const [form, setForm] = useState({ name: '', date: '', location: '', notes: '' })
 
   const h  = { Authorization: `Bearer ${token}` }
@@ -1121,17 +1144,23 @@ function CertificationTab({ token, athletes }) {
     setSaving(false)
   }
 
-  const finalize = async () => {
-    if (!detail) return
-    if (!window.confirm('Завершить аттестацию? Гыпы/даны будут обновлены у сдавших спортсменов.')) return
-    try {
-      const r = await fetch(`${API}/certifications/${detail.id}/finalize`, { method: 'POST', headers: hj })
-      if (r.ok) {
-        const d = await r.json()
-        setMsg(`Завершено. Обновлено спортсменов: ${d.updated_athletes}`)
-        await loadCerts(); await openDetail(detail)
+  const finalize = () => {
+    setConfirm({
+      message: 'Завершить аттестацию? Гыпы и даны будут автоматически обновлены у всех сдавших спортсменов.',
+      confirmText: 'Завершить',
+      danger: true,
+      onConfirm: async () => {
+        setConfirm(null)
+        try {
+          const r = await fetch(`${API}/certifications/${detail.id}/finalize`, { method: 'POST', headers: hj })
+          if (r.ok) {
+            const d = await r.json()
+            setMsg(`Завершено. Обновлено спортсменов: ${d.updated_athletes}`)
+            await loadCerts(); await openDetail(detail)
+          }
+        } catch { setMsg('Ошибка') }
       }
-    } catch { setMsg('Ошибка') }
+    })
   }
 
   const sendNotify = async () => {
@@ -1157,12 +1186,19 @@ function CertificationTab({ token, athletes }) {
     } catch { setMsg('Ошибка создания') }
   }
 
-  const deleteCert = async (id, e) => {
+  const deleteCert = (id, e) => {
     e.stopPropagation()
-    if (!window.confirm('Удалить аттестацию?')) return
-    await fetch(`${API}/certifications/${id}`, { method: 'DELETE', headers: h })
-    if (detail?.id === id) { setDetail(null); setRows([]) }
-    await loadCerts()
+    setConfirm({
+      message: 'Удалить аттестацию и все её результаты?',
+      confirmText: 'Удалить',
+      danger: true,
+      onConfirm: async () => {
+        setConfirm(null)
+        await fetch(`${API}/certifications/${id}`, { method: 'DELETE', headers: h })
+        if (detail?.id === id) { setDetail(null); setRows([]) }
+        await loadCerts()
+      }
+    })
   }
 
   const addAthlete = (a) => {
@@ -1186,6 +1222,7 @@ function CertificationTab({ token, athletes }) {
 
   return (
     <div className="comp-wrap">
+      {confirm && <ConfirmModal message={confirm.message} confirmText={confirm.confirmText} danger={confirm.danger} onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)}/>}
       <div className="comp-top">
         <div className="comp-top-left">
           {detail && <button className="att-all-btn" onClick={() => { setDetail(null); setRows([]); setMsg('') }}>← К списку</button>}
@@ -1374,14 +1411,21 @@ function NotificationsTab({ token }) {
   const markRead = async (id) => {
     await fetch(`${API}/notifications/${id}/read`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
+    window.dispatchEvent(new Event('notifications-read'))
   }
 
   const markAllRead = async () => {
     await fetch(`${API}/notifications/read-all`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
     setNotifs(prev => prev.map(n => ({ ...n, is_read: true })))
+    window.dispatchEvent(new Event('notifications-read'))
   }
 
-  const typeIcon = (t) => t === 'certification' ? '🥋' : t === 'competition' ? '🏆' : t === 'camp' ? '🏕️' : '📢'
+  const typeLabel = (t) => {
+    if (t === 'certification') return { text: 'АТТЕСТ.', color: '#6a8ecb', bg: '#1a1a2e' }
+    if (t === 'competition')   return { text: 'ТУРНИР',  color: '#c8962a', bg: '#2a1e0a' }
+    if (t === 'camp')          return { text: 'СБОРЫ',   color: '#6cba6c', bg: '#1c2a1c' }
+    return                            { text: 'INFO',    color: 'var(--gray)', bg: 'var(--dark)' }
+  }
   const unreadCount = notifs.filter(n => !n.is_read).length
 
   return (
@@ -1407,7 +1451,9 @@ function NotificationsTab({ token }) {
           }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12 }}>
             <div style={{ display:'flex', gap:10, alignItems:'flex-start', flex:1 }}>
-              <span style={{ fontSize:'1.2rem', flexShrink:0 }}>{typeIcon(n.type)}</span>
+              {(() => { const lbl = typeLabel(n.type); return (
+                <span style={{ fontFamily:'Barlow Condensed, sans-serif', fontWeight:700, fontSize:'0.7rem', letterSpacing:'0.08em', padding:'3px 7px', borderRadius:3, background:lbl.bg, color:lbl.color, flexShrink:0, marginTop:2, whiteSpace:'nowrap' }}>{lbl.text}</span>
+              )})()}
               <div>
                 <div style={{ fontWeight:600, color: n.is_read ? 'var(--gray)' : 'var(--white)', marginBottom:4 }}>{n.title}</div>
                 <div style={{ fontSize:'0.85rem', color:'var(--gray)', lineHeight:1.5 }}>{n.body}</div>
