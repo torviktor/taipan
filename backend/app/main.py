@@ -7,7 +7,8 @@ from app.routes.ai import router as ai_router
 from app.routes.attendance import router as attendance_router
 from app.routes.competitions import router as competitions_router
 from app.routes.certifications import router as certifications_router, notif_router as notifications_router
-from app.models import user, event, attendance, competition, certification
+from app.routes.achievements import router as achievements_router
+from app.models import user, event, attendance, competition, certification, achievement
 
 Base.metadata.create_all(bind=engine)
 
@@ -37,6 +38,7 @@ app.include_router(attendance_router,        prefix="/api",              tags=["
 app.include_router(competitions_router,      prefix="/api",              tags=["Соревнования"])
 app.include_router(certifications_router,    prefix="/api",              tags=["Аттестация"])
 app.include_router(notifications_router,     prefix="/api",              tags=["Уведомления"])
+app.include_router(achievements_router,      prefix="/api",              tags=["Ачивки"])
 
 @app.get("/")
 def root():
