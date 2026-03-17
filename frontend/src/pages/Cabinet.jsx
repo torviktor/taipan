@@ -1436,7 +1436,6 @@ function CampsTab({ token, athletes }) {
 
   useEffect(() => { loadCamps() }, [])
 
-  const loadCamps = async () => {
   // Автообновление деталей каждые 20 сек
   useEffect(() => {
     if (!detail) return
