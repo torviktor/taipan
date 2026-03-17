@@ -1,25 +1,17 @@
 version: "3.9"
-
 services:
-
-  # ── База данных ──────────────────────────────────────────────────
   db:
     image: postgres:15-alpine
     environment:
       POSTGRES_USER:     taipan_user
       POSTGRES_PASSWORD: taipan_pass
       POSTGRES_DB:       taipan_db
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: always
-
-  # ── Redis (брокер для Celery) ────────────────────────────────────
   redis:
     image: redis:7-alpine
     restart: always
-
-  # ── Backend FastAPI ──────────────────────────────────────────────
   backend:
     build: ./backend
     depends_on:
@@ -31,11 +23,10 @@ services:
       REDIS_URL:           redis://redis:6379/0
       TELEGRAM_BOT_TOKEN:  ${TELEGRAM_BOT_TOKEN}
       SITE_URL:            ${SITE_URL:-http://185.152.92.101}
+      ANTHROPIC_API_KEY:   ${ANTHROPIC_API_KEY}
     ports:
       - "8000:8000"
     restart: always
-
-  # ── Celery воркер (отправка напоминаний) ─────────────────────────
   celery_worker:
     build: ./backend
     command: celery -A app.celery_app worker --loglevel=info
@@ -47,8 +38,6 @@ services:
       REDIS_URL:          redis://redis:6379/0
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
     restart: always
-
-  # ── Celery Beat (планировщик — каждые 10 минут проверяет) ────────
   celery_beat:
     build: ./backend
     command: celery -A app.celery_app beat --loglevel=info
@@ -57,13 +46,10 @@ services:
     environment:
       REDIS_URL: redis://redis:6379/0
     restart: always
-
-  # ── Frontend React ───────────────────────────────────────────────
   frontend:
     build: ./frontend
     ports:
       - "3000:80"
     restart: always
-
 volumes:
   postgres_data:
