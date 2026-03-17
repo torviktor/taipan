@@ -22,14 +22,15 @@ router = APIRouter(prefix="/competitions", tags=["competitions"])
 # ── Схемы ─────────────────────────────────────────────────────────────────────
 
 class CompetitionCreate(BaseModel):
-    name:           str
-    date:           date
-    location:       Optional[str] = None
-    level:          str
-    comp_type:      str
-    notes:          Optional[str] = None
-    season:         Optional[int] = None
-    add_to_calendar: bool = False   # создать событие в календаре
+    name:            str
+    date:            date
+    time:            Optional[str] = "09:00"  # HH:MM
+    location:        Optional[str] = None
+    level:           str
+    comp_type:       str
+    notes:           Optional[str] = None
+    season:          Optional[int] = None
+    add_to_calendar: bool = False
 
 
 class CompetitionUpdate(BaseModel):
@@ -86,11 +87,10 @@ def create_competition(
         created_by=user.id,
     )
     db.add(comp)
-    db.flush()  # получаем id до commit
+    db.flush()
 
-    # Синхронизация с календарём
     if data.add_to_calendar:
-        _create_calendar_event(comp, user.id, db)
+        _create_calendar_event(comp, user.id, db, data.time or "09:00")
 
     db.commit()
     db.refresh(comp)
@@ -240,6 +240,16 @@ def update_competition(comp_id: int, data: CompetitionUpdate, db: Session = Depe
 @router.delete("/{comp_id}", status_code=204)
 def delete_competition(comp_id: int, db: Session = Depends(get_db), _: User = Depends(require_manager)):
     comp = _get_or_404(comp_id, db)
+    # Удаляем связанное событие в календаре если есть
+    try:
+        from app.models.event import Event
+        from datetime import datetime
+        event_title = f"{comp.comp_type} — {comp.name}"
+        event = db.query(Event).filter(Event.title == event_title).first()
+        if event:
+            db.delete(event)
+    except Exception:
+        pass
     db.delete(comp); db.commit()
 
 
@@ -380,10 +390,12 @@ def _result_out(r):
     }
 
 
-def _create_calendar_event(comp: Competition, user_id: int, db: Session):
+def _create_calendar_event(comp: Competition, user_id: int, db: Session, time_str: str = "09:00"):
     """Создаёт событие в календаре при создании соревнования."""
     try:
         from app.models.event import Event
+        hour, minute = (int(x) for x in time_str.split(":")) if ":" in time_str else (9, 0)
+        event_dt = datetime.combine(comp.date, datetime.min.time()).replace(hour=hour, minute=minute)
         event = Event(
             title=f"{comp.comp_type} — {comp.name}",
             description=(
@@ -392,7 +404,7 @@ def _create_calendar_event(comp: Competition, user_id: int, db: Session):
                 f"Коэффициент значимости: ×{comp.significance}"
                 + (f"\n{comp.notes}" if comp.notes else "")
             ),
-            event_date=datetime.combine(comp.date, datetime.min.time()),
+            event_date=event_dt,
             location=comp.location,
             created_by=user_id,
             notify_before_days=[1, 3],
@@ -400,7 +412,6 @@ def _create_calendar_event(comp: Competition, user_id: int, db: Session):
         )
         db.add(event)
     except Exception as e:
-        # Не ломаем создание соревнования если календарь недоступен
         print(f"Calendar sync error: {e}")
 
 

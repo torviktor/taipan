@@ -562,8 +562,9 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
   const [showAddAthlete, setShowAddAthlete] = useState(false)
   const [showChart,      setShowChart]      = useState(false)
   const [chartData,      setChartData]      = useState([])
+  const [compConfirm,    setCompConfirm]    = useState(null)
   const [msg,            setMsg]            = useState('')
-  const [form, setForm] = useState({ name:'', date:'', location:'', level:'Местный', comp_type:'Турнир', notes:'', add_to_calendar: false })
+  const [form, setForm] = useState({ name:'', date:'', time:'09:00', location:'', level:'Местный', comp_type:'Турнир', notes:'', add_to_calendar: false })
 
   const h  = { Authorization: `Bearer ${token}` }
   const hj = { ...h, 'Content-Type': 'application/json' }
@@ -690,24 +691,32 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
     try {
       const r = await fetch(`${API}/competitions`, {
         method: 'POST', headers: hj,
-        body: JSON.stringify({ name: form.name, date: form.date, location: form.location || null, level: form.level, comp_type: form.comp_type, notes: form.notes || null, add_to_calendar: form.add_to_calendar })
+        body: JSON.stringify({ name: form.name, date: form.date, time: form.time, location: form.location || null, level: form.level, comp_type: form.comp_type, notes: form.notes || null, add_to_calendar: form.add_to_calendar })
       })
       if (r.ok) {
+        const created = await r.json()
         setShowForm(false)
-        setForm({ name:'', date:'', location:'', level:'Местный', comp_type:'Турнир', notes:'', add_to_calendar: false })
+        setForm({ name:'', date:'', time:'09:00', location:'', level:'Местный', comp_type:'Турнир', notes:'', add_to_calendar: false })
         setMsg('')
         await loadComps(); await loadSeasons()
-        setCompView('list') // п.5 — возвращаем на список
+        // п.1 — открываем карточку только что созданного соревнования
+        await openDetail(created) // п.5 — возвращаем на список
       } else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка создания') }
   }
 
-  const deleteComp = async (id, e) => {
+  const deleteComp = (id, e) => {
     e.stopPropagation()
-    if (!window.confirm('Удалить соревнование и все результаты?')) return
-    await fetch(`${API}/competitions/${id}`, { method: 'DELETE', headers: h })
-    if (detail?.id === id) { setCompView('list'); setDetail(null) }
-    await loadComps()
+    setCompConfirm({
+      message: 'Удалить соревнование и все результаты? Событие из календаря также будет удалено.',
+      confirmText: 'Удалить',
+      onConfirm: async () => {
+        setCompConfirm(null)
+        await fetch(`${API}/competitions/${id}`, { method: 'DELETE', headers: h })
+        if (detail?.id === id) { setCompView('list'); setDetail(null) }
+        await loadComps()
+      }
+    })
   }
 
   const notifyComp = async () => {
@@ -791,6 +800,7 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
 
   return (
     <div className="comp-wrap">
+      {compConfirm && <ConfirmModal message={compConfirm.message} confirmText={compConfirm.confirmText} danger={true} onConfirm={compConfirm.onConfirm} onCancel={() => setCompConfirm(null)}/>}
       {/* Шапка */}
       <div className="comp-top">
         <div className="comp-top-left">
@@ -951,7 +961,7 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
       {/* ── Модал: создание соревнования ── */}
       {showForm && (
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="modal-box comp-modal" onClick={e => e.stopPropagation()}>
+          <div className="modal-box comp-modal" onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:560 }}>
             <h3>Новое соревнование</h3>
             <div className="comp-form-grid">
               <div className="comp-field comp-field-full">
@@ -963,6 +973,10 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
                 <input type="date" className="modal-input" value={form.date} onChange={e=>setForm(p=>({...p,date:e.target.value}))} />
               </div>
               <div className="comp-field">
+                <label>Время начала</label>
+                <input type="time" className="modal-input" value={form.time} onChange={e=>setForm(p=>({...p,time:e.target.value}))} />
+              </div>
+              <div className="comp-field comp-field-full">
                 <label>Место проведения</label>
                 <input type="text" className="modal-input" placeholder="Москва, СК «Олимп»" value={form.location} onChange={e=>setForm(p=>({...p,location:e.target.value}))} />
               </div>
@@ -978,7 +992,7 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
                   {typesForLevel(form.level).map(t=><option key={t}>{t}</option>)}
                 </select>
               </div>
-              <div className="comp-field">
+              <div className="comp-field comp-field-full">
                 <label>Коэффициент значимости</label>
                 <div className="comp-sig-preview">
                   <span>{form.level} · {form.comp_type}</span>
