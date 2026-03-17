@@ -666,8 +666,7 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
     if (!detail) return
     setSaving(true); setMsg('')
     try {
-      const payload = rows
-        const payload = rows.map(r => ({
+      const payload = rows.map(r => ({
           athlete_id:      r.athlete_id,
           sparring_place:  r.sparring_place  !== '' ? Number(r.sparring_place)  : null,
           sparring_fights: Number(r.sparring_fights) || 0,
