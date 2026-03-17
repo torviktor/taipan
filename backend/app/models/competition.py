@@ -1,6 +1,6 @@
 # backend/app/models/competition.py
 
-from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, Text, func
+from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, Text, Boolean, func
 from sqlalchemy.orm import relationship
 import math
 from app.core.database import Base
@@ -58,7 +58,9 @@ class CompetitionResult(Base):
     tuli_place      = Column(Integer, nullable=True)
     tuli_perfs      = Column(Integer, nullable=False, default=0)
 
-    rating          = Column(Float, nullable=False, default=0.0)
+    rating         = Column(Float, nullable=False, default=0.0)
+    status         = Column(String(20), nullable=True, default="pending")
+    paid           = Column(Boolean, nullable=False, default=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

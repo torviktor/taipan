@@ -1469,6 +1469,31 @@ function CampsTab({ token, athletes }) {
     setSaving(false)
   }
 
+  const exportCampXlsx = () => {
+    if (!detail) return
+    const wb = XLSX.utils.book_new()
+    const STATUS_RU = { confirmed:'Едет', paid:'Оплачено', pending:'Ожидает', declined:'Не едет' }
+    const going    = parts.filter(p => p.status === 'confirmed' || p.status === 'paid')
+    const pending  = parts.filter(p => p.status === 'pending')
+    const declined = parts.filter(p => p.status === 'declined')
+
+    const toRows = (arr) => arr.map((p, i) => [
+      i+1, p.full_name, p.group||'—', STATUS_RU[p.status]||p.status, p.paid ? 'Да' : 'Нет'
+    ])
+    const header = ['№', 'Спортсмен', 'Группа', 'Статус', 'Оплачено']
+
+    // Один лист со всеми
+    const allRows = [header, ...toRows(going), ...toRows(pending), ...toRows(declined)]
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(allRows), 'Все участники')
+
+    // Лист только едущих
+    if (going.length > 0) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...toRows(going)]), 'Едут')
+    }
+
+    XLSX.writeFile(wb, `${detail.name}_участники.xlsx`)
+  }
+
   const updateStatus = async (athlete_id, status, paid) => {
     if (!detail) return
     try {
@@ -1513,6 +1538,7 @@ function CampsTab({ token, athletes }) {
             <>
               <button className="att-all-btn" onClick={notifyCamp}>Уведомить участников</button>
               <button className="att-all-btn" onClick={() => setShowAdd(true)}>+ Участник</button>
+              <button className="att-all-btn" onClick={exportCampXlsx}>Экспорт xlsx</button>
               <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={saveParticipants} disabled={saving}>
                 {saving ? 'Сохранение...' : 'Сохранить список'}
               </button>
@@ -1566,9 +1592,14 @@ function CampsTab({ token, athletes }) {
 
           {/* Блок едут */}
           {parts.filter(p => p.status === 'confirmed' || p.status === 'paid').length > 0 && (
-            <div style={{ marginBottom:20 }}>
-              <div style={{ fontFamily:'Bebas Neue', fontSize:'1rem', letterSpacing:'0.08em', color:'#6cba6c', marginBottom:10 }}>
-                ЕДУТ — {parts.filter(p => p.status === 'confirmed' || p.status === 'paid').length}
+            <div style={{ marginBottom:24 }}>
+              <div style={{
+                fontFamily:'Bebas Neue', fontSize:'1.1rem', letterSpacing:'0.12em',
+                color:'#6cba6c', marginBottom:16, marginTop:8,
+                paddingBottom:8, borderBottom:'1px solid #1a3a1a',
+                textAlign:'center', textShadow:'0 0 12px rgba(108,186,108,0.4)'
+              }}>
+                ▸ ЕДУТ — {parts.filter(p => p.status === 'confirmed' || p.status === 'paid').length} чел.
               </div>
               <table className="athletes-table">
                 <thead><tr>
@@ -1608,8 +1639,13 @@ function CampsTab({ token, athletes }) {
           {/* Блок ожидают ответа */}
           {parts.filter(p => p.status === 'pending').length > 0 && (
             <div style={{ marginBottom:20, opacity:0.6 }}>
-              <div style={{ fontFamily:'Bebas Neue', fontSize:'1rem', letterSpacing:'0.08em', color:'var(--gray)', marginBottom:10 }}>
-                ОЖИДАЮТ ОТВЕТА — {parts.filter(p => p.status === 'pending').length}
+              <div style={{
+                fontFamily:'Bebas Neue', fontSize:'1.1rem', letterSpacing:'0.12em',
+                color:'var(--gray)', marginBottom:16, marginTop:8,
+                paddingBottom:8, borderBottom:'1px solid var(--gray-dim)',
+                textAlign:'center'
+              }}>
+                ▸ ОЖИДАЮТ ОТВЕТА — {parts.filter(p => p.status === 'pending').length} чел.
               </div>
               <table className="athletes-table">
                 <tbody>
@@ -1637,8 +1673,13 @@ function CampsTab({ token, athletes }) {
           {/* Блок не едут */}
           {parts.filter(p => p.status === 'declined').length > 0 && (
             <div style={{ opacity:0.35 }}>
-              <div style={{ fontFamily:'Bebas Neue', fontSize:'1rem', letterSpacing:'0.08em', color:'var(--red)', marginBottom:10 }}>
-                НЕ ЕДУТ — {parts.filter(p => p.status === 'declined').length}
+              <div style={{
+                fontFamily:'Bebas Neue', fontSize:'1.1rem', letterSpacing:'0.12em',
+                color:'var(--red)', marginBottom:16, marginTop:8,
+                paddingBottom:8, borderBottom:'1px solid #3a1a1a',
+                textAlign:'center'
+              }}>
+                ▸ НЕ ЕДУТ — {parts.filter(p => p.status === 'declined').length} чел.
               </div>
               <table className="athletes-table">
                 <tbody>
