@@ -633,6 +633,8 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
           tuli_place:      ex.tuli_place      ?? '',
           tuli_perfs:      ex.tuli_perfs      ?? 0,
           saved_rating:    ex.rating          ?? null,
+          status:          ex.status          ?? 'pending',
+          paid:            ex.paid            ?? false,
           _inList:         true,
         }
       })
@@ -665,11 +667,7 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
     setSaving(true); setMsg('')
     try {
       const payload = rows
-        .filter(r => r.sparring_place !== '' || r.sparring_fights > 0 ||
-                     r.stopball_place !== '' || r.stopball_fights > 0 ||
-                     r.tegtim_place   !== '' || r.tegtim_fights   > 0 ||
-                     r.tuli_place     !== '' || r.tuli_perfs      > 0)
-        .map(r => ({
+        const payload = rows.map(r => ({
           athlete_id:      r.athlete_id,
           sparring_place:  r.sparring_place  !== '' ? Number(r.sparring_place)  : null,
           sparring_fights: Number(r.sparring_fights) || 0,
@@ -679,6 +677,7 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
           tegtim_fights:   Number(r.tegtim_fights)   || 0,
           tuli_place:      r.tuli_place      !== '' ? Number(r.tuli_place)      : null,
           tuli_perfs:      Number(r.tuli_perfs)      || 0,
+          status:          r.status || 'pending',
         }))
       const r = await fetch(`${API}/competitions/${detail.id}/results`, {
         method: 'PUT', headers: hj, body: JSON.stringify({ results: payload })
@@ -912,8 +911,16 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map(r => (
-                  <tr key={r.athlete_id}>
+                {/* Сортируем: сначала confirmed/paid, потом pending, потом declined */}
+                {[...rows].sort((a,b) => {
+                  const order = {paid:0, confirmed:1, pending:2, declined:3}
+                  return (order[a.status]??2) - (order[b.status]??2)
+                }).map(r => {
+                  const isGoing   = r.status === 'confirmed' || r.status === 'paid'
+                  const isDeclined = r.status === 'declined'
+                  const rowOpacity = isDeclined ? 0.3 : isGoing ? 1 : 0.55
+                  return (
+                  <tr key={r.athlete_id} style={{ opacity: rowOpacity }}>
                     <td className="td-name">{r.full_name}</td>
                     <td>{readOnly ? (r.sparring_place||'—') : <select className="td-input td-input-sm" value={r.sparring_place} onChange={e => updateRow(r.athlete_id,'sparring_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
                     <td>{readOnly ? r.sparring_fights : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.sparring_fights} onChange={e=>updateRow(r.athlete_id,'sparring_fights',e.target.value)}/>}</td>
@@ -935,9 +942,20 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
                       />}
                       {readOnly && <span style={{color: r.paid ? '#6cba6c' : 'var(--gray)', fontSize:'0.8rem'}}>{r.paid ? '✓' : '—'}</span>}
                     </td>
+                    {!readOnly && (
+                      <td>
+                        <select className="td-input td-input-sm" value={r.status||'pending'}
+                          onChange={e => updateRow(r.athlete_id, 'status', e.target.value)}
+                          style={{color: isGoing ? '#6cba6c' : isDeclined ? 'var(--red)' : 'var(--gray)'}}>
+                          <option value="pending">Ожидает</option>
+                          <option value="confirmed">Едет</option>
+                          <option value="declined">Не едет</option>
+                        </select>
+                      </td>
+                    )}
                     {!readOnly && <td><button className="td-btn td-btn-del" onClick={() => removeRow(r.athlete_id)} title="Убрать из списка">✕</button></td>}
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
             {rows.length === 0 && <div className="cabinet-empty">Нет участников. Нажмите «+ Добавить бойца».</div>}
@@ -1547,42 +1565,105 @@ function CampsTab({ token, athletes }) {
             </div>
           </div>
 
-          <div className="athletes-table-wrap">
-            <table className="athletes-table">
-              <thead><tr>
-                <th style={{ textAlign:'left' }}>Спортсмен</th>
-                <th>Группа</th>
-                <th>Статус</th>
-                <th>Оплата</th>
-                <th></th>
-              </tr></thead>
-              <tbody>
-                {parts.map(p => (
-                  <tr key={p.athlete_id}>
-                    <td className="td-name">{p.full_name}</td>
-                    <td style={{ fontSize:'0.82rem', color:'var(--gray)' }}>{p.group || '—'}</td>
-                    <td>
-                      <select className="td-input" value={p.status}
-                        onChange={e => updateStatus(p.athlete_id, e.target.value, undefined)}>
-                        <option value="pending">Ожидает</option>
-                        <option value="confirmed">Едет</option>
-                        <option value="declined">Не едет</option>
-                        <option value="paid">Оплачено</option>
-                      </select>
-                    </td>
-                    <td>
-                      <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', justifyContent:'center' }}>
-                        <input type="checkbox" checked={p.paid} onChange={e => updateStatus(p.athlete_id, e.target.checked ? 'paid' : p.status, e.target.checked)}/>
-                        <span style={{ fontSize:'0.8rem', color: p.paid ? '#c8962a' : 'var(--gray)' }}>{p.paid ? 'Оплачено' : 'Не оплачено'}</span>
-                      </label>
-                    </td>
-                    <td><button className="td-btn td-btn-del" onClick={() => removeParticipant(p.athlete_id)}>✕</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {parts.length === 0 && <div className="cabinet-empty">Нет участников. Нажмите «+ Участник».</div>}
-          </div>
+          {/* Блок едут */}
+          {parts.filter(p => p.status === 'confirmed' || p.status === 'paid').length > 0 && (
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontFamily:'Bebas Neue', fontSize:'1rem', letterSpacing:'0.08em', color:'#6cba6c', marginBottom:10 }}>
+                ЕДУТ — {parts.filter(p => p.status === 'confirmed' || p.status === 'paid').length}
+              </div>
+              <table className="athletes-table">
+                <thead><tr>
+                  <th style={{textAlign:'left'}}>Спортсмен</th>
+                  <th>Группа</th>
+                  <th>Статус</th>
+                  <th>Оплата</th>
+                  <th></th>
+                </tr></thead>
+                <tbody>
+                  {parts.filter(p => p.status === 'confirmed' || p.status === 'paid').map(p => (
+                    <tr key={p.athlete_id}>
+                      <td className="td-name">{p.full_name}</td>
+                      <td style={{fontSize:'0.82rem',color:'var(--gray)'}}>{p.group||'—'}</td>
+                      <td>
+                        <select className="td-input" value={p.status} onChange={e => updateStatus(p.athlete_id, e.target.value, undefined)}>
+                          <option value="pending">Ожидает</option>
+                          <option value="confirmed">Едет</option>
+                          <option value="declined">Не едет</option>
+                          <option value="paid">Оплачено</option>
+                        </select>
+                      </td>
+                      <td>
+                        <label style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',justifyContent:'center'}}>
+                          <input type="checkbox" checked={p.paid} onChange={e => updateStatus(p.athlete_id, e.target.checked ? 'paid' : 'confirmed', e.target.checked)}/>
+                          <span style={{fontSize:'0.8rem',color: p.paid ? '#c8962a' : 'var(--gray)'}}>{p.paid ? 'Оплачено' : 'Не оплачено'}</span>
+                        </label>
+                      </td>
+                      <td><button className="td-btn td-btn-del" onClick={() => removeParticipant(p.athlete_id)}>✕</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Блок ожидают ответа */}
+          {parts.filter(p => p.status === 'pending').length > 0 && (
+            <div style={{ marginBottom:20, opacity:0.6 }}>
+              <div style={{ fontFamily:'Bebas Neue', fontSize:'1rem', letterSpacing:'0.08em', color:'var(--gray)', marginBottom:10 }}>
+                ОЖИДАЮТ ОТВЕТА — {parts.filter(p => p.status === 'pending').length}
+              </div>
+              <table className="athletes-table">
+                <tbody>
+                  {parts.filter(p => p.status === 'pending').map(p => (
+                    <tr key={p.athlete_id}>
+                      <td className="td-name">{p.full_name}</td>
+                      <td style={{fontSize:'0.82rem',color:'var(--gray)'}}>{p.group||'—'}</td>
+                      <td>
+                        <select className="td-input" value={p.status} onChange={e => updateStatus(p.athlete_id, e.target.value, undefined)}>
+                          <option value="pending">Ожидает</option>
+                          <option value="confirmed">Едет</option>
+                          <option value="declined">Не едет</option>
+                          <option value="paid">Оплачено</option>
+                        </select>
+                      </td>
+                      <td></td>
+                      <td><button className="td-btn td-btn-del" onClick={() => removeParticipant(p.athlete_id)}>✕</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Блок не едут */}
+          {parts.filter(p => p.status === 'declined').length > 0 && (
+            <div style={{ opacity:0.35 }}>
+              <div style={{ fontFamily:'Bebas Neue', fontSize:'1rem', letterSpacing:'0.08em', color:'var(--red)', marginBottom:10 }}>
+                НЕ ЕДУТ — {parts.filter(p => p.status === 'declined').length}
+              </div>
+              <table className="athletes-table">
+                <tbody>
+                  {parts.filter(p => p.status === 'declined').map(p => (
+                    <tr key={p.athlete_id}>
+                      <td className="td-name" style={{color:'var(--gray)'}}>{p.full_name}</td>
+                      <td style={{fontSize:'0.82rem',color:'var(--gray)'}}>{p.group||'—'}</td>
+                      <td>
+                        <select className="td-input" value={p.status} onChange={e => updateStatus(p.athlete_id, e.target.value, undefined)}>
+                          <option value="pending">Ожидает</option>
+                          <option value="confirmed">Едет</option>
+                          <option value="declined">Не едет</option>
+                        </select>
+                      </td>
+                      <td></td>
+                      <td></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {parts.length === 0 && <div className="cabinet-empty">Список пуст.</div>}
         </div>
       )}
 

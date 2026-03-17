@@ -52,6 +52,7 @@ class ResultUpsert(BaseModel):
     tegtim_fights:   int = Field(0, ge=0)
     tuli_place:      Optional[int] = Field(None, ge=1, le=3)
     tuli_perfs:      int = Field(0, ge=0)
+    status:          Optional[str] = "pending"
 
 
 class BulkResults(BaseModel):
@@ -91,6 +92,18 @@ def create_competition(
 
     if data.add_to_calendar:
         _create_calendar_event(comp, user.id, db, data.time or "09:00")
+
+    # Автоматически добавляем всех спортсменов со статусом pending (без результатов)
+    athletes = db.query(Athlete).all()
+    for a in athletes:
+        db.add(CompetitionResult(
+            competition_id=comp.id, athlete_id=a.id,
+            sparring_place=None, sparring_fights=0,
+            stopball_place=None, stopball_fights=0,
+            tegtim_place=None, tegtim_fights=0,
+            tuli_place=None, tuli_perfs=0,
+            rating=0, status="pending"
+        ))
 
     db.commit()
     db.refresh(comp)
@@ -283,6 +296,8 @@ def bulk_upsert_results(comp_id: int, data: BulkResults, db: Session = Depends(g
         r.tuli_place      = item.tuli_place
         r.tuli_perfs      = item.tuli_perfs
         r.rating          = calc_result_rating(r, comp.significance)
+        if item.status:
+            r.status = item.status
         saved.append(r)
 
     db.commit()
@@ -369,6 +384,41 @@ def notify_competition(comp_id: int, db: Session = Depends(get_db), _: User = De
     _send_telegram_bulk(users, title, body, db)
 
     return {"sent": sent}
+
+
+@router.post("/{comp_id}/respond")
+def respond_competition(
+    comp_id: int, going: bool,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Родитель/спортсмен отвечает участвует или нет."""
+    athletes = db.query(Athlete).filter(Athlete.user_id == current_user.id).all()
+    athlete_ids = [a.id for a in athletes]
+
+    results = db.query(CompetitionResult).filter(
+        CompetitionResult.competition_id == comp_id,
+        CompetitionResult.athlete_id.in_(athlete_ids)
+    ).all()
+
+    if not results:
+        # Создаём pending запись если её нет
+        for aid in athlete_ids:
+            db.add(CompetitionResult(
+                competition_id=comp_id, athlete_id=aid,
+                sparring_place=None, sparring_fights=0,
+                stopball_place=None, stopball_fights=0,
+                tegtim_place=None, tegtim_fights=0,
+                tuli_place=None, tuli_perfs=0,
+                rating=0, status="confirmed" if going else "declined"
+            ))
+        db.commit()
+        return {"ok": True, "status": "confirmed" if going else "declined"}
+
+    for r in results:
+        r.status = "confirmed" if going else "declined"
+    db.commit()
+    return {"ok": True, "status": "confirmed" if going else "declined"}
 
 
 # ── Хелперы ───────────────────────────────────────────────────────────────────

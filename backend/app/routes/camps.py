@@ -56,6 +56,12 @@ def create_camp(data: CampCreate, db: Session = Depends(get_db), user: User = De
     )
     db.add(camp); db.commit(); db.refresh(camp)
 
+    # Автоматически добавляем всех спортсменов со статусом pending
+    athletes = db.query(Athlete).all()
+    for a in athletes:
+        db.add(CampParticipant(camp_id=camp.id, athlete_id=a.id, status="pending"))
+    db.commit()
+
     # Уведомляем всех пользователей сразу при создании
     _notify_all_users(camp, db)
 

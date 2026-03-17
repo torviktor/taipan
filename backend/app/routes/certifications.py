@@ -335,8 +335,8 @@ def respond_notification(
     if getattr(n, 'link_type', None) == "camp" and n.link_id:
         try:
             from app.models.camp import CampParticipant
-            athletes = db.query(__import__('app.models.user', fromlist=['Athlete']).Athlete) \
-                .filter(__import__('app.models.user', fromlist=['Athlete']).Athlete.user_id == current_user.id).all()
+            from app.models.user import Athlete as AthleteModel
+            athletes = db.query(AthleteModel).filter(AthleteModel.user_id == current_user.id).all()
             for a in athletes:
                 p = db.query(CampParticipant).filter(
                     CampParticipant.camp_id == n.link_id,
@@ -348,7 +348,25 @@ def respond_notification(
         except Exception as e:
             print(f"Camp respond error: {e}")
 
-    # Если соревнование — можно расширить аналогично
+    # Если соревнование — обновляем статус в результатах
+    if getattr(n, 'link_type', None) == "competition" and n.link_id:
+        try:
+            import httpx, os
+            # Вызываем роут соревнований напрямую через DB
+            from app.models.competition import CompetitionResult
+            from app.models.user import Athlete as AthleteModel
+            athletes = db.query(AthleteModel).filter(AthleteModel.user_id == current_user.id).all()
+            for a in athletes:
+                r = db.query(CompetitionResult).filter(
+                    CompetitionResult.competition_id == n.link_id,
+                    CompetitionResult.athlete_id == a.id
+                ).first()
+                if r:
+                    r.status = "confirmed" if going else "declined"
+            db.commit()
+        except Exception as e:
+            print(f"Competition respond error: {e}")
+
     return {"ok": True, "response": n.response}
 
 
