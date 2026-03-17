@@ -147,7 +147,7 @@ function AttendanceTab({ token, athletes }) {
   , [athletes, group])
 
   useEffect(() => { loadSessions() }, [group])
-  useEffect(() => { if (showChart) { setChartData([]); loadChartData() } }, [showChart, group])
+  useEffect(() => { if (showChart) loadChartData(group) }, [showChart, group])
 
   const loadSessions = async () => {
     try {
@@ -156,9 +156,10 @@ function AttendanceTab({ token, athletes }) {
     } catch {}
   }
 
-  const loadChartData = async () => {
+  const loadChartData = async (grp) => {
+    const g = grp || group
     try {
-      const r = await fetch(`${API}/attendance/sessions?group_name=${group}&limit=200`, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await fetch(`${API}/attendance/sessions?group_name=${g}&limit=200`, { headers: { Authorization: `Bearer ${token}` } })
       if (!r.ok) return
       const data = await r.json()
       const monthly = {}
@@ -228,8 +229,8 @@ function AttendanceTab({ token, athletes }) {
     <div className="attendance-wrap">
       <div className="attendance-header">
         <div className="attendance-group-tabs">
-          <button className={`att-group-btn ${group === 'junior' ? 'active' : ''}`} onClick={() => { setGroup('junior'); setViewMode('history'); setChartData([]) }}>Младшая (6–10 лет)</button>
-          <button className={`att-group-btn ${group === 'senior' ? 'active' : ''}`} onClick={() => { setGroup('senior'); setViewMode('history'); setChartData([]) }}>Старшая (11+)</button>
+          <button className={`att-group-btn ${group === 'junior' ? 'active' : ''}`} onClick={() => { setGroup('junior'); setViewMode('history') }}>Младшая (6–10 лет)</button>
+          <button className={`att-group-btn ${group === 'senior' ? 'active' : ''}`} onClick={() => { setGroup('senior'); setViewMode('history') }}>Старшая (11+)</button>
           <button className={`att-group-btn ${showChart ? 'active' : ''}`} onClick={() => setShowChart(v => !v)}>График</button>
         </div>
         <div className="attendance-view-tabs">
@@ -562,7 +563,7 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
   const [showChart,      setShowChart]      = useState(false)
   const [chartData,      setChartData]      = useState([])
   const [msg,            setMsg]            = useState('')
-  const [form, setForm] = useState({ name:'', date:'', location:'', level:'Местный', comp_type:'Турнир', notes:'' })
+  const [form, setForm] = useState({ name:'', date:'', location:'', level:'Местный', comp_type:'Турнир', notes:'', add_to_calendar: false })
 
   const h  = { Authorization: `Bearer ${token}` }
   const hj = { ...h, 'Content-Type': 'application/json' }
@@ -689,11 +690,11 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
     try {
       const r = await fetch(`${API}/competitions`, {
         method: 'POST', headers: hj,
-        body: JSON.stringify({ name: form.name, date: form.date, location: form.location || null, level: form.level, comp_type: form.comp_type, notes: form.notes || null })
+        body: JSON.stringify({ name: form.name, date: form.date, location: form.location || null, level: form.level, comp_type: form.comp_type, notes: form.notes || null, add_to_calendar: form.add_to_calendar })
       })
       if (r.ok) {
         setShowForm(false)
-        setForm({ name:'', date:'', location:'', level:'Местный', comp_type:'Турнир', notes:'' })
+        setForm({ name:'', date:'', location:'', level:'Местный', comp_type:'Турнир', notes:'', add_to_calendar: false })
         setMsg('')
         await loadComps(); await loadSeasons()
         setCompView('list') // п.5 — возвращаем на список
@@ -707,6 +708,15 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
     await fetch(`${API}/competitions/${id}`, { method: 'DELETE', headers: h })
     if (detail?.id === id) { setCompView('list'); setDetail(null) }
     await loadComps()
+  }
+
+  const notifyComp = async () => {
+    if (!detail) return
+    try {
+      const r = await fetch(`${API}/competitions/${detail.id}/notify`, { method: 'POST', headers: hj })
+      if (r.ok) { const d = await r.json(); setMsg(`Уведомлений отправлено: ${d.sent}`) }
+      else setMsg('Ошибка отправки')
+    } catch { setMsg('Ошибка отправки') }
   }
 
   const loadRating = async () => {
@@ -855,6 +865,7 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
             </div>
             <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
               {!readOnly && <button className="att-all-btn" onClick={() => setShowAddAthlete(true)}>+ Добавить бойца</button>}
+              {!readOnly && <button className="att-all-btn" onClick={notifyComp}>Уведомить всех</button>}
               <button className="att-all-btn" onClick={exportResultsXlsx}>Экспорт xlsx</button>
               {!readOnly && (
                 <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={saveResults} disabled={saving}>
@@ -978,6 +989,12 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
                 <label>Примечание</label>
                 <input type="text" className="modal-input" placeholder="Дополнительно..." value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))} />
               </div>
+              <div className="comp-field comp-field-full">
+                <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', textTransform:'none', fontSize:'0.9rem', color:'var(--white)' }}>
+                  <input type="checkbox" checked={form.add_to_calendar} onChange={e=>setForm(p=>({...p,add_to_calendar:e.target.checked}))} />
+                  Добавить в календарь клуба
+                </label>
+              </div>
             </div>
             {msg && <div className="modal-msg">{msg}</div>}
             <div className="modal-btns-row">
@@ -1047,6 +1064,93 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
       </div>
     )
   }
+}
+
+// ── СОРЕВНОВАНИЯ ДЛЯ РОДИТЕЛЯ ─────────────────────────────────────────────────
+
+function ParentCompetitionsTab({ token, athletes }) {
+  const [data,    setData]    = useState([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => { loadAll() }, [])
+
+  const loadAll = async () => {
+    setLoading(true)
+    const results = []
+    for (const a of athletes) {
+      try {
+        const r = await fetch(`${API}/competitions/rating/athlete/${a.id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (r.ok) results.push(await r.json())
+      } catch {}
+    }
+    setData(results)
+    setLoading(false)
+  }
+
+  const placeLabel = (p) => p === 1 ? '1 место' : p === 2 ? '2 место' : p === 3 ? '3 место' : null
+  const placeColor = (p) => p === 1 ? '#c8962a' : p === 2 ? '#aaaaaa' : p === 3 ? '#c87833' : 'var(--gray)'
+
+  if (loading) return <div className="cabinet-loading">Загрузка...</div>
+  if (data.length === 0) return <div className="cabinet-empty">Данные о соревнованиях пока недоступны.</div>
+
+  return (
+    <div>
+      {data.map(a => (
+        <div key={a.athlete_id} style={{ marginBottom: 24 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+            <div className="my-athlete-name">{a.full_name}</div>
+            <div style={{ fontFamily:'Bebas Neue', fontSize:'1.2rem', color:'var(--red)' }}>
+              {a.total_rating} pts
+            </div>
+          </div>
+
+          {a.results.length === 0 && (
+            <div style={{ color:'var(--gray)', fontSize:'0.85rem', padding:'12px 0' }}>
+              Соревнований пока нет.
+            </div>
+          )}
+
+          {a.results.map((r, i) => (
+            <div key={i} style={{
+              background:'var(--dark2)', border:'1px solid var(--gray-dim)',
+              borderRadius:8, padding:'14px 16px', marginBottom:8
+            }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, marginBottom:8 }}>
+                <div>
+                  <div style={{ fontWeight:600, color:'var(--white)', marginBottom:4 }}>{r.competition_name}</div>
+                  <div style={{ fontSize:'0.8rem', color:'var(--gray)', display:'flex', gap:10, flexWrap:'wrap' }}>
+                    <span>{new Date(r.competition_date).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}</span>
+                    <span className={`comp-badge ${LEVEL_BADGE[r.level]||''}`}>{r.level}</span>
+                    <span className="comp-badge">{r.comp_type}</span>
+                  </div>
+                </div>
+                <div style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', color:'var(--red)', flexShrink:0 }}>{r.rating} pts</div>
+              </div>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                {[
+                  { label:'Спарринг', place: r.sparring_place, fights: r.sparring_fights, unit:'боёв' },
+                  { label:'Стоп-балл', place: r.stopball_place, fights: r.stopball_fights, unit:'боёв' },
+                  { label:'Тег-тим', place: r.tegtim_place, fights: r.tegtim_fights, unit:'боёв' },
+                  { label:'Тули', place: r.tuli_place, fights: r.tuli_perfs, unit:'выст.' },
+                ].filter(d => d.place || d.fights > 0).map((d, j) => (
+                  <div key={j} style={{
+                    background:'var(--dark)', border:`1px solid ${d.place ? placeColor(d.place) : 'var(--gray-dim)'}`,
+                    borderRadius:6, padding:'6px 12px', minWidth:80, textAlign:'center'
+                  }}>
+                    <div style={{ fontSize:'0.72rem', color:'var(--gray)', marginBottom:3 }}>{d.label}</div>
+                    {d.place && <div style={{ fontFamily:'Bebas Neue', fontSize:'1.1rem', color: placeColor(d.place) }}>{placeLabel(d.place)}</div>}
+                    {d.fights > 0 && <div style={{ fontSize:'0.78rem', color:'var(--gray)' }}>{d.fights} {d.unit}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 // ── КАСТОМНОЕ ПОДТВЕРЖДЕНИЕ ───────────────────────────────────────────────────
@@ -1635,9 +1739,10 @@ export default function Cabinet() {
 
           {/* п.8 — вкладки родителя */}
           <div className="cabinet-tabs">
-            <button className={`cabinet-tab ${parentView==='athletes'?'active':''}`}    onClick={() => setParentView('athletes')}>Спортсмены</button>
-            <button className={`cabinet-tab ${parentView==='attendance'?'active':''}`}  onClick={() => setParentView('attendance')}>Посещаемость</button>
-            <button className={`cabinet-tab ${parentView==='rating'?'active':''}`}      onClick={() => setParentView('rating')}>Рейтинг</button>
+            <button className={`cabinet-tab ${parentView==='athletes'?'active':''}`}      onClick={() => setParentView('athletes')}>Спортсмены</button>
+            <button className={`cabinet-tab ${parentView==='attendance'?'active':''}`}    onClick={() => setParentView('attendance')}>Посещаемость</button>
+            <button className={`cabinet-tab ${parentView==='competitions'?'active':''}`}  onClick={() => setParentView('competitions')}>Соревнования</button>
+            <button className={`cabinet-tab ${parentView==='rating'?'active':''}`}        onClick={() => setParentView('rating')}>Рейтинг</button>
             <button className={`cabinet-tab ${parentView==='notifications'?'active':''}`} onClick={() => setParentView('notifications')}>
               Уведомления
               <UnreadBadge token={token}/>
@@ -1674,6 +1779,7 @@ export default function Cabinet() {
           )}
 
           {parentView === 'attendance'    && !loading && <ParentAttendanceTab token={token} athletes={myAthletes}/>}
+          {parentView === 'competitions'  && !loading && <ParentCompetitionsTab token={token} athletes={myAthletes}/>}
           {parentView === 'rating'        && !loading && <RatingTab token={token} myAthleteIds={myAthletes.map(a=>a.id)}/>}
           {parentView === 'notifications' && <NotificationsTab token={token}/>}
         </div>

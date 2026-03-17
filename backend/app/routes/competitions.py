@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import Optional
-from datetime import date
+from datetime import date, datetime
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -13,6 +13,7 @@ from app.models.competition import (
     Competition, CompetitionResult,
     SIGNIFICANCE_TABLE, get_significance, calc_result_rating
 )
+from app.models.certification import Notification, NotificationType
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/competitions", tags=["competitions"])
@@ -21,13 +22,14 @@ router = APIRouter(prefix="/competitions", tags=["competitions"])
 # ── Схемы ─────────────────────────────────────────────────────────────────────
 
 class CompetitionCreate(BaseModel):
-    name:      str
-    date:      date
-    location:  Optional[str] = None
-    level:     str
-    comp_type: str
-    notes:     Optional[str] = None
-    season:    Optional[int] = None
+    name:           str
+    date:           date
+    location:       Optional[str] = None
+    level:          str
+    comp_type:      str
+    notes:          Optional[str] = None
+    season:         Optional[int] = None
+    add_to_calendar: bool = False   # создать событие в календаре
 
 
 class CompetitionUpdate(BaseModel):
@@ -66,11 +68,16 @@ def require_manager(u: User = Depends(get_current_user)) -> User:
 # ── CRUD соревнований ─────────────────────────────────────────────────────────
 
 @router.post("", status_code=201)
-def create_competition(data: CompetitionCreate, db: Session = Depends(get_db), user: User = Depends(require_manager)):
+def create_competition(
+    data: CompetitionCreate,
+    db:   Session = Depends(get_db),
+    user: User    = Depends(require_manager)
+):
     if data.level not in SIGNIFICANCE_TABLE:
         raise HTTPException(400, f"Неизвестный уровень: {data.level}")
     if data.comp_type not in SIGNIFICANCE_TABLE.get(data.level, {}):
         raise HTTPException(400, f"Тип «{data.comp_type}» недоступен для «{data.level}»")
+
     comp = Competition(
         name=data.name, date=data.date, location=data.location,
         level=data.level, comp_type=data.comp_type,
@@ -78,7 +85,15 @@ def create_competition(data: CompetitionCreate, db: Session = Depends(get_db), u
         notes=data.notes, season=data.season or data.date.year,
         created_by=user.id,
     )
-    db.add(comp); db.commit(); db.refresh(comp)
+    db.add(comp)
+    db.flush()  # получаем id до commit
+
+    # Синхронизация с календарём
+    if data.add_to_calendar:
+        _create_calendar_event(comp, user.id, db)
+
+    db.commit()
+    db.refresh(comp)
     return _comp_out(comp)
 
 
@@ -103,9 +118,9 @@ def get_seasons(db: Session = Depends(get_db), _: User = Depends(get_current_use
 
 @router.get("/rating/overall")
 def overall_rating(
-    season: Optional[int] = None,
-    group:  Optional[str] = None,
-    gender: Optional[str] = None,
+    season:       Optional[int] = None,
+    group:        Optional[str] = None,
+    gender:       Optional[str] = None,
     age_category: Optional[str] = None,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -116,9 +131,9 @@ def overall_rating(
         .join(CompetitionResult, CompetitionResult.athlete_id == Athlete.id)
         .join(Competition, Competition.id == CompetitionResult.competition_id)
     )
-    if season:       q = q.filter(Competition.season == season)
-    if group:        q = q.filter(Athlete.group == group)
-    if gender:       q = q.filter(Athlete.gender == gender)
+    if season: q = q.filter(Competition.season == season)
+    if group:  q = q.filter(Athlete.group == group)
+    if gender: q = q.filter(Athlete.gender == gender)
 
     rows = q.group_by(Athlete.id).order_by(func.sum(CompetitionResult.rating).desc()).all()
 
@@ -129,27 +144,25 @@ def overall_rating(
         if age_category and cat != age_category:
             continue
         result.append({
-            "place":             i + 1,
-            "athlete_id":        a.id,
-            "full_name":         a.full_name,
-            "birth_date":        str(a.birth_date) if a.birth_date else None,
-            "age":               age,
-            "age_category":      cat,
-            "gender":            a.gender,
-            "gup":               a.gup,
-            "weight":            float(a.weight) if a.weight else None,
-            "group":             a.group,
-            "total_rating":      round(total or 0, 2),
+            "place": i + 1, "athlete_id": a.id, "full_name": a.full_name,
+            "birth_date": str(a.birth_date) if a.birth_date else None,
+            "age": age, "age_category": cat, "gender": a.gender,
+            "gup": a.gup, "weight": float(a.weight) if a.weight else None,
+            "group": a.group, "total_rating": round(total or 0, 2),
             "tournaments_count": cnt,
         })
-    # Перенумеруем место после фильтра по возрасту
     for i, r in enumerate(result):
         r["place"] = i + 1
     return result
 
 
 @router.get("/rating/athlete/{athlete_id}")
-def athlete_rating(athlete_id: int, season: Optional[int] = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def athlete_rating(
+    athlete_id: int,
+    season: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     athlete = db.query(Athlete).filter(Athlete.id == athlete_id).first()
     if not athlete:
         raise HTTPException(404, "Спортсмен не найден")
@@ -166,14 +179,15 @@ def athlete_rating(athlete_id: int, season: Optional[int] = None, db: Session = 
         else:
             raise HTTPException(403, "Нет доступа")
 
-    q = db.query(CompetitionResult).options(joinedload(CompetitionResult.competition)).filter(CompetitionResult.athlete_id == athlete_id)
+    q = db.query(CompetitionResult).options(joinedload(CompetitionResult.competition)) \
+        .filter(CompetitionResult.athlete_id == athlete_id)
     if season:
         q = q.join(Competition).filter(Competition.season == season)
     results = q.order_by(CompetitionResult.competition_id.desc()).all()
 
     return {
-        "athlete_id":   athlete_id,
-        "full_name":    athlete.full_name,
+        "athlete_id": athlete_id,
+        "full_name":  athlete.full_name,
         "total_rating": round(sum(r.rating for r in results), 2),
         "results": [
             {
@@ -201,7 +215,8 @@ def athlete_rating(athlete_id: int, season: Optional[int] = None, db: Session = 
 @router.get("/{comp_id}")
 def get_competition(comp_id: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     comp = _get_or_404(comp_id, db)
-    results = db.query(CompetitionResult).options(joinedload(CompetitionResult.athlete)).filter(CompetitionResult.competition_id == comp_id).all()
+    results = db.query(CompetitionResult).options(joinedload(CompetitionResult.athlete)) \
+        .filter(CompetitionResult.competition_id == comp_id).all()
     return {**_comp_out(comp), "results": [_result_out(r) for r in results]}
 
 
@@ -273,6 +288,51 @@ def delete_result(comp_id: int, athlete_id: int, db: Session = Depends(get_db), 
     db.delete(r); db.commit()
 
 
+# ── Уведомления о соревновании ────────────────────────────────────────────────
+
+@router.post("/{comp_id}/notify")
+def notify_competition(comp_id: int, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+    """
+    Отправить уведомление ВСЕМ зарегистрированным пользователям клуба
+    о предстоящем соревновании.
+    Уведомление также уйдёт через Telegram если есть chat_id.
+    """
+    comp = _get_or_404(comp_id, db)
+
+    # Все активные пользователи клуба
+    users = db.query(User).filter(User.is_active == True).all()
+
+    title = f"Соревнование — {comp.name}"
+    body  = (
+        f"Предстоящее соревнование: {comp.name}. "
+        f"Уровень: {comp.level}, {comp.comp_type}. "
+        f"Дата: {comp.date.strftime('%d.%m.%Y')}."
+    )
+    if comp.location:
+        body += f" Место: {comp.location}."
+    if comp.notes:
+        body += f" {comp.notes}"
+
+    sent = 0
+    for u in users:
+        notif = Notification(
+            user_id=u.id,
+            type=NotificationType.competition,
+            title=title,
+            body=body,
+            link_id=comp_id
+        )
+        db.add(notif)
+        sent += 1
+
+    db.commit()
+
+    # Telegram
+    _send_telegram_bulk(users, title, body, db)
+
+    return {"sent": sent}
+
+
 # ── Хелперы ───────────────────────────────────────────────────────────────────
 
 def _get_or_404(comp_id, db):
@@ -285,18 +345,17 @@ def _get_or_404(comp_id, db):
 def _calc_age(birth_date):
     if not birth_date:
         return None
-    from datetime import date
     today = date.today()
     return today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
 
 
 def _age_category(age):
-    if age is None:     return "Не указан"
-    if age <= 7:        return "6-7"
-    if age <= 9:        return "8-9"
-    if age <= 11:       return "10-11"
-    if age <= 14:       return "12-14"
-    if age <= 17:       return "15-17"
+    if age is None:  return "Не указан"
+    if age <= 7:     return "6-7"
+    if age <= 9:     return "8-9"
+    if age <= 11:    return "10-11"
+    if age <= 14:    return "12-14"
+    if age <= 17:    return "15-17"
     return "18+"
 
 
@@ -319,3 +378,57 @@ def _result_out(r):
         "tuli_place":      r.tuli_place,      "tuli_perfs":      r.tuli_perfs,
         "rating":          r.rating,
     }
+
+
+def _create_calendar_event(comp: Competition, user_id: int, db: Session):
+    """Создаёт событие в календаре при создании соревнования."""
+    try:
+        from app.models.event import Event
+        event = Event(
+            title=f"{comp.comp_type} — {comp.name}",
+            description=(
+                f"Уровень: {comp.level}\n"
+                f"Тип: {comp.comp_type}\n"
+                f"Коэффициент значимости: ×{comp.significance}"
+                + (f"\n{comp.notes}" if comp.notes else "")
+            ),
+            event_date=datetime.combine(comp.date, datetime.min.time()),
+            location=comp.location,
+            created_by=user_id,
+            notify_before_days=[1, 3],
+            notify_everyone=True,
+        )
+        db.add(event)
+    except Exception as e:
+        # Не ломаем создание соревнования если календарь недоступен
+        print(f"Calendar sync error: {e}")
+
+
+def _send_telegram_bulk(users, title: str, body: str, db: Session):
+    """Отправка уведомлений в Telegram всем пользователям у кого есть chat_id."""
+    import os
+    try:
+        import httpx
+    except ImportError:
+        return
+
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not token:
+        return
+
+    from app.models.event import TelegramSubscriber
+    subscribers = db.query(TelegramSubscriber).filter(TelegramSubscriber.subscribed == True).all()
+    user_ids = {u.id for u in users}
+
+    text = f"*{title}*\n\n{body}"
+    for sub in subscribers:
+        if sub.user_id and sub.user_id not in user_ids:
+            continue
+        try:
+            httpx.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": sub.telegram_id, "text": text, "parse_mode": "Markdown"},
+                timeout=5
+            )
+        except Exception:
+            pass
