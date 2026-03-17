@@ -579,6 +579,13 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
   useEffect(() => { loadComps() }, [season])
   useEffect(() => { if (showChart && comps.length > 0) buildChartData() }, [showChart, comps])
 
+  // Автообновление деталей каждые 20 сек пока открыт детальный вид
+  useEffect(() => {
+    if (compView !== 'detail' || !detail) return
+    const interval = setInterval(() => openDetail(detail), 20000)
+    return () => clearInterval(interval)
+  }, [compView, detail?.id])
+
   const loadSeasons = async () => {
     try { const r = await fetch(`${API}/competitions/seasons`, { headers: h }); if (r.ok) setSeasons(await r.json()) } catch {}
   }
@@ -1416,6 +1423,13 @@ function CampsTab({ token, athletes }) {
   useEffect(() => { loadCamps() }, [])
 
   const loadCamps = async () => {
+  // Автообновление деталей каждые 20 сек
+  useEffect(() => {
+    if (!detail) return
+    const interval = setInterval(() => openDetail(detail), 20000)
+    return () => clearInterval(interval)
+  }, [detail?.id])
+
     setLoading(true)
     try { const r = await fetch(`${API}/camps`, { headers: h }); if (r.ok) setCamps(await r.json()) } catch {}
     setLoading(false)
