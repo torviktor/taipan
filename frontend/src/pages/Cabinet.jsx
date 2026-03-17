@@ -1690,7 +1690,7 @@ function CertificationTab({ token, athletes }) {
                   <div key={a.id} className="att-athlete-row absent" style={{ cursor:'pointer' }} onClick={() => addAthlete(a)}>
                     <div className="att-athlete-name">{a.full_name}</div>
                     <div className="att-athlete-age">
-                      {a.age} лет · {a.dan ? `${a.dan} дан` : a.gup ? `${a.gup} гып` : 'пояс не указан'}
+                      {a.age} лет · {a.dan ? `${a.dan} дан` : a.gup === 0 ? 'Без пояса' : a.gup ? `${a.gup} гып` : 'пояс не указан'}
                     </div>
                   </div>
                 ))
@@ -1968,7 +1968,7 @@ export default function Cabinet() {
                         <span>{a.age} лет</span>
                         <span>{a.gender === 'male' ? 'Мужской' : 'Женский'}</span>
                         <span>{a.group || a.auto_group}</span>
-                        <span>{a.dan ? `${a.dan} дан` : a.gup ? `${a.gup} гып` : 'Пояс не указан'}</span>
+                        <span>{a.dan ? `${a.dan} дан` : a.gup === 0 ? 'Без пояса' : a.gup ? `${a.gup} гып` : 'Пояс не указан'}</span>
                       </div>
                     </div>
                   ))}
@@ -2079,10 +2079,17 @@ export default function Cabinet() {
                     </td>
                     <td>{editing === a.id
                       ? <div style={{ display:'flex', gap:'4px' }}>
-                          <input placeholder="Гып" value={editData.gup} onChange={e=>setEditData(d=>({...d,gup:e.target.value,dan:''}))} className="td-input td-input-sm"/>
-                          <input placeholder="Дан" value={editData.dan} onChange={e=>setEditData(d=>({...d,dan:e.target.value,gup:''}))} className="td-input td-input-sm"/>
+                          <select className="td-input td-input-sm" value={editData.gup} onChange={e=>setEditData(d=>({...d,gup:e.target.value,dan:''}))}>
+                            <option value="">— гып</option>
+                            <option value="0">Без пояса</option>
+                            {[11,10,9,8,7,6,5,4,3,2,1].map(g=><option key={g} value={g}>{g} гып</option>)}
+                          </select>
+                          <select className="td-input td-input-sm" value={editData.dan} onChange={e=>setEditData(d=>({...d,dan:e.target.value,gup:''}))}>
+                            <option value="">— дан</option>
+                            {[1,2,3,4,5,6,7,8,9].map(d=><option key={d} value={d}>{d} дан</option>)}
+                          </select>
                         </div>
-                      : a.dan ? `${a.dan} дан` : a.gup ? `${a.gup} гып` : '—'}</td>
+                      : a.dan ? `${a.dan} дан` : a.gup === 0 ? 'Без пояса' : a.gup ? `${a.gup} гып` : '—'}</td>
                     <td>{editing === a.id
                       ? <input value={editData.weight} placeholder="кг" onChange={e=>setEditData(d=>({...d,weight:e.target.value}))} className="td-input td-input-sm"/>
                       : a.weight ? `${a.weight} кг` : '—'}</td>

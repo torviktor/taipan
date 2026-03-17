@@ -43,7 +43,8 @@ function AthleteForm({ data, onChange, index, isParent }) {
             ) : (
               <select value={data.gup} onChange={e => set('gup', e.target.value)}>
                 <option value="">Выберите гып</option>
-                {[10,9,8,7,6,5,4,3,2,1].map(g => <option key={g} value={g}>{g} гып</option>)}
+                <option value="0">Без пояса</option>
+                {[11,10,9,8,7,6,5,4,3,2,1].map(g => <option key={g} value={g}>{g} гып</option>)}
               </select>
             )}
           </div>
@@ -325,7 +326,8 @@ export default function Register() {
                       <select value={athletes[0].gup}
                         onChange={e => setAthletes([{ ...athletes[0], gup: e.target.value }])}>
                         <option value="">Выберите гып</option>
-                        {[10,9,8,7,6,5,4,3,2,1].map(g => <option key={g} value={g}>{g} гып</option>)}
+                        <option value="0">Без пояса</option>
+                        {[11,10,9,8,7,6,5,4,3,2,1].map(g => <option key={g} value={g}>{g} гып</option>)}
                       </select>
                     )}
                   </div>
