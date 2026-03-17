@@ -147,7 +147,7 @@ function AttendanceTab({ token, athletes }) {
   , [athletes, group])
 
   useEffect(() => { loadSessions() }, [group])
-  useEffect(() => { if (showChart) loadChartData() }, [showChart, group])
+  useEffect(() => { if (showChart) { setChartData([]); loadChartData() } }, [showChart, group])
 
   const loadSessions = async () => {
     try {
@@ -228,8 +228,8 @@ function AttendanceTab({ token, athletes }) {
     <div className="attendance-wrap">
       <div className="attendance-header">
         <div className="attendance-group-tabs">
-          <button className={`att-group-btn ${group === 'junior' ? 'active' : ''}`} onClick={() => { setGroup('junior'); setViewMode('history'); setShowChart(false) }}>Младшая (6–10 лет)</button>
-          <button className={`att-group-btn ${group === 'senior' ? 'active' : ''}`} onClick={() => { setGroup('senior'); setViewMode('history'); setShowChart(false) }}>Старшая (11+)</button>
+          <button className={`att-group-btn ${group === 'junior' ? 'active' : ''}`} onClick={() => { setGroup('junior'); setViewMode('history'); setChartData([]) }}>Младшая (6–10 лет)</button>
+          <button className={`att-group-btn ${group === 'senior' ? 'active' : ''}`} onClick={() => { setGroup('senior'); setViewMode('history'); setChartData([]) }}>Старшая (11+)</button>
           <button className={`att-group-btn ${showChart ? 'active' : ''}`} onClick={() => setShowChart(v => !v)}>График</button>
         </div>
         <div className="attendance-view-tabs">
