@@ -231,7 +231,11 @@ function AttendanceTab({ token, athletes }) {
         <div className="attendance-group-tabs">
           <button className={`att-group-btn ${group === 'junior' ? 'active' : ''}`} onClick={() => { setGroup('junior'); setViewMode('history') }}>Младшая (6–10 лет)</button>
           <button className={`att-group-btn ${group === 'senior' ? 'active' : ''}`} onClick={() => { setGroup('senior'); setViewMode('history') }}>Старшая (11+)</button>
-          <button className={`att-group-btn ${showChart ? 'active' : ''}`} onClick={() => setShowChart(v => !v)}>График</button>
+          <button className={`att-group-btn ${showChart ? 'active' : ''}`} onClick={() => {
+            const next = !showChart
+            setShowChart(next)
+            if (next) loadChartData(group)
+          }}>График</button>
         </div>
         <div className="attendance-view-tabs">
           <button className={`att-view-btn ${viewMode !== 'history' ? 'active' : ''}`} onClick={startNewSession}>+ Новая тренировка</button>
