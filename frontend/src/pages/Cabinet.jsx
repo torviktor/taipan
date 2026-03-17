@@ -582,7 +582,20 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
   // Автообновление деталей каждые 20 сек пока открыт детальный вид
   useEffect(() => {
     if (compView !== 'detail' || !detail) return
-    const interval = setInterval(() => openDetail(detail), 20000)
+    const id = detail.id
+    const interval = setInterval(async () => {
+      try {
+        const r = await fetch(`${API}/competitions/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+        if (!r.ok) return
+        const d = await r.json()
+        const existingMap = {}
+        ;(d.results || []).forEach(res => { existingMap[res.athlete_id] = res })
+        setRows(prev => prev.map(row => {
+          const ex = existingMap[row.athlete_id]
+          return ex ? { ...row, status: ex.status || row.status, paid: ex.paid ?? row.paid } : row
+        }))
+      } catch {}
+    }, 20000)
     return () => clearInterval(interval)
   }, [compView, detail?.id])
 
@@ -887,6 +900,7 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
             <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
               {!readOnly && <button className="att-all-btn" onClick={() => setShowAddAthlete(true)}>+ Добавить бойца</button>}
               {!readOnly && <button className="att-all-btn" onClick={notifyComp}>Уведомить всех</button>}
+              {!readOnly && <button className="att-all-btn" onClick={() => openDetail(detail)}>↻ Обновить</button>}
               <button className="att-all-btn" onClick={exportResultsXlsx}>Экспорт xlsx</button>
               {!readOnly && (
                 <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={saveResults} disabled={saving}>
@@ -1426,10 +1440,17 @@ function CampsTab({ token, athletes }) {
   // Автообновление деталей каждые 20 сек
   useEffect(() => {
     if (!detail) return
-    const interval = setInterval(() => openDetail(detail), 20000)
+    const id = detail.id
+    const interval = setInterval(async () => {
+      try {
+        const r = await fetch(`${API}/camps/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+        if (r.ok) { const d = await r.json(); setDetail(d); setParts(d.participants || []) }
+      } catch {}
+    }, 20000)
     return () => clearInterval(interval)
   }, [detail?.id])
 
+  const loadCamps = async () => {
     setLoading(true)
     try { const r = await fetch(`${API}/camps`, { headers: h }); if (r.ok) setCamps(await r.json()) } catch {}
     setLoading(false)
@@ -1551,6 +1572,7 @@ function CampsTab({ token, athletes }) {
           {detail && (
             <>
               <button className="att-all-btn" onClick={notifyCamp}>Уведомить участников</button>
+              <button className="att-all-btn" onClick={() => openDetail(detail)}>↻ Обновить</button>
               <button className="att-all-btn" onClick={() => setShowAdd(true)}>+ Участник</button>
               <button className="att-all-btn" onClick={exportCampXlsx}>Экспорт xlsx</button>
               <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={saveParticipants} disabled={saving}>
