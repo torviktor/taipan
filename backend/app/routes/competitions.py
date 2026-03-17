@@ -465,6 +465,7 @@ def _result_out(r):
         "tegtim_place":    r.tegtim_place,    "tegtim_fights":   r.tegtim_fights,
         "tuli_place":      r.tuli_place,      "tuli_perfs":      r.tuli_perfs,
         "rating":          r.rating,
+        "status":          getattr(r, 'status', 'pending') or 'pending',
         "paid":            getattr(r, 'paid', False),
     }
 

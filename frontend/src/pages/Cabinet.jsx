@@ -686,24 +686,26 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
     if (!detail) return
     setSaving(true); setMsg('')
     try {
-      const payload = rows.map(r => ({
-          athlete_id:      r.athlete_id,
-          sparring_place:  r.sparring_place  !== '' ? Number(r.sparring_place)  : null,
-          sparring_fights: Number(r.sparring_fights) || 0,
-          stopball_place:  r.stopball_place  !== '' ? Number(r.stopball_place)  : null,
-          stopball_fights: Number(r.stopball_fights) || 0,
-          tegtim_place:    r.tegtim_place    !== '' ? Number(r.tegtim_place)    : null,
-          tegtim_fights:   Number(r.tegtim_fights)   || 0,
-          tuli_place:      r.tuli_place      !== '' ? Number(r.tuli_place)      : null,
-          tuli_perfs:      Number(r.tuli_perfs)      || 0,
-          status:          r.status || 'pending',
-        }))
+      // Сохраняем только тех кто подтвердил участие, не трогаем pending/declined
+      const goingRows = rows.filter(r => r.status === 'confirmed' || r.status === 'paid')
+      const payload = goingRows.map(r => ({
+        athlete_id:      r.athlete_id,
+        sparring_place:  r.sparring_place  !== '' ? Number(r.sparring_place)  : null,
+        sparring_fights: Number(r.sparring_fights) || 0,
+        stopball_place:  r.stopball_place  !== '' ? Number(r.stopball_place)  : null,
+        stopball_fights: Number(r.stopball_fights) || 0,
+        tegtim_place:    r.tegtim_place    !== '' ? Number(r.tegtim_place)    : null,
+        tegtim_fights:   Number(r.tegtim_fights)   || 0,
+        tuli_place:      r.tuli_place      !== '' ? Number(r.tuli_place)      : null,
+        tuli_perfs:      Number(r.tuli_perfs)      || 0,
+        status:          r.status,
+      }))
+      if (payload.length === 0) { setMsg('Нет подтверждённых участников'); setSaving(false); return }
       const r = await fetch(`${API}/competitions/${detail.id}/results`, {
         method: 'PUT', headers: hj, body: JSON.stringify({ results: payload })
       })
       if (r.ok) {
         setMsg('Результаты сохранены')
-        // Остаёмся на странице, обновляем сохранённые значения
         await openDetail(detail)
       } else setMsg('Ошибка сохранения')
     } catch { setMsg('Ошибка сохранения') }
@@ -807,6 +809,67 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
   const updateRow = (athleteId, field, value) =>
     setRows(prev => prev.map(r => r.athlete_id === athleteId ? { ...r, [field]: value } : r))
 
+  const updateRowStatus = async (athleteId, status) => {
+    updateRow(athleteId, 'status', status)
+    const row = rows.find(r => r.athlete_id === athleteId)
+    if (!row || !detail) return
+    try {
+      await fetch(`${API}/competitions/${detail.id}/results`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ results: [{
+          athlete_id: athleteId,
+          sparring_place: row.sparring_place !== '' ? Number(row.sparring_place) : null,
+          sparring_fights: Number(row.sparring_fights) || 0,
+          stopball_place: row.stopball_place !== '' ? Number(row.stopball_place) : null,
+          stopball_fights: Number(row.stopball_fights) || 0,
+          tegtim_place: row.tegtim_place !== '' ? Number(row.tegtim_place) : null,
+          tegtim_fights: Number(row.tegtim_fights) || 0,
+          tuli_place: row.tuli_place !== '' ? Number(row.tuli_place) : null,
+          tuli_perfs: Number(row.tuli_perfs) || 0,
+          status,
+        }]})
+      })
+    } catch {}
+  }
+
+  const renderResultRow = (r) => {
+    const isGoing = r.status === 'confirmed' || r.status === 'paid'
+    return (
+      <tr key={r.athlete_id}>
+        <td className="td-name">{r.full_name}</td>
+        <td>{readOnly ? (r.sparring_place||'—') : <select className="td-input td-input-sm" value={r.sparring_place} onChange={e => updateRow(r.athlete_id,'sparring_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
+        <td>{readOnly ? r.sparring_fights : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.sparring_fights} onChange={e=>updateRow(r.athlete_id,'sparring_fights',e.target.value)}/>}</td>
+        <td>{readOnly ? (r.stopball_place||'—') : <select className="td-input td-input-sm" value={r.stopball_place} onChange={e=>updateRow(r.athlete_id,'stopball_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
+        <td>{readOnly ? r.stopball_fights : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.stopball_fights} onChange={e=>updateRow(r.athlete_id,'stopball_fights',e.target.value)}/>}</td>
+        <td>{readOnly ? (r.tegtim_place||'—') : <select className="td-input td-input-sm" value={r.tegtim_place} onChange={e=>updateRow(r.athlete_id,'tegtim_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
+        <td>{readOnly ? r.tegtim_fights : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.tegtim_fights} onChange={e=>updateRow(r.athlete_id,'tegtim_fights',e.target.value)}/>}</td>
+        <td>{readOnly ? (r.tuli_place||'—') : <select className="td-input td-input-sm" value={r.tuli_place} onChange={e=>updateRow(r.athlete_id,'tuli_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
+        <td>{readOnly ? r.tuli_perfs : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.tuli_perfs} onChange={e=>updateRow(r.athlete_id,'tuli_perfs',e.target.value)}/>}</td>
+        <td className="comp-rating-val">{calcRatingPreview(r, detail?.significance||1)}</td>
+        <td style={{textAlign:'center'}}>
+          {!readOnly && <input type="checkbox" checked={r.paid||false}
+            onChange={async e => {
+              const paid = e.target.checked
+              updateRow(r.athlete_id, 'paid', paid)
+              await fetch(`${API}/competitions/${detail.id}/results/${r.athlete_id}/paid?paid=${paid}`, { method:'PATCH', headers:{Authorization:`Bearer ${token}`} })
+            }}/>}
+          {readOnly && <span style={{color: r.paid ? '#6cba6c' : 'var(--gray)', fontSize:'0.8rem'}}>{r.paid ? '✓' : '—'}</span>}
+        </td>
+        {!readOnly && <td>
+          <select className="td-input td-input-sm" value={r.status||'confirmed'}
+            onChange={e => updateRowStatus(r.athlete_id, e.target.value)}
+            style={{color:'#6cba6c'}}>
+            <option value="pending">Ожидает</option>
+            <option value="confirmed">Участвует</option>
+            <option value="declined">Не участвует</option>
+          </select>
+        </td>}
+        {!readOnly && <td><button className="td-btn td-btn-del" onClick={() => removeRow(r.athlete_id)}>✕</button></td>}
+      </tr>
+    )
+  }
+
   const typesForLevel = (lvl) => Object.keys(SIG_TABLE[lvl] || {})
   const formSig = (SIG_TABLE[form.level] || {})[form.comp_type] || 1.0
 
@@ -909,76 +972,105 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
             </div>
           </div>
 
-          <div className="athletes-table-wrap">
-            <table className="athletes-table comp-results-table">
-              <thead>
-                <tr>
-                  <th rowSpan="2" style={{ textAlign:'left' }}>Спортсмен</th>
-                  <th colSpan="2">Спарринг</th>
-                  <th colSpan="2">Стоп-балл</th>
-                  <th colSpan="2">Тег-тим</th>
-                  <th colSpan="2">Тули</th>
-                  <th rowSpan="2">Рейтинг</th>
-                  <th rowSpan="2">Взнос</th>
-                  {!readOnly && <th rowSpan="2"></th>}
-                </tr>
-                <tr>
-                  <th>Место</th><th>Бои</th>
-                  <th>Место</th><th>Бои</th>
-                  <th>Место</th><th>Бои</th>
-                  <th>Место</th><th>Выст.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* Сортируем: сначала confirmed/paid, потом pending, потом declined */}
-                {[...rows].sort((a,b) => {
-                  const order = {paid:0, confirmed:1, pending:2, declined:3}
-                  return (order[a.status]??2) - (order[b.status]??2)
-                }).map(r => {
-                  const isGoing   = r.status === 'confirmed' || r.status === 'paid'
-                  const isDeclined = r.status === 'declined'
-                  const rowOpacity = isDeclined ? 0.3 : isGoing ? 1 : 0.55
-                  return (
-                  <tr key={r.athlete_id} style={{ opacity: rowOpacity }}>
-                    <td className="td-name">{r.full_name}</td>
-                    <td>{readOnly ? (r.sparring_place||'—') : <select className="td-input td-input-sm" value={r.sparring_place} onChange={e => updateRow(r.athlete_id,'sparring_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
-                    <td>{readOnly ? r.sparring_fights : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.sparring_fights} onChange={e=>updateRow(r.athlete_id,'sparring_fights',e.target.value)}/>}</td>
-                    <td>{readOnly ? (r.stopball_place||'—') : <select className="td-input td-input-sm" value={r.stopball_place} onChange={e=>updateRow(r.athlete_id,'stopball_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
-                    <td>{readOnly ? r.stopball_fights : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.stopball_fights} onChange={e=>updateRow(r.athlete_id,'stopball_fights',e.target.value)}/>}</td>
-                    <td>{readOnly ? (r.tegtim_place||'—') : <select className="td-input td-input-sm" value={r.tegtim_place} onChange={e=>updateRow(r.athlete_id,'tegtim_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
-                    <td>{readOnly ? r.tegtim_fights : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.tegtim_fights} onChange={e=>updateRow(r.athlete_id,'tegtim_fights',e.target.value)}/>}</td>
-                    <td>{readOnly ? (r.tuli_place||'—') : <select className="td-input td-input-sm" value={r.tuli_place} onChange={e=>updateRow(r.athlete_id,'tuli_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
-                    <td>{readOnly ? r.tuli_perfs : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.tuli_perfs} onChange={e=>updateRow(r.athlete_id,'tuli_perfs',e.target.value)}/>}</td>
-                    <td className="comp-rating-val">{calcRatingPreview(r, detail.significance||1)}</td>
-                    <td style={{textAlign:'center'}}>
-                      {!readOnly && <input type="checkbox" checked={r.paid||false}
-                        onChange={async e => {
-                          const paid = e.target.checked
-                          updateRow(r.athlete_id, 'paid', paid)
-                          await fetch(`${API}/competitions/${detail.id}/results/${r.athlete_id}/paid?paid=${paid}`, { method:'PATCH', headers:{Authorization:`Bearer ${token}`} })
-                        }}
-                        title={r.paid ? 'Оплачено' : 'Не оплачено'}
-                      />}
-                      {readOnly && <span style={{color: r.paid ? '#6cba6c' : 'var(--gray)', fontSize:'0.8rem'}}>{r.paid ? '✓' : '—'}</span>}
-                    </td>
-                    {!readOnly && (
-                      <td>
-                        <select className="td-input td-input-sm" value={r.status||'pending'}
-                          onChange={e => updateRow(r.athlete_id, 'status', e.target.value)}
-                          style={{color: isGoing ? '#6cba6c' : isDeclined ? 'var(--red)' : 'var(--gray)'}}>
-                          <option value="pending">Ожидает</option>
-                          <option value="confirmed">Едет</option>
-                          <option value="declined">Не едет</option>
-                        </select>
-                      </td>
-                    )}
-                    {!readOnly && <td><button className="td-btn td-btn-del" onClick={() => removeRow(r.athlete_id)} title="Убрать из списка">✕</button></td>}
-                  </tr>
-                )})}
-              </tbody>
-            </table>
-            {rows.length === 0 && <div className="cabinet-empty">Нет участников. Нажмите «+ Добавить бойца».</div>}
-          </div>
+          {/* Блок участвуют */}
+          {rows.filter(r => r.status === 'confirmed' || r.status === 'paid').length > 0 && (
+            <div style={{ marginBottom:24 }}>
+              <div style={{
+                fontFamily:'Bebas Neue', fontSize:'1.1rem', letterSpacing:'0.12em',
+                color:'#6cba6c', marginBottom:16, marginTop:8,
+                paddingBottom:8, borderBottom:'1px solid #1a3a1a',
+                textAlign:'center', textShadow:'0 0 12px rgba(108,186,108,0.4)'
+              }}>▸ УЧАСТВУЮТ — {rows.filter(r => r.status === 'confirmed' || r.status === 'paid').length} чел.</div>
+              <div className="athletes-table-wrap">
+                <table className="athletes-table comp-results-table">
+                  <thead><tr>
+                    <th rowSpan="2" style={{textAlign:'left'}}>Спортсмен</th>
+                    <th colSpan="2">Спарринг</th><th colSpan="2">Стоп-балл</th>
+                    <th colSpan="2">Тег-тим</th><th colSpan="2">Тули</th>
+                    <th rowSpan="2">Рейтинг</th><th rowSpan="2">Взнос</th>
+                    {!readOnly && <th rowSpan="2">Статус</th>}
+                    {!readOnly && <th rowSpan="2"></th>}
+                  </tr><tr>
+                    <th>Место</th><th>Бои</th><th>Место</th><th>Бои</th>
+                    <th>Место</th><th>Бои</th><th>Место</th><th>Выст.</th>
+                  </tr></thead>
+                  <tbody>
+                    {rows.filter(r => r.status === 'confirmed' || r.status === 'paid').map(r => renderResultRow(r))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Блок ожидают ответа */}
+          {rows.filter(r => r.status === 'pending').length > 0 && (
+            <div style={{ marginBottom:20, opacity:0.55 }}>
+              <div style={{
+                fontFamily:'Bebas Neue', fontSize:'1.1rem', letterSpacing:'0.12em',
+                color:'var(--gray)', marginBottom:16, marginTop:8,
+                paddingBottom:8, borderBottom:'1px solid var(--gray-dim)',
+                textAlign:'center'
+              }}>▸ ОЖИДАЮТ ОТВЕТА — {rows.filter(r => r.status === 'pending').length} чел.</div>
+              <div className="athletes-table-wrap">
+                <table className="athletes-table">
+                  <tbody>
+                    {rows.filter(r => r.status === 'pending').map(r => (
+                      <tr key={r.athlete_id}>
+                        <td className="td-name">{r.full_name}</td>
+                        <td colSpan={8} style={{color:'var(--gray)',fontSize:'0.82rem'}}>ожидается ответ</td>
+                        {!readOnly && <td>
+                          <select className="td-input td-input-sm" value="pending"
+                            onChange={e => updateRowStatus(r.athlete_id, e.target.value)}
+                            style={{color:'var(--gray)'}}>
+                            <option value="pending">Ожидает</option>
+                            <option value="confirmed">Участвует</option>
+                            <option value="declined">Не участвует</option>
+                          </select>
+                        </td>}
+                        {!readOnly && <td><button className="td-btn td-btn-del" onClick={() => removeRow(r.athlete_id)}>✕</button></td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Блок не участвуют */}
+          {rows.filter(r => r.status === 'declined').length > 0 && (
+            <div style={{ opacity:0.35 }}>
+              <div style={{
+                fontFamily:'Bebas Neue', fontSize:'1.1rem', letterSpacing:'0.12em',
+                color:'var(--red)', marginBottom:16, marginTop:8,
+                paddingBottom:8, borderBottom:'1px solid #3a1a1a',
+                textAlign:'center'
+              }}>▸ НЕ УЧАСТВУЮТ — {rows.filter(r => r.status === 'declined').length} чел.</div>
+              <div className="athletes-table-wrap">
+                <table className="athletes-table">
+                  <tbody>
+                    {rows.filter(r => r.status === 'declined').map(r => (
+                      <tr key={r.athlete_id}>
+                        <td className="td-name" style={{color:'var(--gray)'}}>{r.full_name}</td>
+                        <td colSpan={8} style={{color:'var(--gray)',fontSize:'0.82rem'}}>отказался</td>
+                        {!readOnly && <td>
+                          <select className="td-input td-input-sm" value="declined"
+                            onChange={e => updateRowStatus(r.athlete_id, e.target.value)}
+                            style={{color:'var(--red)'}}>
+                            <option value="pending">Ожидает</option>
+                            <option value="confirmed">Участвует</option>
+                            <option value="declined">Не участвует</option>
+                          </select>
+                        </td>}
+                        {!readOnly && <td></td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {rows.length === 0 && <div className="cabinet-empty">Нет участников.</div>}
         </div>
       )}
 
