@@ -184,6 +184,14 @@ def finalize_certification(
 
     cert.status = CertificationStatus.completed
     db.commit()
+    # Автоначисление ачивок за аттестацию
+    try:
+        from app.routes.achievements import auto_grant
+        for r in results:
+            if r.passed is True and r.athlete:
+                auto_grant(r.athlete_id, db)
+    except Exception as e:
+        print(f"Achievement error: {e}")
     return {"updated_athletes": updated, "status": "completed"}
 
 

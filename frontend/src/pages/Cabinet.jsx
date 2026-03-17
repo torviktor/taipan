@@ -1173,25 +1173,15 @@ function ParentCompetitionsTab({ token, athletes }) {
 
 // ── АЧИВКИ ────────────────────────────────────────────────────────────────────
 
-// SVG иконки для ачивок
-const AchievementIcons = {
-  steps:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="28" height="28"><path d="M13 6l3 3-8 8-4 1 1-4 8-8z"/><path d="M9 10l5 5"/></svg>,
-  shield:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="28" height="28"><path d="M12 3L4 7v5c0 5.25 3.5 10.15 8 11.35C17.5 22.15 21 17.25 21 12V7L12 3z"/></svg>,
-  iron:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="28" height="28"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>,
-  star:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="28" height="28"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
-  sword:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="28" height="28"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6 2 2-6 6-2-2z"/><path d="M3 21l2.5-2.5"/></svg>,
-  trophy:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="28" height="28"><path d="M6 9H4.5a2.5 2.5 0 010-5H6M18 9h1.5a2.5 2.5 0 000-5H18M6 9V4h12v5M6 9v6a6 6 0 0012 0V9M12 18v4M9 22h6"/></svg>,
-  crown:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="28" height="28"><path d="M2 19h20M2 19l3-10 5 5 2-7 2 7 5-5 3 10"/></svg>,
-  belt:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="28" height="28"><rect x="2" y="9" width="20" height="6" rx="1"/><path d="M12 9v6M8 12h8"/></svg>,
-  upgrade: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="28" height="28"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>,
-  camp:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="28" height="28"><path d="M3 20l9-16 9 16H3z"/><path d="M9 20v-4a3 3 0 016 0v4"/></svg>,
-}
+// SVG иконки убраны — используем только эмблему клуба
 
 const TIER_STYLES = {
-  common:    { border: '#555555', bg: '#1a1a1a', glow: 'none',                        label: 'Обычная' },
-  rare:      { border: '#CC0000', bg: '#1a0000', glow: '0 0 12px rgba(204,0,0,0.4)',  label: 'Редкая' },
-  legendary: { border: '#c8962a', bg: '#1a1200', glow: '0 0 16px rgba(200,150,42,0.5)', label: 'Легендарная' },
+  common:    { border: '#555555', bg: '#111111', glow: 'none',                          label: 'Обычная' },
+  rare:      { border: '#CC0000', bg: '#180000', glow: '0 0 14px rgba(204,0,0,0.5)',    label: 'Редкая' },
+  legendary: { border: '#c8962a', bg: '#1a1200', glow: '0 0 18px rgba(200,150,42,0.6)', label: 'Легендарная' },
 }
+
+const TIER_LABEL = { common: 'Обычная', rare: 'Редкая', legendary: 'Легендарная' }
 
 const CATEGORY_LABEL = {
   attendance:   'Посещаемость',
@@ -1203,7 +1193,7 @@ const CATEGORY_LABEL = {
 function AchievementBadge({ ach, size = 'normal' }) {
   const style = TIER_STYLES[ach.tier] || TIER_STYLES.common
   const dim = size === 'small' ? 80 : 110
-  const opacity = ach.granted ? 1 : 0.25
+  const opacity = ach.granted ? 1 : 0.2
 
   return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6, opacity, transition:'opacity 0.2s', width: dim + 20 }}>
@@ -1213,30 +1203,48 @@ function AchievementBadge({ ach, size = 'normal' }) {
         borderRadius: 8,
         background: style.bg,
         boxShadow: ach.granted ? style.glow : 'none',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        gap: 6, padding: 8, position: 'relative', cursor: 'default'
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'relative', overflow: 'hidden'
       }}>
-        {/* Эмблема клуба как фоновый элемент */}
+        {/* Эмблема клуба — яркая, во всю площадь */}
         <img src="/logo.png" alt="" style={{
-          position: 'absolute', inset: 0, width: '100%', height: '100%',
-          objectFit: 'cover', borderRadius: 6, opacity: 0.06, pointerEvents: 'none'
+          width: '82%', height: '82%',
+          objectFit: 'contain',
+          opacity: ach.granted ? 0.9 : 0.15,
+          filter: ach.granted
+            ? (ach.tier === 'legendary'
+                ? 'drop-shadow(0 0 8px rgba(200,150,42,0.8))'
+                : ach.tier === 'rare'
+                ? 'drop-shadow(0 0 6px rgba(204,0,0,0.8))'
+                : 'none')
+            : 'grayscale(1)',
+          transition: 'all 0.2s',
+          position: 'relative', zIndex: 1
         }}/>
-        <div style={{ color: ach.granted ? style.border : '#555', position:'relative', zIndex:1 }}>
-          {AchievementIcons[ach.icon] || AchievementIcons.star}
-        </div>
+        {/* Угловой индикатор редкости */}
         {ach.granted && (
           <div style={{
-            position: 'absolute', top: 4, right: 4,
-            width: 8, height: 8, borderRadius: '50%',
-            background: style.border
+            position: 'absolute', top: 0, right: 0,
+            width: 0, height: 0,
+            borderStyle: 'solid',
+            borderWidth: '0 22px 22px 0',
+            borderColor: `transparent ${style.border} transparent transparent`,
           }}/>
         )}
       </div>
       <div style={{
-        fontFamily: 'Bebas Neue, sans-serif', fontSize: size === 'small' ? '0.7rem' : '0.8rem',
-        letterSpacing: '0.05em', color: ach.granted ? style.border : '#444',
-        textAlign: 'center', lineHeight: 1.2, maxWidth: dim + 10
+        fontFamily: 'Bebas Neue, sans-serif',
+        fontSize: size === 'small' ? '0.7rem' : '0.78rem',
+        letterSpacing: '0.05em',
+        color: ach.granted ? style.border : '#333',
+        textAlign: 'center', lineHeight: 1.2,
+        maxWidth: dim + 10
       }}>{ach.name}</div>
+      {ach.granted && (
+        <div style={{ fontSize: '0.65rem', color: 'var(--gray)', textAlign:'center' }}>
+          {TIER_LABEL[ach.tier]}
+        </div>
+      )}
     </div>
   )
 }

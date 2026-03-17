@@ -130,6 +130,14 @@ def mark_attendance(
         db.add(Attendance(session_id=session_id, athlete_id=rec.athlete_id, present=rec.present))
 
     db.commit()
+    # Автоначисление ачивок за посещаемость
+    try:
+        from app.routes.achievements import auto_grant
+        for rec in data.records:
+            if rec.present:
+                auto_grant(rec.athlete_id, db)
+    except Exception as e:
+        print(f"Achievement error: {e}")
     return {"ok": True, "marked": len(data.records)}
 
 

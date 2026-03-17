@@ -284,6 +284,13 @@ def bulk_upsert_results(comp_id: int, data: BulkResults, db: Session = Depends(g
     db.commit()
     for r in saved:
         db.refresh(r)
+    # Автоначисление ачивок за соревнования
+    try:
+        from app.routes.achievements import auto_grant
+        for r in saved:
+            auto_grant(r.athlete_id, db)
+    except Exception as e:
+        print(f"Achievement error: {e}")
     return [_result_out(r) for r in saved]
 
 

@@ -238,10 +238,13 @@ def auto_grant(athlete_id: int, db: Session) -> list[str]:
             CertificationResult.passed == True
         ).all()
 
-        if cert_results:
-            grant("certification_first")
-        if len(cert_results) > 1:
-            grant("certification_upgrade")
+        for r in cert_results:
+            # «Первый пояс» — только если получил именно 10 гып (первый в жизни)
+            if r.target_gup == 10:
+                grant("certification_first")
+            # «Восхождение» — любое повышение выше 10 гыпа или получение дана
+            if (r.target_gup and r.target_gup < 10) or r.target_dan:
+                grant("certification_upgrade")
 
     except Exception as e:
         print(f"Certification achievement error: {e}")
