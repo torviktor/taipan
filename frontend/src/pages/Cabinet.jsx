@@ -901,7 +901,8 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
                   <th colSpan="2">Тег-тим</th>
                   <th colSpan="2">Тули</th>
                   <th rowSpan="2">Рейтинг</th>
-                  <th rowSpan="2"></th>
+                  <th rowSpan="2">Взнос</th>
+                  {!readOnly && <th rowSpan="2"></th>}
                 </tr>
                 <tr>
                   <th>Место</th><th>Бои</th>
@@ -923,6 +924,17 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
                     <td>{readOnly ? (r.tuli_place||'—') : <select className="td-input td-input-sm" value={r.tuli_place} onChange={e=>updateRow(r.athlete_id,'tuli_place',e.target.value)}>{PLACE_OPTS.map(o=><option key={o.label} value={o.value}>{o.label}</option>)}</select>}</td>
                     <td>{readOnly ? r.tuli_perfs : <input type="number" min="0" max="99" className="td-input td-input-sm" value={r.tuli_perfs} onChange={e=>updateRow(r.athlete_id,'tuli_perfs',e.target.value)}/>}</td>
                     <td className="comp-rating-val">{calcRatingPreview(r, detail.significance||1)}</td>
+                    <td style={{textAlign:'center'}}>
+                      {!readOnly && <input type="checkbox" checked={r.paid||false}
+                        onChange={async e => {
+                          const paid = e.target.checked
+                          updateRow(r.athlete_id, 'paid', paid)
+                          await fetch(`${API}/competitions/${detail.id}/results/${r.athlete_id}/paid?paid=${paid}`, { method:'PATCH', headers:{Authorization:`Bearer ${token}`} })
+                        }}
+                        title={r.paid ? 'Оплачено' : 'Не оплачено'}
+                      />}
+                      {readOnly && <span style={{color: r.paid ? '#6cba6c' : 'var(--gray)', fontSize:'0.8rem'}}>{r.paid ? '✓' : '—'}</span>}
+                    </td>
                     {!readOnly && <td><button className="td-btn td-btn-del" onClick={() => removeRow(r.athlete_id)} title="Убрать из списка">✕</button></td>}
                   </tr>
                 ))}
@@ -1017,8 +1029,11 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
               </div>
             </div>
             {msg && <div className="modal-msg">{msg}</div>}
+            <div className="modal-msg" style={{ background:'#1a1200', border:'1px solid #c8962a', color:'#c8962a', marginBottom:8 }}>
+              При создании все зарегистрированные пользователи получат уведомление с опросом об участии.
+            </div>
             <div className="modal-btns-row">
-              <button className="btn-primary" onClick={createComp}>Создать</button>
+              <button className="btn-primary" onClick={createComp}>Создать и уведомить всех</button>
               <button className="btn-outline" onClick={() => setShowForm(false)}>Отмена</button>
             </div>
           </div>
@@ -1405,7 +1420,13 @@ function CampsTab({ token, athletes }) {
         method: 'POST', headers: hj,
         body: JSON.stringify({ name: form.name, date_start: form.date_start, date_end: form.date_end, location: form.location || null, price: form.price ? parseFloat(form.price) : null, notes: form.notes || null })
       })
-      if (r.ok) { setShowForm(false); setForm({ name:'', date_start:'', date_end:'', location:'', price:'', notes:'' }); await loadCamps() }
+      if (r.ok) {
+        const created = await r.json()
+        setShowForm(false)
+        setForm({ name:'', date_start:'', date_end:'', location:'', price:'', notes:'' })
+        await loadCamps()
+        await openDetail(created)
+      }
       else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
   }
@@ -1585,8 +1606,11 @@ function CampsTab({ token, athletes }) {
                 <input type="text" className="modal-input" value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))}/></div>
             </div>
             {msg && <div className="modal-msg">{msg}</div>}
+            <div className="modal-msg" style={{ background:'#1a1200', border:'1px solid #c8962a', color:'#c8962a', marginBottom:8 }}>
+              При создании все зарегистрированные пользователи получат уведомление с опросом об участии.
+            </div>
             <div className="modal-btns-row">
-              <button className="btn-primary" onClick={createCamp}>Создать</button>
+              <button className="btn-primary" onClick={createCamp}>Создать и уведомить всех</button>
               <button className="btn-outline" onClick={() => setShowForm(false)}>Отмена</button>
             </div>
           </div>
@@ -1927,6 +1951,7 @@ function CertificationTab({ token, athletes }) {
                 <th>Текущий</th>
                 <th>Целевой гып/дан</th>
                 <th>Результат</th>
+                <th>Оплата</th>
                 <th></th>
               </tr></thead>
               <tbody>
@@ -1962,6 +1987,18 @@ function CertificationTab({ token, athletes }) {
                           {r.passed === null ? '—' : r.passed ? 'Сдал' : 'Не сдал'}
                         </span>
                       )}
+                    </td>
+                    <td style={{textAlign:'center'}}>
+                      <input type="checkbox" checked={r.paid||false}
+                        onChange={async e => {
+                          const paid = e.target.checked
+                          updateRow(r.athlete_id, 'paid', paid)
+                          await fetch(`${API}/certifications/${detail.id}/results/${r.athlete_id}/paid?paid=${paid}`, {
+                            method:'PATCH', headers:{Authorization:`Bearer ${token}`}
+                          })
+                        }}
+                        title={r.paid ? 'Оплачено' : 'Не оплачено'}
+                      />
                     </td>
                     <td>{detail.status !== 'completed' && <button className="td-btn td-btn-del" onClick={() => removeRow(r.athlete_id)}>✕</button>}</td>
                   </tr>
@@ -2056,6 +2093,16 @@ function NotificationsTab({ token }) {
     window.dispatchEvent(new Event('notifications-read'))
   }
 
+  const respond = async (notifId, going) => {
+    const r = await fetch(`${API}/notifications/${notifId}/respond?going=${going}`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }
+    })
+    if (r.ok) {
+      setNotifs(prev => prev.map(n => n.id === notifId ? { ...n, response: going ? 'going' : 'not_going', is_read: true } : n))
+      window.dispatchEvent(new Event('notifications-read'))
+    }
+  }
+
   const typeLabel = (t) => {
     if (t === 'certification') return { text: 'АТТЕСТ.', color: '#6a8ecb', bg: '#1a1a2e' }
     if (t === 'competition')   return { text: 'ТУРНИР',  color: '#c8962a', bg: '#2a1e0a' }
@@ -2077,15 +2124,16 @@ function NotificationsTab({ token }) {
       {!loading && notifs.length === 0 && <div className="cabinet-empty">Уведомлений пока нет.</div>}
 
       {notifs.map(n => (
-        <div key={n.id} onClick={() => !n.is_read && markRead(n.id)}
+        <div key={n.id}
           style={{
             background: n.is_read ? 'var(--dark2)' : '#1a1500',
             border: `1px solid ${n.is_read ? 'var(--gray-dim)' : '#c8962a'}`,
             borderRadius: 8, padding: '14px 16px', marginBottom: 10,
-            cursor: n.is_read ? 'default' : 'pointer',
             transition: 'background 0.15s'
           }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12 }}
+            onClick={() => !n.is_read && !n.link_type && markRead(n.id)}
+            style={{ cursor: !n.is_read && !n.link_type ? 'pointer' : 'default' }}>
             <div style={{ display:'flex', gap:10, alignItems:'flex-start', flex:1 }}>
               {(() => { const lbl = typeLabel(n.type); return (
                 <span style={{ fontFamily:'Barlow Condensed, sans-serif', fontWeight:700, fontSize:'0.7rem', letterSpacing:'0.08em', padding:'3px 7px', borderRadius:3, background:lbl.bg, color:lbl.color, flexShrink:0, marginTop:2, whiteSpace:'nowrap' }}>{lbl.text}</span>
@@ -2102,6 +2150,23 @@ function NotificationsTab({ token }) {
               {!n.is_read && <span style={{ width:8, height:8, borderRadius:'50%', background:'#c8962a', display:'block' }}/>}
             </div>
           </div>
+          {/* Кнопки опроса для сборов и соревнований */}
+          {(n.link_type === 'camp' || n.link_type === 'competition') && (
+            <div style={{ marginTop:12, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+              {n.response === 'going' && <span style={{ color:'#6cba6c', fontSize:'0.85rem', fontWeight:600 }}>✓ Вы подтвердили участие</span>}
+              {n.response === 'not_going' && <span style={{ color:'var(--gray)', fontSize:'0.85rem' }}>✗ Вы отказались от участия</span>}
+              <button
+                className="btn-primary" style={{ padding:'6px 16px', fontSize:'13px', background: n.response === 'going' ? '#1a3a1a' : undefined, border: n.response === 'going' ? '1px solid #6cba6c' : undefined }}
+                onClick={() => respond(n.id, true)}>
+                {n.link_type === 'camp' ? (n.response === 'going' ? 'Еду ✓' : 'Еду') : (n.response === 'going' ? 'Участвую ✓' : 'Участвую')}
+              </button>
+              <button
+                className="btn-outline" style={{ padding:'6px 16px', fontSize:'13px' }}
+                onClick={() => respond(n.id, false)}>
+                {n.link_type === 'camp' ? 'Не еду' : 'Не участвую'}
+              </button>
+            </div>
+          )}
         </div>
       ))}
     </div>

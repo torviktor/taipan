@@ -94,6 +94,10 @@ def create_competition(
 
     db.commit()
     db.refresh(comp)
+
+    # Уведомляем всех при создании
+    _notify_all_about_competition(comp, db)
+
     return _comp_out(comp)
 
 
@@ -305,6 +309,23 @@ def delete_result(comp_id: int, athlete_id: int, db: Session = Depends(get_db), 
     db.delete(r); db.commit()
 
 
+# ── Оплата взноса ────────────────────────────────────────────────────────────
+
+@router.patch("/{comp_id}/results/{athlete_id}/paid")
+def update_result_paid(
+    comp_id: int, athlete_id: int, paid: bool,
+    db: Session = Depends(get_db), _: User = Depends(require_manager)
+):
+    r = db.query(CompetitionResult).filter(
+        CompetitionResult.competition_id == comp_id,
+        CompetitionResult.athlete_id == athlete_id
+    ).first()
+    if not r: raise HTTPException(404)
+    r.paid = paid
+    db.commit()
+    return _result_out(r)
+
+
 # ── Уведомления о соревновании ────────────────────────────────────────────────
 
 @router.post("/{comp_id}/notify")
@@ -394,7 +415,31 @@ def _result_out(r):
         "tegtim_place":    r.tegtim_place,    "tegtim_fights":   r.tegtim_fights,
         "tuli_place":      r.tuli_place,      "tuli_perfs":      r.tuli_perfs,
         "rating":          r.rating,
+        "paid":            getattr(r, 'paid', False),
     }
+
+
+def _notify_all_about_competition(comp: Competition, db: Session):
+    """Уведомить всех активных пользователей о новом соревновании."""
+    try:
+        from app.models.certification import Notification, NotificationType
+        users = db.query(User).filter(User.is_active == True).all()
+        body = (
+            f"Объявлено соревнование «{comp.name}». "
+            f"Уровень: {comp.level}, {comp.comp_type}. "
+            f"Дата: {comp.date.strftime('%d.%m.%Y')}."
+        )
+        if comp.location: body += f" Место: {comp.location}."
+        body += " Укажите планируете ли участвовать."
+        for u in users:
+            db.add(Notification(
+                user_id=u.id, type=NotificationType.competition,
+                title=f"Соревнование — {comp.name}",
+                body=body, link_id=comp.id, link_type="competition"
+            ))
+        db.commit()
+    except Exception as e:
+        print(f"Competition notify error: {e}")
 
 
 def _create_calendar_event(comp: Competition, user_id: int, db: Session, time_str: str = "09:00"):

@@ -55,6 +55,10 @@ def create_camp(data: CampCreate, db: Session = Depends(get_db), user: User = De
         created_by=user.id
     )
     db.add(camp); db.commit(); db.refresh(camp)
+
+    # Уведомляем всех пользователей сразу при создании
+    _notify_all_users(camp, db)
+
     return _camp_out(camp)
 
 
@@ -257,3 +261,26 @@ def _part_out(p):
         "status":     p.status,
         "paid":       p.paid,
     }
+
+
+def _notify_all_users(camp: Camp, db):
+    """Уведомить всех активных пользователей о сборах."""
+    from app.models.certification import Notification, NotificationType
+    users = db.query(User).filter(User.is_active == True).all()
+    price_str = f" Стоимость: {camp.price} руб." if camp.price else ""
+    for u in users:
+        user_role = getattr(u, 'role', 'parent')
+        if user_role == 'athlete':
+            body = f"Объявлены спортивные сборы «{camp.name}». Даты: {camp.date_start.strftime('%d.%m.%Y')} — {camp.date_end.strftime('%d.%m.%Y')}."
+        else:
+            body = f"Объявлены спортивные сборы «{camp.name}». Даты: {camp.date_start.strftime('%d.%m.%Y')} — {camp.date_end.strftime('%d.%m.%Y')}."
+        if camp.location: body += f" Место: {camp.location}."
+        body += price_str
+        body += " Укажите планируете ли участвовать."
+        db.add(Notification(
+            user_id=u.id, type=NotificationType.camp,
+            title=f"Сборы — {camp.name}",
+            body=body, link_id=camp.id, link_type="camp"
+        ))
+    camp.notify_sent = True
+    db.commit()

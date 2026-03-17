@@ -195,6 +195,21 @@ def finalize_certification(
     return {"updated_athletes": updated, "status": "completed"}
 
 
+@router.patch("/{cert_id}/results/{athlete_id}/paid")
+def update_paid(
+    cert_id: int, athlete_id: int, paid: bool,
+    db: Session = Depends(get_db), _: User = Depends(require_manager)
+):
+    r = db.query(CertificationResult).filter(
+        CertificationResult.certification_id == cert_id,
+        CertificationResult.athlete_id == athlete_id
+    ).first()
+    if not r: raise HTTPException(404)
+    r.paid = paid
+    db.commit()
+    return _result_out(r)
+
+
 @router.post("/{cert_id}/notify")
 def send_notifications(
     cert_id: int,
@@ -298,6 +313,45 @@ def mark_all_read(db: Session = Depends(get_db), user: User = Depends(get_curren
     return {"ok": True}
 
 
+@notif_router.post("/{notif_id}/respond")
+def respond_notification(
+    notif_id: int,
+    going: bool,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Ответить на опрос прямо из уведомления — еду/не еду."""
+    n = db.query(Notification).filter(
+        Notification.id == notif_id,
+        Notification.user_id == current_user.id
+    ).first()
+    if not n: raise HTTPException(404)
+
+    n.response = "going" if going else "not_going"
+    n.is_read  = True
+    db.commit()
+
+    # Если сборы — обновляем статус участника
+    if getattr(n, 'link_type', None) == "camp" and n.link_id:
+        try:
+            from app.models.camp import CampParticipant
+            athletes = db.query(__import__('app.models.user', fromlist=['Athlete']).Athlete) \
+                .filter(__import__('app.models.user', fromlist=['Athlete']).Athlete.user_id == current_user.id).all()
+            for a in athletes:
+                p = db.query(CampParticipant).filter(
+                    CampParticipant.camp_id == n.link_id,
+                    CampParticipant.athlete_id == a.id
+                ).first()
+                if p:
+                    p.status = "confirmed" if going else "declined"
+            db.commit()
+        except Exception as e:
+            print(f"Camp respond error: {e}")
+
+    # Если соревнование — можно расширить аналогично
+    return {"ok": True, "response": n.response}
+
+
 # ── Хелперы ───────────────────────────────────────────────────────────────────
 
 def _get_or_404(cert_id, db):
@@ -327,6 +381,7 @@ def _result_out(r):
         "target_gup":       r.target_gup,
         "target_dan":       r.target_dan,
         "passed":           r.passed,
+        "paid":             r.paid,
     }
 
 
@@ -338,6 +393,8 @@ def _notif_out(n):
         "body":       n.body,
         "is_read":    n.is_read,
         "link_id":    n.link_id,
+        "link_type":  getattr(n, 'link_type', None),
+        "response":   getattr(n, 'response', None),
         "created_at": str(n.created_at),
     }
 
