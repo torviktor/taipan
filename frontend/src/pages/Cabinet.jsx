@@ -900,7 +900,6 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
             <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
               {!readOnly && <button className="att-all-btn" onClick={() => setShowAddAthlete(true)}>+ Добавить бойца</button>}
               {!readOnly && <button className="att-all-btn" onClick={notifyComp}>Уведомить всех</button>}
-              {!readOnly && <button className="att-all-btn" onClick={() => openDetail(detail)}>↻ Обновить</button>}
               <button className="att-all-btn" onClick={exportResultsXlsx}>Экспорт xlsx</button>
               {!readOnly && (
                 <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={saveResults} disabled={saving}>
@@ -1436,16 +1435,21 @@ function CampsTab({ token, athletes }) {
 
   useEffect(() => { loadCamps() }, [])
 
-  // Автообновление деталей каждые 20 сек
+  // Автообновление деталей каждые 15 сек — подхватывает ответы родителей
   useEffect(() => {
     if (!detail) return
-    const id = detail.id
+    const campId = detail.id
+    const hdr = { Authorization: `Bearer ${token}` }
     const interval = setInterval(async () => {
       try {
-        const r = await fetch(`${API}/camps/${id}`, { headers: { Authorization: `Bearer ${token}` } })
-        if (r.ok) { const d = await r.json(); setDetail(d); setParts(d.participants || []) }
+        const r = await fetch(`${API}/camps/${campId}`, { headers: hdr })
+        if (r.ok) {
+          const d = await r.json()
+          setDetail(d)
+          setParts(d.participants || [])
+        }
       } catch {}
-    }, 20000)
+    }, 15000)
     return () => clearInterval(interval)
   }, [detail?.id])
 
@@ -1498,7 +1502,13 @@ function CampsTab({ token, athletes }) {
         method: 'PUT', headers: hj,
         body: JSON.stringify({ athlete_ids: parts.map(p => p.athlete_id) })
       })
-      if (r.ok) { setParts(await r.json()); setMsg('Список сохранён') }
+      if (r.ok) {
+        // Не перезаписываем parts — статусы уже правильные в локальном стейте
+        // Обновляем только detail (счётчики)
+        const d = await (await fetch(`${API}/camps/${detail.id}`, { headers: h })).json()
+        setDetail(d)
+        setMsg('Список сохранён')
+      }
     } catch { setMsg('Ошибка') }
     setSaving(false)
   }
@@ -1571,7 +1581,6 @@ function CampsTab({ token, athletes }) {
           {detail && (
             <>
               <button className="att-all-btn" onClick={notifyCamp}>Уведомить участников</button>
-              <button className="att-all-btn" onClick={() => openDetail(detail)}>↻ Обновить</button>
               <button className="att-all-btn" onClick={() => setShowAdd(true)}>+ Участник</button>
               <button className="att-all-btn" onClick={exportCampXlsx}>Экспорт xlsx</button>
               <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={saveParticipants} disabled={saving}>
