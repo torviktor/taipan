@@ -6,7 +6,7 @@ import './Competitions.css'
 
 const API = '/api'
 
-const GROUPS = ['Младшая группа (6–10 лет)', 'Старшая группа (11+)']
+const GROUPS = ['Младшая группа (6–10 лет)', 'Старшая группа (11+)', 'Взрослые (18+)']
 
 function useSorted(data) {
   const [sort, setSort] = useState({ key: null, dir: 'asc' })
@@ -140,9 +140,10 @@ function AttendanceTab({ token, athletes }) {
   const groupAthletes = useMemo(() =>
     athletes.filter(a => {
       const g = a.group || a.auto_group || ''
-      return group === 'junior'
-        ? g.includes('6') || g.includes('Младшая')
-        : g.includes('11') || g.includes('Старшая') || g.includes('Взрослые') || g.includes('16')
+      if (group === 'junior')  return g.includes('6') || g.includes('Младшая')
+      if (group === 'senior')  return g.includes('11') || g.includes('Старшая')
+      if (group === 'adults')  return g.includes('18') || g.includes('Взрослые')
+      return false
     })
   , [athletes, group])
 
@@ -231,6 +232,7 @@ function AttendanceTab({ token, athletes }) {
         <div className="attendance-group-tabs">
           <button className={`att-group-btn ${group === 'junior' ? 'active' : ''}`} onClick={() => { setGroup('junior'); setViewMode('history') }}>Младшая (6–10 лет)</button>
           <button className={`att-group-btn ${group === 'senior' ? 'active' : ''}`} onClick={() => { setGroup('senior'); setViewMode('history') }}>Старшая (11+)</button>
+          <button className={`att-group-btn ${group === 'adults' ? 'active' : ''}`} onClick={() => { setGroup('adults'); setViewMode('history') }}>Взрослые (18+)</button>
           <button className={`att-group-btn ${showChart ? 'active' : ''}`} onClick={() => {
             const next = !showChart
             setShowChart(next)
@@ -1356,6 +1358,326 @@ function AchievementsLeaderboard({ token }) {
   )
 }
 
+// ── СБОРЫ ─────────────────────────────────────────────────────────────────────
+
+const CAMP_STATUS = {
+  pending:   { label: 'Ожидает ответа', color: 'var(--gray)' },
+  confirmed: { label: 'Едет',           color: '#6cba6c' },
+  declined:  { label: 'Не едет',        color: 'var(--red)' },
+  paid:      { label: 'Оплачено',       color: '#c8962a' },
+}
+
+function CampsTab({ token, athletes }) {
+  const [camps,   setCamps]   = useState([])
+  const [detail,  setDetail]  = useState(null)
+  const [parts,   setParts]   = useState([])
+  const [loading, setLoading] = useState(false)
+  const [saving,  setSaving]  = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [showAdd,  setShowAdd]  = useState(false)
+  const [msg,     setMsg]     = useState('')
+  const [form, setForm] = useState({ name:'', date_start:'', date_end:'', location:'', price:'', notes:'' })
+
+  const h  = { Authorization: `Bearer ${token}` }
+  const hj = { ...h, 'Content-Type': 'application/json' }
+
+  useEffect(() => { loadCamps() }, [])
+
+  const loadCamps = async () => {
+    setLoading(true)
+    try { const r = await fetch(`${API}/camps`, { headers: h }); if (r.ok) setCamps(await r.json()) } catch {}
+    setLoading(false)
+  }
+
+  const openDetail = async (camp) => {
+    setLoading(true)
+    try {
+      const r = await fetch(`${API}/camps/${camp.id}`, { headers: h })
+      if (r.ok) { const d = await r.json(); setDetail(d); setParts(d.participants || []) }
+    } catch {}
+    setLoading(false)
+  }
+
+  const createCamp = async () => {
+    if (!form.name || !form.date_start || !form.date_end) { setMsg('Заполните название и даты'); return }
+    try {
+      const r = await fetch(`${API}/camps`, {
+        method: 'POST', headers: hj,
+        body: JSON.stringify({ name: form.name, date_start: form.date_start, date_end: form.date_end, location: form.location || null, price: form.price ? parseFloat(form.price) : null, notes: form.notes || null })
+      })
+      if (r.ok) { setShowForm(false); setForm({ name:'', date_start:'', date_end:'', location:'', price:'', notes:'' }); await loadCamps() }
+      else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
+    } catch { setMsg('Ошибка') }
+  }
+
+  const deleteCamp = async (id, e) => {
+    e.stopPropagation()
+    if (!window.confirm('Удалить сборы?')) return
+    await fetch(`${API}/camps/${id}`, { method: 'DELETE', headers: h })
+    if (detail?.id === id) { setDetail(null); setParts([]) }
+    await loadCamps()
+  }
+
+  const saveParticipants = async () => {
+    if (!detail) return
+    setSaving(true)
+    try {
+      const r = await fetch(`${API}/camps/${detail.id}/participants`, {
+        method: 'PUT', headers: hj,
+        body: JSON.stringify({ athlete_ids: parts.map(p => p.athlete_id) })
+      })
+      if (r.ok) { setParts(await r.json()); setMsg('Список сохранён') }
+    } catch { setMsg('Ошибка') }
+    setSaving(false)
+  }
+
+  const updateStatus = async (athlete_id, status, paid) => {
+    if (!detail) return
+    try {
+      const r = await fetch(`${API}/camps/${detail.id}/participants/${athlete_id}`, {
+        method: 'PATCH', headers: hj,
+        body: JSON.stringify({ status, paid: paid ?? undefined })
+      })
+      if (r.ok) setParts(prev => prev.map(p => p.athlete_id === athlete_id ? { ...p, status, paid: paid ?? p.paid } : p))
+    } catch {}
+  }
+
+  const notifyCamp = async () => {
+    if (!detail) return
+    try {
+      const r = await fetch(`${API}/camps/${detail.id}/notify`, { method: 'POST', headers: hj })
+      if (r.ok) { const d = await r.json(); setMsg(`Уведомлений отправлено: ${d.sent}`) }
+    } catch { setMsg('Ошибка') }
+  }
+
+  const addAthlete = (a) => {
+    if (parts.find(p => p.athlete_id === a.id)) return
+    setParts(prev => [...prev, { athlete_id: a.id, full_name: a.full_name, group: a.group || a.auto_group, status: 'pending', paid: false }])
+    setShowAdd(false)
+  }
+
+  const removeParticipant = (id) => setParts(prev => prev.filter(p => p.athlete_id !== id))
+  const notInList = athletes.filter(a => !parts.find(p => p.athlete_id === a.id))
+
+  const formatDate = (d) => d ? new Date(d).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' }) : ''
+  const confirmedCount = parts.filter(p => p.status === 'confirmed' || p.status === 'paid').length
+  const paidCount      = parts.filter(p => p.paid).length
+
+  return (
+    <div className="comp-wrap">
+      <div className="comp-top">
+        <div className="comp-top-left">
+          {detail && <button className="att-all-btn" onClick={() => { setDetail(null); setParts([]); setMsg('') }}>← К списку</button>}
+        </div>
+        <div className="comp-top-right">
+          {!detail && <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={() => { setShowForm(true); setMsg('') }}>+ Сборы</button>}
+          {detail && (
+            <>
+              <button className="att-all-btn" onClick={notifyCamp}>Уведомить участников</button>
+              <button className="att-all-btn" onClick={() => setShowAdd(true)}>+ Участник</button>
+              <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={saveParticipants} disabled={saving}>
+                {saving ? 'Сохранение...' : 'Сохранить список'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {msg && <div className="att-msg">{msg}</div>}
+      {loading && <div className="cabinet-loading">Загрузка...</div>}
+
+      {/* Список сборов */}
+      {!loading && !detail && (
+        <div className="comp-list">
+          {camps.length === 0 && <div className="cabinet-empty">Сборов пока нет.</div>}
+          {camps.map(c => (
+            <div key={c.id} className="comp-card" onClick={() => openDetail(c)}>
+              <div className="comp-card-body">
+                <div className="comp-card-name">{c.name}</div>
+                <div className="comp-card-meta">
+                  <span className="comp-card-date">{formatDate(c.date_start)} — {formatDate(c.date_end)}</span>
+                  {c.location && <span className="comp-card-date">/ {c.location}</span>}
+                  {c.price && <span className="comp-badge">{c.price} руб.</span>}
+                  <span className="comp-badge" style={{ color:'#6cba6c' }}>{c.confirmed}/{c.total} едут</span>
+                  {c.paid > 0 && <span className="comp-badge" style={{ color:'#c8962a' }}>{c.paid} оплатили</span>}
+                </div>
+              </div>
+              <div className="comp-card-right">
+                <button className="td-btn td-btn-del" onClick={e => deleteCamp(c.id, e)}>Удал.</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Детальный вид */}
+      {!loading && detail && (
+        <div className="comp-detail">
+          <div className="comp-detail-head">
+            <div>
+              <div className="comp-detail-name">{detail.name}</div>
+              <div className="comp-card-meta" style={{ marginTop:4 }}>
+                <span className="comp-card-date">{formatDate(detail.date_start)} — {formatDate(detail.date_end)}</span>
+                {detail.location && <span className="comp-card-date">/ {detail.location}</span>}
+                {detail.price && <span className="comp-badge">{detail.price} руб.</span>}
+                <span className="comp-badge" style={{ color:'#6cba6c' }}>{confirmedCount} едут</span>
+                <span className="comp-badge" style={{ color:'#c8962a' }}>{paidCount} оплатили</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="athletes-table-wrap">
+            <table className="athletes-table">
+              <thead><tr>
+                <th style={{ textAlign:'left' }}>Спортсмен</th>
+                <th>Группа</th>
+                <th>Статус</th>
+                <th>Оплата</th>
+                <th></th>
+              </tr></thead>
+              <tbody>
+                {parts.map(p => (
+                  <tr key={p.athlete_id}>
+                    <td className="td-name">{p.full_name}</td>
+                    <td style={{ fontSize:'0.82rem', color:'var(--gray)' }}>{p.group || '—'}</td>
+                    <td>
+                      <select className="td-input" value={p.status}
+                        onChange={e => updateStatus(p.athlete_id, e.target.value, undefined)}>
+                        <option value="pending">Ожидает</option>
+                        <option value="confirmed">Едет</option>
+                        <option value="declined">Не едет</option>
+                        <option value="paid">Оплачено</option>
+                      </select>
+                    </td>
+                    <td>
+                      <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', justifyContent:'center' }}>
+                        <input type="checkbox" checked={p.paid} onChange={e => updateStatus(p.athlete_id, e.target.checked ? 'paid' : p.status, e.target.checked)}/>
+                        <span style={{ fontSize:'0.8rem', color: p.paid ? '#c8962a' : 'var(--gray)' }}>{p.paid ? 'Оплачено' : 'Не оплачено'}</span>
+                      </label>
+                    </td>
+                    <td><button className="td-btn td-btn-del" onClick={() => removeParticipant(p.athlete_id)}>✕</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {parts.length === 0 && <div className="cabinet-empty">Нет участников. Нажмите «+ Участник».</div>}
+          </div>
+        </div>
+      )}
+
+      {/* Модал создания */}
+      {showForm && (
+        <div className="modal-overlay" onClick={() => setShowForm(false)}>
+          <div className="modal-box comp-modal" onClick={e => e.stopPropagation()} style={{ maxWidth:520 }}>
+            <h3>Новые сборы</h3>
+            <div className="comp-form-grid">
+              <div className="comp-field comp-field-full"><label>Название *</label>
+                <input type="text" className="modal-input" placeholder="Летние сборы 2026" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))}/></div>
+              <div className="comp-field"><label>Дата начала *</label>
+                <input type="date" className="modal-input" value={form.date_start} onChange={e=>setForm(p=>({...p,date_start:e.target.value}))}/></div>
+              <div className="comp-field"><label>Дата окончания *</label>
+                <input type="date" className="modal-input" value={form.date_end} onChange={e=>setForm(p=>({...p,date_end:e.target.value}))}/></div>
+              <div className="comp-field"><label>Место</label>
+                <input type="text" className="modal-input" placeholder="Подмосковье, база «Олимп»" value={form.location} onChange={e=>setForm(p=>({...p,location:e.target.value}))}/></div>
+              <div className="comp-field"><label>Стоимость (руб.)</label>
+                <input type="number" className="modal-input" placeholder="5000" value={form.price} onChange={e=>setForm(p=>({...p,price:e.target.value}))}/></div>
+              <div className="comp-field comp-field-full"><label>Примечание</label>
+                <input type="text" className="modal-input" value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))}/></div>
+            </div>
+            {msg && <div className="modal-msg">{msg}</div>}
+            <div className="modal-btns-row">
+              <button className="btn-primary" onClick={createCamp}>Создать</button>
+              <button className="btn-outline" onClick={() => setShowForm(false)}>Отмена</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модал добавления участника */}
+      {showAdd && (
+        <div className="modal-overlay" onClick={() => setShowAdd(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <h3>Добавить участника</h3>
+            {notInList.length === 0
+              ? <p style={{ color:'var(--gray)' }}>Все спортсмены уже в списке.</p>
+              : notInList.map(a => (
+                  <div key={a.id} className="att-athlete-row absent" style={{ cursor:'pointer' }} onClick={() => addAthlete(a)}>
+                    <div className="att-athlete-name">{a.full_name}</div>
+                    <div className="att-athlete-age">{a.age} лет · {a.group || a.auto_group}</div>
+                  </div>
+                ))
+            }
+            <div className="modal-btns-row" style={{ marginTop:12 }}>
+              <button className="btn-outline" onClick={() => setShowAdd(false)}>Закрыть</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── СБОРЫ ДЛЯ РОДИТЕЛЯ ────────────────────────────────────────────────────────
+
+function ParentCampsTab({ token, athletes }) {
+  const [camps,   setCamps]   = useState([])
+  const [loading, setLoading] = useState(false)
+  const [msg,     setMsg]     = useState('')
+
+  const h  = { Authorization: `Bearer ${token}` }
+  const hj = { ...h, 'Content-Type': 'application/json' }
+
+  useEffect(() => { loadCamps() }, [])
+
+  const loadCamps = async () => {
+    setLoading(true)
+    try { const r = await fetch(`${API}/camps`, { headers: h }); if (r.ok) setCamps(await r.json()) } catch {}
+    setLoading(false)
+  }
+
+  const respond = async (campId, going) => {
+    try {
+      const r = await fetch(`${API}/camps/${campId}/respond?going=${going}`, { method: 'POST', headers: hj })
+      if (r.ok) { setMsg(going ? 'Подтверждено участие' : 'Отказ зафиксирован'); await loadCamps() }
+    } catch { setMsg('Ошибка') }
+  }
+
+  const myAthleteIds = athletes.map(a => a.id)
+
+  if (loading) return <div className="cabinet-loading">Загрузка...</div>
+  if (camps.length === 0) return <div className="cabinet-empty">Информации о сборах пока нет.</div>
+
+  return (
+    <div>
+      {msg && <div className="att-msg">{msg}</div>}
+      {camps.map(c => (
+        <div key={c.id} className="my-athlete-card" style={{ marginBottom:16 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12 }}>
+            <div>
+              <div className="my-athlete-name" style={{ marginBottom:6 }}>{c.name}</div>
+              <div style={{ fontSize:'0.84rem', color:'var(--gray)', display:'flex', gap:10, flexWrap:'wrap' }}>
+                <span>{new Date(c.date_start).toLocaleDateString('ru-RU')} — {new Date(c.date_end).toLocaleDateString('ru-RU')}</span>
+                {c.location && <span>{c.location}</span>}
+                {c.price && <span style={{ color:'#c8962a' }}>{c.price} руб.</span>}
+              </div>
+            </div>
+          </div>
+          {c.total > 0 && (
+            <div style={{ display:'flex', gap:8, marginTop:12 }}>
+              <button className="btn-primary" style={{ padding:'7px 16px', fontSize:'13px' }} onClick={() => respond(c.id, true)}>
+                Едем
+              </button>
+              <button className="btn-outline" style={{ padding:'7px 16px', fontSize:'13px' }} onClick={() => respond(c.id, false)}>
+                Не едем
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── КАСТОМНОЕ ПОДТВЕРЖДЕНИЕ ───────────────────────────────────────────────────
 
 function ConfirmModal({ message, onConfirm, onCancel, confirmText = 'Подтвердить', danger = false }) {
@@ -1946,6 +2268,7 @@ export default function Cabinet() {
             <button className={`cabinet-tab ${parentView==='attendance'?'active':''}`}    onClick={() => setParentView('attendance')}>Посещаемость</button>
             <button className={`cabinet-tab ${parentView==='competitions'?'active':''}`}  onClick={() => setParentView('competitions')}>Соревнования</button>
             <button className={`cabinet-tab ${parentView==='achievements'?'active':''}`}  onClick={() => setParentView('achievements')}>Ачивки</button>
+            <button className={`cabinet-tab ${parentView==='camps'?'active':''}`}          onClick={() => setParentView('camps')}>Сборы</button>
             <button className={`cabinet-tab ${parentView==='rating'?'active':''}`}        onClick={() => setParentView('rating')}>Рейтинг</button>
             <button className={`cabinet-tab ${parentView==='notifications'?'active':''}`} onClick={() => setParentView('notifications')}>
               Уведомления
@@ -1985,6 +2308,7 @@ export default function Cabinet() {
           {parentView === 'attendance'    && !loading && <ParentAttendanceTab token={token} athletes={myAthletes}/>}
           {parentView === 'competitions'  && !loading && <ParentCompetitionsTab token={token} athletes={myAthletes}/>}
           {parentView === 'achievements'  && !loading && <AchievementsTab token={token} athletes={myAthletes}/>}
+          {parentView === 'camps'         && !loading && <ParentCampsTab  token={token} athletes={myAthletes}/>}
           {parentView === 'rating'        && !loading && <RatingTab token={token} myAthleteIds={myAthletes.map(a=>a.id)}/>}
           {parentView === 'notifications' && <NotificationsTab token={token}/>}
         </div>
@@ -2021,9 +2345,10 @@ export default function Cabinet() {
           <button className={`cabinet-tab ${view==='rating'?'active':''}`}        onClick={() => setView('rating')}>Рейтинг</button>
           <button className={`cabinet-tab ${view==='certification'?'active':''}`} onClick={() => setView('certification')}>Аттестация</button>
           <button className={`cabinet-tab ${view==='achievements'?'active':''}`}  onClick={() => setView('achievements')}>Ачивки</button>
+          <button className={`cabinet-tab ${view==='camps'?'active':''}`}         onClick={() => setView('camps')}>Сборы</button>
         </div>
 
-        {view !== 'attendance' && view !== 'competitions' && view !== 'rating' && view !== 'certification' && view !== 'achievements' && (
+        {view !== 'attendance' && view !== 'competitions' && view !== 'rating' && view !== 'certification' && view !== 'achievements' && view !== 'camps' && (
           <div className="cabinet-toolbar">
             <div className="cabinet-search">
               <input type="text" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} />
@@ -2042,6 +2367,7 @@ export default function Cabinet() {
         {view === 'rating'        && <RatingTab        token={token} />}
         {view === 'certification' && <CertificationTab token={token} athletes={athletes} />}
         {view === 'achievements'  && <AchievementsLeaderboard token={token} />}
+        {view === 'camps'         && <CampsTab token={token} athletes={athletes} />}
 
         {/* ── Спортсмены ── */}
         {view === 'athletes' && (

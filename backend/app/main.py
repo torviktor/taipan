@@ -8,7 +8,8 @@ from app.routes.attendance import router as attendance_router
 from app.routes.competitions import router as competitions_router
 from app.routes.certifications import router as certifications_router, notif_router as notifications_router
 from app.routes.achievements import router as achievements_router
-from app.models import user, event, attendance, competition, certification, achievement
+from app.routes.camps import router as camps_router
+from app.models import user, event, attendance, competition, certification, achievement, camp
 
 Base.metadata.create_all(bind=engine)
 
@@ -39,6 +40,7 @@ app.include_router(competitions_router,      prefix="/api",              tags=["
 app.include_router(certifications_router,    prefix="/api",              tags=["Аттестация"])
 app.include_router(notifications_router,     prefix="/api",              tags=["Уведомления"])
 app.include_router(achievements_router,      prefix="/api",              tags=["Ачивки"])
+app.include_router(camps_router,             prefix="/api",              tags=["Сборы"])
 
 @app.get("/")
 def root():

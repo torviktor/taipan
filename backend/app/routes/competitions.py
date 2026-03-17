@@ -373,7 +373,7 @@ def _age_category(age):
     if age <= 11:    return "10-11"
     if age <= 14:    return "12-14"
     if age <= 17:    return "15-17"
-    return "18+"
+    return None  # взрослые не попадают в возрастной рейтинг
 
 
 def _comp_out(c):

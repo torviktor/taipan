@@ -249,6 +249,18 @@ def auto_grant(athlete_id: int, db: Session) -> list[str]:
     except Exception as e:
         print(f"Certification achievement error: {e}")
 
+    # ── Сборы ─────────────────────────────────────────────────────────────────
+    try:
+        from app.models.camp import CampParticipant
+        camp_count = db.query(CampParticipant).filter(
+            CampParticipant.athlete_id == athlete_id,
+            CampParticipant.status.in_(["confirmed", "paid"])
+        ).count()
+        if camp_count >= 1:
+            grant("camp_first")
+    except Exception as e:
+        print(f"Camp achievement error: {e}")
+
     if new_codes:
         db.commit()
 
