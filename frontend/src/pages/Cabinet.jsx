@@ -163,14 +163,15 @@ function AttendanceTab({ token, athletes }) {
       const data = await r.json()
       const monthly = {}
       data.forEach(s => {
-        const month = s.date.substring(0, 7)
+        const month = s.date ? s.date.substring(0, 7) : null
+        if (!month) return
         if (!monthly[month]) monthly[month] = { month, sessions: 0, present: 0, total: 0 }
         monthly[month].sessions += 1
-        monthly[month].present  += s.present || 0
-        monthly[month].total    += s.total   || 0
+        monthly[month].present  += (s.present || 0)
+        monthly[month].total    += (s.total   || 0)
       })
       setChartData(Object.values(monthly).sort((a, b) => a.month.localeCompare(b.month)))
-    } catch {}
+    } catch (e) { console.error('Chart error:', e) }
   }
 
   const initMarks = (list, existing = {}) => {
@@ -239,10 +240,16 @@ function AttendanceTab({ token, athletes }) {
       {showChart && (
         <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderRadius:10, padding:20, marginBottom:16 }}>
           <div style={{ marginBottom:8, fontSize:'0.85rem', color:'var(--gray)' }}>Тренировок в месяц</div>
-          <LineChart data={chartData} xKey="month" yKey="sessions" color="var(--red)" height={180}/>
-          <div style={{ marginTop:20, marginBottom:8, fontSize:'0.85rem', color:'var(--gray)' }}>Присутствовало (чел.) в месяц</div>
-          <LineChart data={chartData} xKey="month" yKey="present" color="#6cba6c" height={160}/>
-          {chartData.length === 0 && <div className="cabinet-empty">Нет данных для графика</div>}
+          {chartData.length === 0
+            ? <div className="cabinet-empty" style={{ cursor:'pointer' }} onClick={loadChartData}>Нет данных. Нажмите для загрузки.</div>
+            : <LineChart data={chartData} xKey="month" yKey="sessions" color="var(--red)" height={180}/>
+          }
+          {chartData.length > 0 && (
+            <>
+              <div style={{ marginTop:20, marginBottom:8, fontSize:'0.85rem', color:'var(--gray)' }}>Присутствовало (чел.) в месяц</div>
+              <LineChart data={chartData} xKey="month" yKey="present" color="#6cba6c" height={160}/>
+            </>
+          )}
         </div>
       )}
       {viewMode === 'history' && !showChart && (
