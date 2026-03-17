@@ -59,6 +59,16 @@ class Athlete(Base):
         back_populates="athlete",
         cascade="all, delete-orphan"
     )
+    certification_results = relationship(
+        "CertificationResult",
+        back_populates="athlete",
+        cascade="all, delete-orphan"
+    )
+    achievements = relationship(
+        "AthleteAchievement",
+        back_populates="athlete",
+        cascade="all, delete-orphan"
+    )
 
     @property
     def age(self) -> int:
