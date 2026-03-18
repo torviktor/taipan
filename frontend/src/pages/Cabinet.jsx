@@ -350,15 +350,26 @@ function AttendanceTab({ token, athletes }) {
 function ParentAttendanceTab({ token, athletes }) {
   const [data, setData]       = useState([])
   const [loading, setLoading] = useState(false)
+  const [season, setSeason]   = useState(currentSeason)
+  const [seasons, setSeasons] = useState([currentSeason])
 
-  useEffect(() => { loadAll() }, [])
+  useEffect(() => {
+    fetch(`${API}/attendance/seasons`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [currentSeason])
+      .then(s => { const list = s.length ? s : [currentSeason]; setSeasons(list); if (list.includes(currentSeason)) setSeason(currentSeason); else setSeason(list[0]) })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => { loadAll() }, [season])
 
   const loadAll = async () => {
     setLoading(true)
     const results = []
+    const { start, end } = seasonRange(season)
+    const months = season !== '' ? Math.ceil((new Date(end) - new Date(start)) / (30*24*60*60*1000)) : 24
     for (const a of athletes) {
       try {
-        const r = await fetch(`${API}/attendance/athlete/${a.id}?months=6`, {
+        const r = await fetch(`${API}/attendance/athlete/${a.id}?months=${months}`, {
           headers: { Authorization: `Bearer ${token}` }
         })
         if (r.ok) results.push(await r.json())
@@ -373,6 +384,12 @@ function ParentAttendanceTab({ token, athletes }) {
 
   return (
     <div>
+      <div style={{marginBottom:12}}>
+        <select className="att-date-input" value={season} onChange={e => setSeason(e.target.value === '' ? '' : Number(e.target.value))} style={{width:'auto'}}>
+          <option value="">Все сезоны</option>
+          {seasons.map(y => <option key={y} value={y}>{seasonLabel(y)}</option>)}
+        </select>
+      </div>
       {data.map(a => (
         <div key={a.athlete_id} className="my-athlete-card" style={{ marginBottom: 20 }}>
           <div className="my-athlete-name" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -402,6 +419,7 @@ function ParentAttendanceTab({ token, athletes }) {
           )}
         </div>
       ))}
+    </div>
     </div>
   )
 }
@@ -1293,17 +1311,25 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
 function ParentCompetitionsTab({ token, athletes }) {
   const [data,    setData]    = useState([])
   const [loading, setLoading] = useState(false)
+  const [season,  setSeason]  = useState(currentSeason)
+  const [seasons, setSeasons] = useState([currentSeason])
 
-  useEffect(() => { loadAll() }, [])
+  useEffect(() => {
+    fetch(`${API}/competitions/seasons`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [currentSeason])
+      .then(s => { const list = s.length ? s : [currentSeason]; setSeasons(list); if (list.includes(currentSeason)) setSeason(currentSeason); else setSeason(list[0]) })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => { loadAll() }, [season])
 
   const loadAll = async () => {
     setLoading(true)
     const results = []
     for (const a of athletes) {
       try {
-        const r = await fetch(`${API}/competitions/rating/athlete/${a.id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        const url = season !== '' ? `${API}/competitions/rating/athlete/${a.id}?season=${season}` : `${API}/competitions/rating/athlete/${a.id}`
+        const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
         if (r.ok) results.push(await r.json())
       } catch {}
     }
@@ -1315,10 +1341,16 @@ function ParentCompetitionsTab({ token, athletes }) {
   const placeColor = (p) => p === 1 ? '#c8962a' : p === 2 ? '#aaaaaa' : p === 3 ? '#c87833' : 'var(--gray)'
 
   if (loading) return <div className="cabinet-loading">Загрузка...</div>
-  if (data.length === 0) return <div className="cabinet-empty">Данные о соревнованиях пока недоступны.</div>
 
   return (
     <div>
+      <div style={{marginBottom:12}}>
+        <select className="att-date-input" value={season} onChange={e => setSeason(e.target.value === '' ? '' : Number(e.target.value))} style={{width:'auto'}}>
+          <option value="">Все сезоны</option>
+          {seasons.map(y => <option key={y} value={y}>{seasonLabel(y)}</option>)}
+        </select>
+      </div>
+      {data.length === 0 && <div className="cabinet-empty">Данных о соревнованиях за этот сезон нет.</div>}
       {data.map(a => (
         <div key={a.athlete_id} style={{ marginBottom: 24 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
@@ -1454,19 +1486,27 @@ function AchievementBadge({ ach, size = 'normal' }) {
 }
 
 function AchievementsTab({ token, athletes }) {
-  const [data,    setData]    = useState({})   // { athlete_id: [achievements] }
+  const [data,    setData]    = useState({})
   const [loading, setLoading] = useState(false)
+  const [season,  setSeason]  = useState(currentSeason)
+  const [seasons, setSeasons] = useState([currentSeason])
 
-  useEffect(() => { loadAll() }, [])
+  useEffect(() => {
+    fetch(`${API}/competitions/seasons`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [currentSeason])
+      .then(s => { const list = s.length ? s : [currentSeason]; setSeasons(list); if (list.includes(currentSeason)) setSeason(currentSeason); else setSeason(list[0]) })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => { loadAll() }, [season])
 
   const loadAll = async () => {
     setLoading(true)
     const result = {}
     for (const a of athletes) {
       try {
-        const r = await fetch(`${API}/achievements/athlete/${a.id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        const url = season !== '' ? (() => { const {start,end} = seasonRange(season); return `${API}/achievements/athlete/${a.id}?date_from=${start}&date_to=${end}` })() : `${API}/achievements/athlete/${a.id}`
+        const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
         if (r.ok) result[a.id] = await r.json()
       } catch {}
     }
@@ -1481,6 +1521,12 @@ function AchievementsTab({ token, athletes }) {
 
   return (
     <div>
+      <div style={{marginBottom:12}}>
+        <select className="att-date-input" value={season} onChange={e => setSeason(e.target.value === '' ? '' : Number(e.target.value))} style={{width:'auto'}}>
+          <option value="">Все сезоны</option>
+          {seasons.map(y => <option key={y} value={y}>{seasonLabel(y)}</option>)}
+        </select>
+      </div>
       {athletes.map(a => {
         const achs = data[a.id] || []
         const granted = achs.filter(x => x.granted).length
@@ -2572,6 +2618,104 @@ const STATUS_LABELS = {
   rejected:   { label: 'Отклонена',    color: '#CC0000' },
 }
 
+// ── ПОЯС СПОРТСМЕНА ───────────────────────────────────────────────────────────
+
+const BELT_CONFIG = {
+  // gup: { label, colors: [основной, полоска] }
+  null: { label: 'Без пояса',     colors: ['#888888', null] },
+  0:    { label: 'Без пояса',     colors: ['#888888', null] },
+  11:   { label: '11 гып',        colors: ['#FF8C00', null] },         // оранжевый
+  10:   { label: '10 гып',        colors: ['#f0f0f0', null] },         // белый
+  9:    { label: '9 гып',         colors: ['#f0f0f0', '#FFD700'] },    // белый/жёлтый
+  8:    { label: '8 гып',         colors: ['#FFD700', null] },         // жёлтый
+  7:    { label: '7 гып',         colors: ['#FFD700', '#3a9a3a'] },    // жёлтый/зелёный
+  6:    { label: '6 гып',         colors: ['#3a9a3a', null] },         // зелёный
+  5:    { label: '5 гып',         colors: ['#3a9a3a', '#1a6ab5'] },    // зелёный/синий
+  4:    { label: '4 гып',         colors: ['#1a6ab5', null] },         // синий
+  3:    { label: '3 гып',         colors: ['#1a6ab5', '#CC0000'] },    // синий/красный
+  2:    { label: '2 гып',         colors: ['#CC0000', null] },         // красный
+  1:    { label: '1 гып',         colors: ['#CC0000', '#111111'] },    // красный/чёрный
+}
+
+function BeltSVG({ colors, stripes = 0, width = 220, height = 32 }) {
+  const [main, stripe] = colors
+  const r = 6 // corner radius
+
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.5))'}}>
+      <defs>
+        <linearGradient id={`belt-grad-${main}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={main} stopOpacity="1"/>
+          <stop offset="40%" stopColor={main} stopOpacity="0.85"/>
+          <stop offset="100%" stopColor={main} stopOpacity="0.7"/>
+        </linearGradient>
+        {/* Stitching texture */}
+        <pattern id="stitch" x="0" y="0" width="16" height={height} patternUnits="userSpaceOnUse">
+          <line x1="8" y1="4" x2="8" y2={height-4} stroke="rgba(255,255,255,0.12)" strokeWidth="1" strokeDasharray="3,3"/>
+        </pattern>
+      </defs>
+
+      {/* Основной пояс */}
+      <rect x="0" y="0" width={width} height={height} rx={r} ry={r} fill={`url(#belt-grad-${main})`}/>
+      {/* Текстура */}
+      <rect x="0" y="0" width={width} height={height} rx={r} ry={r} fill="url(#stitch)" opacity="0.6"/>
+      {/* Блик сверху */}
+      <rect x={r} y="1" width={width - r*2} height={height/3} rx={r/2} fill="rgba(255,255,255,0.12)"/>
+      {/* Обводка */}
+      <rect x="0.5" y="0.5" width={width-1} height={height-1} rx={r} ry={r} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1"/>
+
+      {/* Полоска если есть */}
+      {stripe && (
+        <>
+          <rect x={0} y={height*0.35} width={width} height={height*0.3} fill={stripe} opacity="0.9"/>
+          <rect x={0} y={height*0.35} width={width} height={height*0.3} fill="url(#stitch)" opacity="0.4"/>
+        </>
+      )}
+
+      {/* Насечки для данов (на черном поясе) */}
+      {stripes > 0 && Array.from({length: stripes}).map((_, i) => (
+        <rect key={i} x={width - 28 - i*16} y={4} width={10} height={height-8} rx={2} fill="#FFD700" opacity="0.9"/>
+      ))}
+
+      {/* Центральный узел */}
+      <rect x={width/2 - 12} y={2} width={24} height={height-4} rx={3} fill="rgba(0,0,0,0.3)"/>
+      <rect x={width/2 - 8} y={5} width={16} height={height-10} rx={2} fill="rgba(255,255,255,0.08)"/>
+    </svg>
+  )
+}
+
+function BeltDisplay({ gup, dan }) {
+  if (dan) {
+    // Чёрный пояс с насечками
+    return (
+      <div style={{ marginTop:16, display:'flex', alignItems:'center', gap:16 }}>
+        <div>
+          <div style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', color:'#FFD700', letterSpacing:'0.05em', textShadow:'0 0 12px rgba(200,150,42,0.6)', marginBottom:6 }}>
+            {dan} ДАН
+          </div>
+          <BeltSVG colors={['#111111', null]} stripes={dan}/>
+        </div>
+      </div>
+    )
+  }
+
+  const cfg = BELT_CONFIG[gup] || BELT_CONFIG[null]
+
+  return (
+    <div style={{ marginTop:16, display:'flex', alignItems:'center', gap:16 }}>
+      <div>
+        <div style={{ fontFamily:'Bebas Neue', fontSize:'1.2rem', letterSpacing:'0.05em', marginBottom:6,
+          color: gup !== null && gup !== undefined && gup !== 0 ? '#c8962a' : 'var(--gray)',
+          textShadow: gup ? '0 0 10px rgba(200,150,42,0.5)' : 'none'
+        }}>
+          {cfg.label}
+        </div>
+        <BeltSVG colors={cfg.colors}/>
+      </div>
+    </div>
+  )
+}
+
 // ── ГЛАВНЫЙ КОМПОНЕНТ ──────────────────────────────────────────────────────────
 export default function Cabinet() {
   const navigate = useNavigate()
@@ -2793,7 +2937,6 @@ export default function Cabinet() {
             <button className={`cabinet-tab ${parentView==='attendance'?'active':''}`}    onClick={() => setParentView('attendance')}>Посещаемость</button>
             <button className={`cabinet-tab ${parentView==='competitions'?'active':''}`}  onClick={() => setParentView('competitions')}>Соревнования</button>
             <button className={`cabinet-tab ${parentView==='achievements'?'active':''}`}  onClick={() => setParentView('achievements')}>Ачивки</button>
-            <button className={`cabinet-tab ${parentView==='camps'?'active':''}`}          onClick={() => setParentView('camps')}>Сборы</button>
             <button className={`cabinet-tab ${parentView==='rating'?'active':''}`}        onClick={() => setParentView('rating')}>Рейтинг</button>
             <button className={`cabinet-tab ${parentView==='notifications'?'active':''}`} onClick={() => setParentView('notifications')}>
               Уведомления
@@ -2816,8 +2959,8 @@ export default function Cabinet() {
                         <span>{a.age} лет</span>
                         <span>{a.gender === 'male' ? 'Мужской' : 'Женский'}</span>
                         <span>{a.group || a.auto_group}</span>
-                        <span>{a.dan ? `${a.dan} дан` : a.gup === 0 ? 'Без пояса' : a.gup ? `${a.gup} гып` : 'Пояс не указан'}</span>
                       </div>
+                      <BeltDisplay gup={a.gup} dan={a.dan}/>
                     </div>
                   ))}
                 </div>
@@ -2833,7 +2976,6 @@ export default function Cabinet() {
           {parentView === 'attendance'    && !loading && <ParentAttendanceTab token={token} athletes={myAthletes}/>}
           {parentView === 'competitions'  && !loading && <ParentCompetitionsTab token={token} athletes={myAthletes}/>}
           {parentView === 'achievements'  && !loading && <AchievementsTab token={token} athletes={myAthletes}/>}
-          {parentView === 'camps'         && !loading && <ParentCampsTab  token={token} athletes={myAthletes}/>}
           {parentView === 'rating'        && !loading && <RatingTab token={token} myAthleteIds={myAthletes.map(a=>a.id)}/>}
           {parentView === 'notifications' && <NotificationsTab token={token}/>}
         </div>

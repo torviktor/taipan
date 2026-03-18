@@ -20,6 +20,8 @@ router = APIRouter(prefix="/achievements", tags=["achievements"])
 @router.get("/athlete/{athlete_id}")
 def get_athlete_achievements(
     athlete_id: int,
+    date_from: Optional[str] = None,
+    date_to:   Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -27,17 +29,22 @@ def get_athlete_achievements(
     if not athlete:
         raise HTTPException(404, "Спортсмен не найден")
 
-    # Проверка прав
     role = current_user.role
     if role not in ("manager", "admin"):
-        if role == "athlete" and athlete.user_id != current_user.id:
-            raise HTTPException(403)
-        if role == "parent":
+        if role == "athlete":
+            if athlete.user_id != current_user.id:
+                raise HTTPException(403)
+        elif role == "parent":
             ids = [a.id for a in db.query(Athlete).filter(Athlete.user_id == current_user.id).all()]
             if athlete_id not in ids:
                 raise HTTPException(403)
+        else:
+            raise HTTPException(403)
 
-    granted = db.query(AthleteAchievement).filter(AthleteAchievement.athlete_id == athlete_id).all()
+    q = db.query(AthleteAchievement).filter(AthleteAchievement.athlete_id == athlete_id)
+    if date_from: q = q.filter(AthleteAchievement.granted_at >= date_from)
+    if date_to:   q = q.filter(AthleteAchievement.granted_at <= date_to + ' 23:59:59')
+    granted = q.all()
     granted_codes = {a.code for a in granted}
 
     result = []
