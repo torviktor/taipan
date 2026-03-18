@@ -71,8 +71,17 @@ def create_certification(
     return _cert_out(cert)
 
 
+@router.get("/seasons")
+def get_cert_seasons(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    rows = db.query(Certification.date).all()
+    seasons = set()
+    for (d,) in rows:
+        year = d.year if d.month >= 9 else d.year - 1
+        seasons.add(year)
+    return sorted(seasons, reverse=True)
+
+
 @router.get("")
-def list_certifications(
     date_from: Optional[str] = None,
     date_to:   Optional[str] = None,
     db: Session = Depends(get_db),

@@ -68,8 +68,17 @@ def create_camp(data: CampCreate, db: Session = Depends(get_db), user: User = De
     return _camp_out(camp)
 
 
+@router.get("/seasons")
+def get_camp_seasons(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    rows = db.query(Camp.date_start).all()
+    seasons = set()
+    for (d,) in rows:
+        year = d.year if d.month >= 9 else d.year - 1
+        seasons.add(year)
+    return sorted(seasons, reverse=True)
+
+
 @router.get("")
-def list_camps(
     date_from: Optional[str] = None,
     date_to:   Optional[str] = None,
     db: Session = Depends(get_db),

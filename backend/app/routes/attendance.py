@@ -55,8 +55,19 @@ def create_session(data: SessionCreate, db: Session = Depends(get_db), _=Depends
 
 # ── Получить список тренировок ──────────────────────────────────────────────────
 
-@router.get("/sessions")
-def get_sessions(
+@router.get("/seasons")
+def get_attendance_seasons(db: Session = Depends(get_db), _=Depends(require_admin)):
+    """Возвращает список лет начала спортивных сезонов где есть тренировки."""
+    from sqlalchemy import extract
+    rows = db.query(TrainingSession.date).all()
+    seasons = set()
+    for (d,) in rows:
+        year = d.year if d.month >= 9 else d.year - 1
+        seasons.add(year)
+    return sorted(seasons, reverse=True)
+
+
+
     group_name: Optional[str] = None,
     limit: int = 300,
     date_from: Optional[str] = None,

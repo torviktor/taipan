@@ -145,6 +145,7 @@ function AttendanceTab({ token, athletes }) {
   const [date, setDate]         = useState(today)
   const [group, setGroup]       = useState('junior')
   const [season, setSeason]     = useState(currentSeason)
+  const [seasons, setSeasons]   = useState([currentSeason])
   const [sessions, setSessions] = useState([])
   const [activeSession, setActiveSession] = useState(null)
   const [marks, setMarks]       = useState({})
@@ -165,13 +166,21 @@ function AttendanceTab({ token, athletes }) {
     })
   , [athletes, group])
 
+  useEffect(() => {
+    fetch(`${API}/attendance/seasons`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [currentSeason])
+      .then(s => { setSeasons(s.length ? s : [currentSeason]) })
+      .catch(() => {})
+  }, [])
+
   useEffect(() => { loadSessions() }, [group, season])
   useEffect(() => { if (showChart) loadChartData(group) }, [showChart, group])
 
   const loadSessions = async () => {
     try {
       const { start, end } = seasonRange(season)
-      const r = await fetch(`${API}/attendance/sessions?group_name=${group}&limit=300&date_from=${start}&date_to=${end}`, { headers: { Authorization: `Bearer ${token}` } })
+      const url = season !== '' ? `${API}/attendance/sessions?group_name=${group}&limit=300&date_from=${start}&date_to=${end}` : `${API}/attendance/sessions?group_name=${group}&limit=300`
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) setSessions(await r.json())
     } catch {}
   }
@@ -257,8 +266,9 @@ function AttendanceTab({ token, athletes }) {
             setShowChart(next)
             if (next) loadChartData(group)
           }}>График</button>
-          <select className="att-date-input" value={season} onChange={e => setSeason(Number(e.target.value))} style={{marginLeft:8}}>
-            {Array.from({length:5},(_,i)=>currentSeason-i).map(y=>(
+          <select className="att-date-input" value={season} onChange={e => setSeason(e.target.value === '' ? '' : Number(e.target.value))} style={{marginLeft:8}}>
+            <option value="">Все сезоны</option>
+            {seasons.map(y=>(
               <option key={y} value={y}>{seasonLabel(y)}</option>
             ))}
           </select>
@@ -1497,6 +1507,15 @@ function AchievementsLeaderboard({ token }) {
   const [data,    setData]    = useState([])
   const [loading, setLoading] = useState(false)
   const [season,  setSeason]  = useState(currentSeason)
+  const [seasons, setSeasons] = useState([currentSeason])
+
+  useEffect(() => {
+    // Загружаем доступные сезоны из соревнований (ачивки связаны с активностью)
+    fetch(`${API}/competitions/seasons`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [currentSeason])
+      .then(s => setSeasons(s.length ? s : [currentSeason]))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -1512,8 +1531,9 @@ function AchievementsLeaderboard({ token }) {
   return (
     <div>
       <div style={{marginBottom:12}}>
-        <select className="att-date-input" value={season} onChange={e => setSeason(Number(e.target.value))} style={{width:'auto'}}>
-          {Array.from({length:5},(_,i)=>currentSeason-i).map(y=>(
+        <select className="att-date-input" value={season} onChange={e => setSeason(e.target.value === '' ? '' : Number(e.target.value))} style={{width:'auto'}}>
+          <option value="">Все сезоны</option>
+          {seasons.map(y=>(
             <option key={y} value={y}>{seasonLabel(y)}</option>
           ))}
         </select>
@@ -1565,12 +1585,20 @@ function CampsTab({ token, athletes }) {
   const [msg,     setMsg]     = useState('')
   const [campConfirm, setCampConfirm] = useState(null)
   const [season, setSeason] = useState(currentSeason)
+  const [seasons, setSeasons] = useState([currentSeason])
   const [form, setForm] = useState({ name:'', date_start:'', date_end:'', location:'', price:'', notes:'' })
 
   const h  = { Authorization: `Bearer ${token}` }
   const hj = { ...h, 'Content-Type': 'application/json' }
 
-  useEffect(() => { loadCamps() }, [])
+  useEffect(() => {
+    fetch(`${API}/camps/seasons`, { headers: h })
+      .then(r => r.ok ? r.json() : [currentSeason])
+      .then(s => setSeasons(s.length ? s : [currentSeason]))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => { loadCamps() }, [season])
 
   // Автообновление деталей каждые 15 сек — подхватывает ответы родителей
   useEffect(() => {
@@ -1720,8 +1748,9 @@ function CampsTab({ token, athletes }) {
         <div className="comp-top-left">
           {detail && <button className="att-all-btn" onClick={() => { setDetail(null); setParts([]); setMsg('') }}>← К списку</button>}
           {!detail && (
-            <select className="att-date-input" value={season} onChange={e => setSeason(Number(e.target.value))} style={{width:'auto'}}>
-              {Array.from({length:5},(_,i)=>currentSeason-i).map(y=>(
+            <select className="att-date-input" value={season} onChange={e => setSeason(e.target.value === '' ? '' : Number(e.target.value))} style={{width:'auto'}}>
+              <option value="">Все сезоны</option>
+              {seasons.map(y=>(
                 <option key={y} value={y}>{seasonLabel(y)}</option>
               ))}
             </select>
@@ -1972,8 +2001,8 @@ function ParentCampsTab({ token, athletes }) {
   const loadCamps = async () => {
     setLoading(true)
     try {
-      const { start, end } = seasonRange(season)
-      const r = await fetch(`${API}/camps?date_from=${start}&date_to=${end}`, { headers: h })
+      const url = season !== '' ? (() => { const {start,end} = seasonRange(season); return `${API}/camps?date_from=${start}&date_to=${end}` })() : `${API}/camps`
+      const r = await fetch(url, { headers: h })
       if (r.ok) setCamps(await r.json())
     } catch {}
     setLoading(false)
@@ -2076,18 +2105,26 @@ function CertificationTab({ token, athletes }) {
   const [msg,         setMsg]         = useState('')
   const [confirm,     setConfirm]     = useState(null)
   const [season,      setSeason]      = useState(currentSeason)
+  const [seasons,     setSeasons]     = useState([currentSeason])
   const [form, setForm] = useState({ name: '', date: '', location: '', notes: '' })
 
   const h  = { Authorization: `Bearer ${token}` }
   const hj = { ...h, 'Content-Type': 'application/json' }
+
+  useEffect(() => {
+    fetch(`${API}/certifications/seasons`, { headers: h })
+      .then(r => r.ok ? r.json() : [currentSeason])
+      .then(s => { setSeasons(s.length ? s : [currentSeason]) })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => { loadCerts() }, [season])
 
   const loadCerts = async () => {
     setLoading(true)
     try {
-      const { start, end } = seasonRange(season)
-      const r = await fetch(`${API}/certifications?date_from=${start}&date_to=${end}`, { headers: h })
+      const url = season !== '' ? (() => { const {start,end} = seasonRange(season); return `${API}/certifications?date_from=${start}&date_to=${end}` })() : `${API}/certifications`
+      const r = await fetch(url, { headers: h })
       if (r.ok) setCerts(await r.json())
     } catch {}
     setLoading(false)
@@ -2209,8 +2246,9 @@ function CertificationTab({ token, athletes }) {
         <div className="comp-top-left">
           {detail && <button className="att-all-btn" onClick={() => { setDetail(null); setRows([]); setMsg('') }}>← К списку</button>}
           {!detail && (
-            <select className="att-date-input" value={season} onChange={e => setSeason(Number(e.target.value))} style={{width:'auto'}}>
-              {Array.from({length:5},(_,i)=>currentSeason-i).map(y=>(
+            <select className="att-date-input" value={season} onChange={e => setSeason(e.target.value === '' ? '' : Number(e.target.value))} style={{width:'auto'}}>
+              <option value="">Все сезоны</option>
+              {seasons.map(y=>(
                 <option key={y} value={y}>{seasonLabel(y)}</option>
               ))}
             </select>
