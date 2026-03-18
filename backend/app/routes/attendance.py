@@ -57,8 +57,7 @@ def create_session(data: SessionCreate, db: Session = Depends(get_db), _=Depends
 
 @router.get("/seasons")
 def get_attendance_seasons(db: Session = Depends(get_db), _=Depends(require_admin)):
-    """Возвращает список лет начала спортивных сезонов где есть тренировки."""
-    from sqlalchemy import extract
+    """Список лет начала спортивных сезонов."""
     rows = db.query(TrainingSession.date).all()
     seasons = set()
     for (d,) in rows:
@@ -67,7 +66,8 @@ def get_attendance_seasons(db: Session = Depends(get_db), _=Depends(require_admi
     return sorted(seasons, reverse=True)
 
 
-
+@router.get("/sessions")
+def get_sessions(
     group_name: Optional[str] = None,
     limit: int = 300,
     date_from: Optional[str] = None,
@@ -147,7 +147,6 @@ def mark_attendance(
         db.add(Attendance(session_id=session_id, athlete_id=rec.athlete_id, present=rec.present))
 
     db.commit()
-    # Автоначисление ачивок за посещаемость
     try:
         from app.routes.achievements import auto_grant
         for rec in data.records:
