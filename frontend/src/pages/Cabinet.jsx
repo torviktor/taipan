@@ -258,6 +258,12 @@ function AttendanceTab({ token, athletes }) {
     <div className="attendance-wrap">
       <div className="attendance-header">
         <div className="attendance-group-tabs">
+          <select className="att-date-input" value={season} onChange={e => setSeason(e.target.value === '' ? '' : Number(e.target.value))} style={{marginRight:8}}>
+            <option value="">Все сезоны</option>
+            {seasons.map(y=>(
+              <option key={y} value={y}>{seasonLabel(y)}</option>
+            ))}
+          </select>
           <button className={`att-group-btn ${group === 'junior' ? 'active' : ''}`} onClick={() => { setGroup('junior'); setViewMode('history') }}>Младшая (6–10 лет)</button>
           <button className={`att-group-btn ${group === 'senior' ? 'active' : ''}`} onClick={() => { setGroup('senior'); setViewMode('history') }}>Старшая (11+)</button>
           <button className={`att-group-btn ${group === 'adults' ? 'active' : ''}`} onClick={() => { setGroup('adults'); setViewMode('history') }}>Взрослые (18+)</button>
@@ -266,12 +272,6 @@ function AttendanceTab({ token, athletes }) {
             setShowChart(next)
             if (next) loadChartData(group)
           }}>График</button>
-          <select className="att-date-input" value={season} onChange={e => setSeason(e.target.value === '' ? '' : Number(e.target.value))} style={{marginLeft:8}}>
-            <option value="">Все сезоны</option>
-            {seasons.map(y=>(
-              <option key={y} value={y}>{seasonLabel(y)}</option>
-            ))}
-          </select>
         </div>
         <div className="attendance-view-tabs">
           <button className={`att-view-btn ${viewMode !== 'history' ? 'active' : ''}`} onClick={startNewSession}>+ Новая тренировка</button>
