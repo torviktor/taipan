@@ -107,6 +107,9 @@ def update_athlete(
     db.refresh(a)
     return build_athlete_out(a)
 
+class ArchiveRequest(BaseModel):
+    archive_children: Optional[bool] = None  # None = не спрашивали, True/False = ответ
+
 # ─── Архивировать спортсмена ──────────────────────────────────────────────────
 @router.patch("/athletes/{athlete_id}/archive")
 def archive_athlete(
@@ -118,10 +121,20 @@ def archive_athlete(
         raise HTTPException(status_code=404, detail="Спортсмен не найден")
     a.is_archived = True
     a.archived_at = datetime.utcnow()
+    # Если у родителя больше нет активных детей — блокируем его аккаунт
+    parent = db.query(User).filter(User.id == a.user_id).first()
+    if parent and parent.role == 'parent':
+        active_children = db.query(Athlete).filter(
+            Athlete.user_id == parent.id,
+            Athlete.id != athlete_id,
+            Athlete.is_archived == False
+        ).count()
+        if active_children == 0:
+            parent.is_active = False
     db.commit()
     return {"ok": True}
 
-# ─── Восстановить из архива ───────────────────────────────────────────────────
+# ─── Восстановить спортсмена из архива ───────────────────────────────────────
 @router.patch("/athletes/{athlete_id}/restore")
 def restore_athlete(
     athlete_id: int,
@@ -132,6 +145,64 @@ def restore_athlete(
         raise HTTPException(status_code=404, detail="Спортсмен не найден")
     a.is_archived = False
     a.archived_at = None
+    # Восстанавливаем доступ родителя
+    parent = db.query(User).filter(User.id == a.user_id).first()
+    if parent and not parent.is_active:
+        parent.is_active = True
+    db.commit()
+    return {"ok": True}
+
+# ─── Архивировать родителя (с детьми) ────────────────────────────────────────
+@router.patch("/parents/{user_id}/archive")
+def archive_parent(
+    user_id: int,
+    data: ArchiveRequest,
+    db: Session = Depends(get_db), _: User = Depends(require_manager)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    children = db.query(Athlete).filter(
+        Athlete.user_id == user_id,
+        Athlete.is_archived == False
+    ).all()
+
+    # Если есть дети и ответ не дан — просим подтверждение
+    if children and data.archive_children is None:
+        return {
+            "needs_confirmation": True,
+            "children_count": len(children),
+            "children": [{"id": c.id, "full_name": c.full_name} for c in children]
+        }
+
+    # Архивируем детей если подтверждено
+    if data.archive_children:
+        for c in children:
+            c.is_archived = True
+            c.archived_at = datetime.utcnow()
+
+    # Блокируем родителя
+    user.is_active = False
+    db.commit()
+    return {"ok": True}
+
+# ─── Восстановить родителя (с детьми) ────────────────────────────────────────
+@router.patch("/parents/{user_id}/restore")
+def restore_parent(
+    user_id: int,
+    restore_children: bool = True,
+    db: Session = Depends(get_db), _: User = Depends(require_manager)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    user.is_active = True
+    if restore_children:
+        db.query(Athlete).filter(
+            Athlete.user_id == user_id,
+            Athlete.is_archived == True
+        ).update({"is_archived": False, "archived_at": None})
     db.commit()
     return {"ok": True}
 

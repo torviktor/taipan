@@ -2526,6 +2526,32 @@ export default function Cabinet() {
     loadAthletes()
   }
 
+  const [archiveParentModal, setArchiveParentModal] = useState(null) // { user_id, parent_name, children }
+
+  const archiveParent = async (user_id, archiveChildren) => {
+    const r = await fetch(`${API}/users/parents/${user_id}/archive`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archive_children: archiveChildren })
+    })
+    if (r.ok) {
+      const d = await r.json()
+      if (d.needs_confirmation) {
+        setArchiveParentModal({ user_id, children: d.children })
+      } else {
+        setArchiveParentModal(null)
+        loadAthletes()
+      }
+    }
+  }
+
+  const restoreParent = async (user_id) => {
+    await fetch(`${API}/users/parents/${user_id}/restore?restore_children=true`, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${token}` }
+    })
+    loadAthletes()
+  }
+
   const updateAppStatus = async (id, status) => {
     await fetch(`${API}/applications/${id}/status`, {
       method: 'PATCH',
@@ -2552,11 +2578,17 @@ export default function Cabinet() {
 
   const parents = useMemo(() => {
     const map = new Map()
+    // Включаем всех — и родителей и взрослых спортсменов
     athletes.forEach(a => {
-      if (!map.has(a.parent_phone)) {
-        map.set(a.parent_phone, {
-          user_id: a.user_id, parent_name: a.parent_name, parent_phone: a.parent_phone,
-          children: athletes.filter(x => x.parent_phone === a.parent_phone).map(x => x.full_name),
+      if (!map.has(a.user_id)) {
+        const isAthlete = a.parent_phone === a.user_id?.toString() || !a.parent_name ||
+          athletes.filter(x => x.user_id === a.user_id).every(x => x.user_id === x.id)
+        map.set(a.user_id, {
+          user_id:      a.user_id,
+          parent_name:  a.parent_name,
+          parent_phone: a.parent_phone,
+          is_athlete:   false, // будет определено ниже
+          children:     athletes.filter(x => x.user_id === a.user_id && !x.is_archived).map(x => x.full_name),
         })
       }
     })
@@ -2714,7 +2746,7 @@ export default function Cabinet() {
         {view === 'archive'       && (
           <div>
             <div style={{ marginBottom:16, color:'var(--gray)', fontSize:'0.9rem' }}>
-              Архивные спортсмены не отображаются в посещаемости, соревнованиях и рейтинге.
+              Архивные спортсмены не отображаются в посещаемости, соревнованиях и рейтинге. Архивные родители не могут войти в личный кабинет.
             </div>
             {athletes.filter(a => a.is_archived).length === 0
               ? <div className="cabinet-empty">Архив пуст.</div>
@@ -2725,6 +2757,7 @@ export default function Cabinet() {
                       <th>Группа</th>
                       <th>Возраст</th>
                       <th>Гып/Дан</th>
+                      <th>Родитель</th>
                       <th></th>
                     </tr></thead>
                     <tbody>
@@ -2734,6 +2767,7 @@ export default function Cabinet() {
                           <td>{a.group||'—'}</td>
                           <td>{a.age} лет</td>
                           <td>{a.dan ? `${a.dan} дан` : a.gup === 0 ? 'Без пояса' : a.gup ? `${a.gup} гып` : '—'}</td>
+                          <td style={{fontSize:'0.82rem',color:'var(--gray)'}}>{a.parent_name}</td>
                           <td>
                             <button className="td-btn td-btn-edit" onClick={() => restoreAthlete(a.id)}>Восстановить</button>
                             <button className="td-btn td-btn-del" onClick={() => deleteAthlete(a.id)}>Удал.</button>
@@ -2818,28 +2852,55 @@ export default function Cabinet() {
 
         {/* ── Родители ── */}
         {view === 'parents' && (
-          <div className="athletes-table-wrap">
-            <table className="athletes-table">
-              <thead>
-                <tr>
-                  <Th colKey="parent_name"  sort={sortP} toggle={toggleP}>ФИО родителя</Th>
-                  <Th colKey="parent_phone" sort={sortP} toggle={toggleP}>Телефон</Th>
-                  <Th colKey="children"     sort={sortP} toggle={toggleP}>Спортсмены</Th>
-                  <th>Пароль</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedParents.map((p, i) => (
-                  <tr key={i}>
-                    <td className="td-name">{p.parent_name}</td>
-                    <td>{p.parent_phone}</td>
-                    <td>{p.children.join(', ')}</td>
-                    <td><button className="td-btn td-btn-edit" onClick={() => setResetUser(p)}>Сбросить пароль</button></td>
+          <div>
+            {archiveParentModal && (
+              <div className="modal-overlay" onClick={() => setArchiveParentModal(null)}>
+                <div className="modal-box" onClick={e => e.stopPropagation()}>
+                  <h3>Архивировать детей?</h3>
+                  <p style={{color:'var(--gray)', marginBottom:16}}>
+                    Вместе с родителем в архив перейдут:
+                  </p>
+                  {archiveParentModal.children.map(c => (
+                    <div key={c.id} style={{color:'var(--white)', marginBottom:4}}>— {c.full_name}</div>
+                  ))}
+                  <div className="modal-btns-row" style={{marginTop:16}}>
+                    <button className="btn-primary" onClick={() => archiveParent(archiveParentModal.user_id, true)}>Архивировать с детьми</button>
+                    <button className="btn-outline" onClick={() => archiveParent(archiveParentModal.user_id, false)}>Только родителя</button>
+                    <button className="btn-outline" onClick={() => setArchiveParentModal(null)}>Отмена</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="athletes-table-wrap">
+              <table className="athletes-table">
+                <thead>
+                  <tr>
+                    <Th colKey="parent_name"  sort={sortP} toggle={toggleP}>ФИО</Th>
+                    <Th colKey="parent_phone" sort={sortP} toggle={toggleP}>Телефон</Th>
+                    <Th colKey="children"     sort={sortP} toggle={toggleP}>Спортсмены</Th>
+                    <th>Пароль</th>
+                    <th></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            {sortedParents.length === 0 && !loading && <div className="cabinet-empty">Родителей не найдено</div>}
+                </thead>
+                <tbody>
+                  {sortedParents.map((p, i) => (
+                    <tr key={i}>
+                      <td className="td-name">
+                        {p.parent_name}
+                        {p.children.length === 1 && p.children[0] === p.parent_name && (
+                          <span style={{color:'var(--gray)', fontSize:'0.75rem', marginLeft:6}}>(взрослый спортсмен)</span>
+                        )}
+                      </td>
+                      <td>{p.parent_phone}</td>
+                      <td>{p.children.join(', ') || '—'}</td>
+                      <td><button className="td-btn td-btn-edit" onClick={() => setResetUser(p)}>Сбросить пароль</button></td>
+                      <td><button className="td-btn" style={{color:'var(--gray)',border:'1px solid var(--gray-dim)'}} onClick={() => archiveParent(p.user_id, null)}>В архив</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {sortedParents.length === 0 && !loading && <div className="cabinet-empty">Родителей не найдено</div>}
+            </div>
           </div>
         )}
 
