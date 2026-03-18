@@ -84,7 +84,7 @@ def create_competition(
         name=data.name, date=data.date, location=data.location,
         level=data.level, comp_type=data.comp_type,
         significance=get_significance(data.level, data.comp_type),
-        notes=data.notes, season=data.season or data.date.year,
+        notes=data.notes, season=data.season or _get_sport_season(data.date),
         created_by=user.id,
     )
     db.add(comp)
@@ -131,6 +131,11 @@ def sig_table():
 def get_seasons(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     rows = db.query(Competition.season).distinct().order_by(Competition.season.desc()).all()
     return [r[0] for r in rows]
+
+
+def _get_sport_season(d: date) -> int:
+    """Год начала спортивного сезона (сентябрь–август)."""
+    return d.year if d.month >= 9 else d.year - 1
 
 
 @router.get("/rating/overall")

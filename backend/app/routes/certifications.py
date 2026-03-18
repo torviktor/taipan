@@ -72,8 +72,16 @@ def create_certification(
 
 
 @router.get("")
-def list_certifications(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    certs = db.query(Certification).order_by(Certification.date.desc()).all()
+def list_certifications(
+    date_from: Optional[str] = None,
+    date_to:   Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user)
+):
+    q = db.query(Certification).order_by(Certification.date.desc())
+    if date_from: q = q.filter(Certification.date >= date_from)
+    if date_to:   q = q.filter(Certification.date <= date_to)
+    certs = q.all()
     return [_cert_out(c) for c in certs]
 
 

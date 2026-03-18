@@ -6,6 +6,23 @@ import './Competitions.css'
 
 const API = '/api'
 
+// ── Спортивный сезон (сентябрь–август) ────────────────────────────────────────
+// Сезон 2025/2026 = сен 2025 – авг 2026
+const getSeason = (d) => {
+  const date = d ? new Date(d) : new Date()
+  const year = date.getFullYear()
+  const month = date.getMonth() + 1 // 1-12
+  return month >= 9 ? year : year - 1  // начало сезона
+}
+const seasonLabel = (y) => `${y}/${y+1}`
+const currentSeason = getSeason()
+const currentSeasonLabel = seasonLabel(currentSeason)
+// Диапазон дат сезона
+const seasonRange = (y) => ({
+  start: `${y}-09-01`,
+  end:   `${y+1}-08-31`
+})
+
 const GROUPS = ['Младшая группа (6–10 лет)', 'Старшая группа (11+)', 'Взрослые (18+)']
 
 function useSorted(data) {
@@ -127,6 +144,7 @@ function AttendanceTab({ token, athletes }) {
   const today = new Date().toISOString().split('T')[0]
   const [date, setDate]         = useState(today)
   const [group, setGroup]       = useState('junior')
+  const [season, setSeason]     = useState(currentSeason)
   const [sessions, setSessions] = useState([])
   const [activeSession, setActiveSession] = useState(null)
   const [marks, setMarks]       = useState({})
@@ -147,12 +165,13 @@ function AttendanceTab({ token, athletes }) {
     })
   , [athletes, group])
 
-  useEffect(() => { loadSessions() }, [group])
+  useEffect(() => { loadSessions() }, [group, season])
   useEffect(() => { if (showChart) loadChartData(group) }, [showChart, group])
 
   const loadSessions = async () => {
     try {
-      const r = await fetch(`${API}/attendance/sessions?group_name=${group}&limit=50`, { headers: { Authorization: `Bearer ${token}` } })
+      const { start, end } = seasonRange(season)
+      const r = await fetch(`${API}/attendance/sessions?group_name=${group}&limit=300&date_from=${start}&date_to=${end}`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) setSessions(await r.json())
     } catch {}
   }
@@ -238,6 +257,11 @@ function AttendanceTab({ token, athletes }) {
             setShowChart(next)
             if (next) loadChartData(group)
           }}>График</button>
+          <select className="att-date-input" value={season} onChange={e => setSeason(Number(e.target.value))} style={{marginLeft:8}}>
+            {Array.from({length:5},(_,i)=>currentSeason-i).map(y=>(
+              <option key={y} value={y}>{seasonLabel(y)}</option>
+            ))}
+          </select>
         </div>
         <div className="attendance-view-tabs">
           <button className={`att-view-btn ${viewMode !== 'history' ? 'active' : ''}`} onClick={startNewSession}>+ Новая тренировка</button>
@@ -371,23 +395,31 @@ function ParentAttendanceTab({ token, athletes }) {
 function RatingTab({ token, myAthleteIds = [] }) {
   const [rating,       setRating]       = useState([])
   const [seasons,      setSeasons]      = useState([])
-  const [season,       setSeason]       = useState('')
+  const [season,       setSeason]       = useState(currentSeason)  // текущий спортивный сезон
   const [ratingFilter, setRatingFilter] = useState('all')
   const [loading,      setLoading]      = useState(false)
 
   const h = { Authorization: `Bearer ${token}` }
 
-  useEffect(() => { loadSeasons(); loadRating() }, [])
+  useEffect(() => { loadSeasons(); }, [])
   useEffect(() => { loadRating() }, [season])
 
   const loadSeasons = async () => {
-    try { const r = await fetch(`${API}/competitions/seasons`, { headers: h }); if (r.ok) setSeasons(await r.json()) } catch {}
+    try {
+      const r = await fetch(`${API}/competitions/seasons`, { headers: h })
+      if (r.ok) {
+        const years = await r.json()
+        // Преобразуем годы начала сезонов
+        setSeasons(years)
+        // Если нет данных за текущий сезон — не меняем дефолт
+      }
+    } catch {}
   }
 
   const loadRating = async () => {
     setLoading(true)
     try {
-      const url = season ? `${API}/competitions/rating/overall?season=${season}` : `${API}/competitions/rating/overall`
+      const url = season !== '' ? `${API}/competitions/rating/overall?season=${season}` : `${API}/competitions/rating/overall`
       const r = await fetch(url, { headers: h }); if (r.ok) setRating(await r.json())
     } catch {}
     setLoading(false)
@@ -459,9 +491,9 @@ function RatingTab({ token, myAthleteIds = [] }) {
     <div className="comp-wrap">
       <div className="comp-top">
         <div className="comp-top-left">
-          <select className="att-date-input" value={season} onChange={e => setSeason(e.target.value)} style={{width:'auto'}}>
+          <select className="att-date-input" value={season} onChange={e => setSeason(e.target.value === '' ? '' : Number(e.target.value))} style={{width:'auto'}}>
             <option value="">Все сезоны</option>
-            {seasons.map(s => <option key={s} value={s}>{s}</option>)}
+            {seasons.map(s => <option key={s} value={s}>{seasonLabel(s)}</option>)}
           </select>
         </div>
         <div className="comp-top-right">
@@ -556,7 +588,7 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
   const [compView,       setCompView]       = useState('list')
   const [comps,          setComps]          = useState([])
   const [seasons,        setSeasons]        = useState([])
-  const [season,         setSeason]         = useState('')
+  const [season,         setSeason]         = useState(currentSeason)
   const [detail,         setDetail]         = useState(null)
   const [rows,           setRows]           = useState([])
   const [allAthletes,    setAllAthletes]    = useState([])
@@ -891,9 +923,9 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
       {/* Шапка */}
       <div className="comp-top">
         <div className="comp-top-left">
-          <select className="att-date-input" value={season} onChange={e => setSeason(e.target.value)} style={{ width: 'auto' }}>
+          <select className="att-date-input" value={season} onChange={e => setSeason(e.target.value === '' ? '' : Number(e.target.value))} style={{ width: 'auto' }}>
             <option value="">Все сезоны</option>
-            {seasons.map(s => <option key={s} value={s}>{s}</option>)}
+            {seasons.map(s => <option key={s} value={s}>{seasonLabel(s)}</option>)}
           </select>
           {compView !== 'list' && (
             <button className="att-all-btn" onClick={() => { setCompView('list'); setDetail(null); setMsg('') }}>← К списку</button>
@@ -1464,20 +1496,30 @@ function AchievementsTab({ token, athletes }) {
 function AchievementsLeaderboard({ token }) {
   const [data,    setData]    = useState([])
   const [loading, setLoading] = useState(false)
+  const [season,  setSeason]  = useState(currentSeason)
 
   useEffect(() => {
     setLoading(true)
-    fetch(`${API}/achievements/leaderboard`, { headers: { Authorization: `Bearer ${token}` } })
+    const { start, end } = seasonRange(season)
+    fetch(`${API}/achievements/leaderboard?date_from=${start}&date_to=${end}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [])
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [])
+  }, [season])
 
   if (loading) return <div className="cabinet-loading">Загрузка...</div>
-  if (data.length === 0) return <div className="cabinet-empty">Ачивок пока нет.</div>
 
   return (
-    <div className="athletes-table-wrap">
+    <div>
+      <div style={{marginBottom:12}}>
+        <select className="att-date-input" value={season} onChange={e => setSeason(Number(e.target.value))} style={{width:'auto'}}>
+          {Array.from({length:5},(_,i)=>currentSeason-i).map(y=>(
+            <option key={y} value={y}>{seasonLabel(y)}</option>
+          ))}
+        </select>
+      </div>
+      {data.length === 0 && <div className="cabinet-empty">Ачивок за этот сезон пока нет.</div>}
+      {data.length > 0 && <div className="athletes-table-wrap">
       <table className="athletes-table">
         <thead><tr>
           <th style={{width:50}}>Место</th>
@@ -1498,6 +1540,7 @@ function AchievementsLeaderboard({ token }) {
           ))}
         </tbody>
       </table>
+      </div>}
     </div>
   )
 }
@@ -1520,6 +1563,8 @@ function CampsTab({ token, athletes }) {
   const [showForm, setShowForm] = useState(false)
   const [showAdd,  setShowAdd]  = useState(false)
   const [msg,     setMsg]     = useState('')
+  const [campConfirm, setCampConfirm] = useState(null)
+  const [season, setSeason] = useState(currentSeason)
   const [form, setForm] = useState({ name:'', date_start:'', date_end:'', location:'', price:'', notes:'' })
 
   const h  = { Authorization: `Bearer ${token}` }
@@ -1580,10 +1625,16 @@ function CampsTab({ token, athletes }) {
 
   const deleteCamp = async (id, e) => {
     e.stopPropagation()
-    if (!window.confirm('Удалить сборы?')) return
-    await fetch(`${API}/camps/${id}`, { method: 'DELETE', headers: h })
-    if (detail?.id === id) { setDetail(null); setParts([]) }
-    await loadCamps()
+    setCampConfirm({
+      message: 'Удалить сборы и все данные об участниках?',
+      confirmText: 'Удалить',
+      onConfirm: async () => {
+        setCampConfirm(null)
+        await fetch(`${API}/camps/${id}`, { method: 'DELETE', headers: h })
+        if (detail?.id === id) { setDetail(null); setParts([]) }
+        await loadCamps()
+      }
+    })
   }
 
   const saveParticipants = async () => {
@@ -1664,9 +1715,17 @@ function CampsTab({ token, athletes }) {
 
   return (
     <div className="comp-wrap">
+      {campConfirm && <ConfirmModal message={campConfirm.message} confirmText={campConfirm.confirmText} danger={true} onConfirm={campConfirm.onConfirm} onCancel={() => setCampConfirm(null)}/>}
       <div className="comp-top">
         <div className="comp-top-left">
           {detail && <button className="att-all-btn" onClick={() => { setDetail(null); setParts([]); setMsg('') }}>← К списку</button>}
+          {!detail && (
+            <select className="att-date-input" value={season} onChange={e => setSeason(Number(e.target.value))} style={{width:'auto'}}>
+              {Array.from({length:5},(_,i)=>currentSeason-i).map(y=>(
+                <option key={y} value={y}>{seasonLabel(y)}</option>
+              ))}
+            </select>
+          )}
         </div>
         <div className="comp-top-right">
           {!detail && <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={() => { setShowForm(true); setMsg('') }}>+ Сборы</button>}
@@ -1908,11 +1967,15 @@ function ParentCampsTab({ token, athletes }) {
   const h  = { Authorization: `Bearer ${token}` }
   const hj = { ...h, 'Content-Type': 'application/json' }
 
-  useEffect(() => { loadCamps() }, [])
+  useEffect(() => { loadCamps() }, [season])
 
   const loadCamps = async () => {
     setLoading(true)
-    try { const r = await fetch(`${API}/camps`, { headers: h }); if (r.ok) setCamps(await r.json()) } catch {}
+    try {
+      const { start, end } = seasonRange(season)
+      const r = await fetch(`${API}/camps?date_from=${start}&date_to=${end}`, { headers: h })
+      if (r.ok) setCamps(await r.json())
+    } catch {}
     setLoading(false)
   }
 
@@ -2011,18 +2074,20 @@ function CertificationTab({ token, athletes }) {
   const [showForm,    setShowForm]    = useState(false)
   const [showAdd,     setShowAdd]     = useState(false)
   const [msg,         setMsg]         = useState('')
-  const [confirm,     setConfirm]     = useState(null)  // { message, onConfirm, confirmText, danger }
+  const [confirm,     setConfirm]     = useState(null)
+  const [season,      setSeason]      = useState(currentSeason)
   const [form, setForm] = useState({ name: '', date: '', location: '', notes: '' })
 
   const h  = { Authorization: `Bearer ${token}` }
   const hj = { ...h, 'Content-Type': 'application/json' }
 
-  useEffect(() => { loadCerts() }, [])
+  useEffect(() => { loadCerts() }, [season])
 
   const loadCerts = async () => {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/certifications`, { headers: h })
+      const { start, end } = seasonRange(season)
+      const r = await fetch(`${API}/certifications?date_from=${start}&date_to=${end}`, { headers: h })
       if (r.ok) setCerts(await r.json())
     } catch {}
     setLoading(false)
@@ -2143,6 +2208,13 @@ function CertificationTab({ token, athletes }) {
       <div className="comp-top">
         <div className="comp-top-left">
           {detail && <button className="att-all-btn" onClick={() => { setDetail(null); setRows([]); setMsg('') }}>← К списку</button>}
+          {!detail && (
+            <select className="att-date-input" value={season} onChange={e => setSeason(Number(e.target.value))} style={{width:'auto'}}>
+              {Array.from({length:5},(_,i)=>currentSeason-i).map(y=>(
+                <option key={y} value={y}>{seasonLabel(y)}</option>
+              ))}
+            </select>
+          )}
         </div>
         <div className="comp-top-right">
           {!detail && <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={() => { setShowForm(true); setMsg('') }}>+ Аттестация</button>}
@@ -2516,8 +2588,34 @@ export default function Cabinet() {
     loadAthletes()
   }
 
+  const [archiveAthleteModal, setArchiveAthleteModal] = useState(null) // { athlete_id, parent_name, user_id }
+
   const archiveAthlete = async (id) => {
-    await fetch(`${API}/users/athletes/${id}/archive`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
+    // Сначала проверяем — есть ли другие дети у родителя
+    const athlete = athletes.find(a => a.id === id)
+    if (!athlete) return
+    const siblings = athletes.filter(a => a.user_id === athlete.user_id && a.id !== id && !a.is_archived)
+    // Показываем модал с вопросом об архивировании родителя
+    setArchiveAthleteModal({
+      athlete_id: id,
+      athlete_name: athlete.full_name,
+      user_id: athlete.user_id,
+      parent_name: athlete.parent_name,
+      has_siblings: siblings.length > 0,
+    })
+  }
+
+  const doArchiveAthlete = async (athlete_id, also_archive_parent) => {
+    setArchiveAthleteModal(null)
+    await fetch(`${API}/users/athletes/${athlete_id}/archive`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
+    if (also_archive_parent) {
+      const athlete = athletes.find(a => a.id === athlete_id)
+      if (athlete) await fetch(`${API}/users/parents/${athlete.user_id}/archive`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archive_children: false })
+      })
+    }
     loadAthletes()
   }
 
@@ -2783,7 +2881,34 @@ export default function Cabinet() {
 
         {/* ── Спортсмены ── */}
         {view === 'athletes' && (
-          <div className="athletes-table-wrap">
+          <div>
+            {archiveAthleteModal && (
+              <div className="modal-overlay" onClick={() => setArchiveAthleteModal(null)}>
+                <div className="modal-box" onClick={e => e.stopPropagation()} style={{maxWidth:420}}>
+                  <h3 style={{marginBottom:12}}>Архивировать спортсмена?</h3>
+                  <p style={{color:'var(--white)', marginBottom:8, fontSize:'0.9rem'}}>
+                    {archiveAthleteModal.athlete_name}
+                  </p>
+                  {!archiveAthleteModal.has_siblings && (
+                    <p style={{color:'var(--gray)', marginBottom:12, fontSize:'0.85rem'}}>
+                      Это единственный ребёнок у родителя {archiveAthleteModal.parent_name}. Заблокировать его кабинет?
+                    </p>
+                  )}
+                  <div style={{display:'flex', gap:8, marginTop:16, flexWrap:'wrap'}}>
+                    {!archiveAthleteModal.has_siblings ? (
+                      <>
+                        <button className="btn-primary" style={{padding:'8px 16px', fontSize:'13px'}} onClick={() => doArchiveAthlete(archiveAthleteModal.athlete_id, true)}>Архивировать с родителем</button>
+                        <button className="btn-outline" style={{padding:'8px 16px', fontSize:'13px'}} onClick={() => doArchiveAthlete(archiveAthleteModal.athlete_id, false)}>Только спортсмена</button>
+                      </>
+                    ) : (
+                      <button className="btn-primary" style={{padding:'8px 16px', fontSize:'13px'}} onClick={() => doArchiveAthlete(archiveAthleteModal.athlete_id, false)}>В архив</button>
+                    )}
+                    <button className="btn-outline" style={{padding:'8px 16px', fontSize:'13px'}} onClick={() => setArchiveAthleteModal(null)}>Отмена</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="athletes-table-wrap">
             <table className="athletes-table">
               <thead>
                 <tr>
@@ -2848,6 +2973,7 @@ export default function Cabinet() {
             </table>
             {sortedAthletes.length === 0 && !loading && <div className="cabinet-empty">Спортсменов не найдено</div>}
           </div>
+          </div>
         )}
 
         {/* ── Родители ── */}
@@ -2855,18 +2981,18 @@ export default function Cabinet() {
           <div>
             {archiveParentModal && (
               <div className="modal-overlay" onClick={() => setArchiveParentModal(null)}>
-                <div className="modal-box" onClick={e => e.stopPropagation()}>
-                  <h3>Архивировать детей?</h3>
-                  <p style={{color:'var(--gray)', marginBottom:16}}>
+                <div className="modal-box" onClick={e => e.stopPropagation()} style={{maxWidth:420}}>
+                  <h3 style={{marginBottom:12}}>Архивировать детей?</h3>
+                  <p style={{color:'var(--gray)', marginBottom:12, fontSize:'0.9rem'}}>
                     Вместе с родителем в архив перейдут:
                   </p>
                   {archiveParentModal.children.map(c => (
-                    <div key={c.id} style={{color:'var(--white)', marginBottom:4}}>— {c.full_name}</div>
+                    <div key={c.id} style={{color:'var(--white)', marginBottom:4, fontSize:'0.9rem'}}>— {c.full_name}</div>
                   ))}
-                  <div className="modal-btns-row" style={{marginTop:16}}>
-                    <button className="btn-primary" onClick={() => archiveParent(archiveParentModal.user_id, true)}>Архивировать с детьми</button>
-                    <button className="btn-outline" onClick={() => archiveParent(archiveParentModal.user_id, false)}>Только родителя</button>
-                    <button className="btn-outline" onClick={() => setArchiveParentModal(null)}>Отмена</button>
+                  <div style={{display:'flex', gap:8, marginTop:16, flexWrap:'wrap'}}>
+                    <button className="btn-primary" style={{padding:'8px 16px', fontSize:'13px'}} onClick={() => archiveParent(archiveParentModal.user_id, true)}>С детьми</button>
+                    <button className="btn-outline" style={{padding:'8px 16px', fontSize:'13px'}} onClick={() => archiveParent(archiveParentModal.user_id, false)}>Только родителя</button>
+                    <button className="btn-outline" style={{padding:'8px 16px', fontSize:'13px'}} onClick={() => setArchiveParentModal(null)}>Отмена</button>
                   </div>
                 </div>
               </div>

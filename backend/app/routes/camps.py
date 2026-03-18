@@ -69,8 +69,16 @@ def create_camp(data: CampCreate, db: Session = Depends(get_db), user: User = De
 
 
 @router.get("")
-def list_camps(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    camps = db.query(Camp).order_by(Camp.date_start.desc()).all()
+def list_camps(
+    date_from: Optional[str] = None,
+    date_to:   Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user)
+):
+    q = db.query(Camp).order_by(Camp.date_start.desc())
+    if date_from: q = q.filter(Camp.date_start >= date_from)
+    if date_to:   q = q.filter(Camp.date_start <= date_to)
+    camps = q.all()
     return [_camp_out(c) for c in camps]
 
 

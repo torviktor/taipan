@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional
+from typing import Optional
 from datetime import date
 
 from app.core.database import get_db
@@ -83,14 +84,20 @@ def mark_seen(athlete_id: int, db: Session = Depends(get_db), _: User = Depends(
 # ── Общий рейтинг по ачивкам (для админа) ────────────────────────────────────
 
 @router.get("/leaderboard")
-def leaderboard(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    rows = (
-        db.query(Athlete, func.count(AthleteAchievement.id).label("count"))
+def leaderboard(
+    date_from: Optional[str] = None,
+    date_to:   Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user)
+):
+    from datetime import datetime
+    q = db.query(Athlete, func.count(AthleteAchievement.id).label("count")) \
         .join(AthleteAchievement, AthleteAchievement.athlete_id == Athlete.id)
-        .group_by(Athlete.id)
-        .order_by(func.count(AthleteAchievement.id).desc())
-        .all()
-    )
+    if date_from:
+        q = q.filter(AthleteAchievement.granted_at >= date_from)
+    if date_to:
+        q = q.filter(AthleteAchievement.granted_at <= date_to + ' 23:59:59')
+    rows = q.group_by(Athlete.id).order_by(func.count(AthleteAchievement.id).desc()).all()
     result = []
     for i, (a, cnt) in enumerate(rows):
         # Считаем легендарные отдельно для тай-брейка

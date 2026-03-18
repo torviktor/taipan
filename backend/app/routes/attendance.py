@@ -58,13 +58,19 @@ def create_session(data: SessionCreate, db: Session = Depends(get_db), _=Depends
 @router.get("/sessions")
 def get_sessions(
     group_name: Optional[str] = None,
-    limit: int = 30,
+    limit: int = 300,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     db: Session = Depends(get_db),
     _=Depends(require_admin)
 ):
     q = db.query(TrainingSession)
     if group_name:
         q = q.filter(TrainingSession.group_name == group_name)
+    if date_from:
+        q = q.filter(TrainingSession.date >= date_from)
+    if date_to:
+        q = q.filter(TrainingSession.date <= date_to)
     sessions = q.order_by(TrainingSession.date.desc()).limit(limit).all()
     return [
         {
