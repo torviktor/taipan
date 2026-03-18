@@ -82,8 +82,9 @@ def get_cert_seasons(db: Session = Depends(get_db), _: User = Depends(get_curren
 
 
 @router.get("")
+def list_certifications(
     date_from: Optional[str] = None,
-    date_to:   Optional[str] = None,
+    date_to: Optional[str] = None,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user)
 ):
@@ -201,7 +202,6 @@ def finalize_certification(
 
     cert.status = CertificationStatus.completed
     db.commit()
-    # Автоначисление ачивок за аттестацию
     try:
         from app.routes.achievements import auto_grant
         for r in results:
@@ -337,19 +337,15 @@ def respond_notification(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Ответить на опрос прямо из уведомления — еду/не еду."""
     n = db.query(Notification).filter(
         Notification.id == notif_id,
         Notification.user_id == current_user.id
     ).first()
     if not n: raise HTTPException(404)
-
     n.response = "going" if going else "not_going"
-    n.is_read  = True
+    n.is_read = True
     db.commit()
-
-    # Если сборы — обновляем статус участника
-    if getattr(n, 'link_type', None) == "camp" and n.link_id:
+    if getattr(n, "link_type", None) == "camp" and n.link_id:
         try:
             from app.models.camp import CampParticipant
             from app.models.user import Athlete as AthleteModel
@@ -364,12 +360,8 @@ def respond_notification(
             db.commit()
         except Exception as e:
             print(f"Camp respond error: {e}")
-
-    # Если соревнование — обновляем статус в результатах
-    if getattr(n, 'link_type', None) == "competition" and n.link_id:
+    if getattr(n, "link_type", None) == "competition" and n.link_id:
         try:
-            import httpx, os
-            # Вызываем роут соревнований напрямую через DB
             from app.models.competition import CompetitionResult
             from app.models.user import Athlete as AthleteModel
             athletes = db.query(AthleteModel).filter(AthleteModel.user_id == current_user.id).all()
@@ -383,7 +375,6 @@ def respond_notification(
             db.commit()
         except Exception as e:
             print(f"Competition respond error: {e}")
-
     return {"ok": True, "response": n.response}
 
 
@@ -416,7 +407,7 @@ def _result_out(r):
         "target_gup":       r.target_gup,
         "target_dan":       r.target_dan,
         "passed":           r.passed,
-        "paid":             r.paid,
+        "paid":             getattr(r, "paid", False),
     }
 
 
@@ -428,8 +419,8 @@ def _notif_out(n):
         "body":       n.body,
         "is_read":    n.is_read,
         "link_id":    n.link_id,
-        "link_type":  getattr(n, 'link_type', None),
-        "response":   getattr(n, 'response', None),
+        "link_type":  getattr(n, "link_type", None),
+        "response":   getattr(n, "response", None),
         "created_at": str(n.created_at),
     }
 
