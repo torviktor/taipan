@@ -405,7 +405,7 @@ function ParentAttendanceTab({ token, athletes }) {
 function RatingTab({ token, myAthleteIds = [] }) {
   const [rating,       setRating]       = useState([])
   const [seasons,      setSeasons]      = useState([])
-  const [season,       setSeason]       = useState(currentSeason)  // текущий спортивный сезон
+  const [season,       setSeason]       = useState('')  // текущий спортивный сезон
   const [ratingFilter, setRatingFilter] = useState('all')
   const [loading,      setLoading]      = useState(false)
 
@@ -419,9 +419,10 @@ function RatingTab({ token, myAthleteIds = [] }) {
       const r = await fetch(`${API}/competitions/seasons`, { headers: h })
       if (r.ok) {
         const years = await r.json()
-        // Преобразуем годы начала сезонов
         setSeasons(years)
-        // Если нет данных за текущий сезон — не меняем дефолт
+        // Устанавливаем текущий сезон если он есть в списке, иначе первый доступный
+        if (years.includes(currentSeason)) setSeason(currentSeason)
+        else if (years.length > 0) setSeason(years[0])
       }
     } catch {}
   }
@@ -598,7 +599,7 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
   const [compView,       setCompView]       = useState('list')
   const [comps,          setComps]          = useState([])
   const [seasons,        setSeasons]        = useState([])
-  const [season,         setSeason]         = useState(currentSeason)
+  const [season,         setSeason]         = useState('')
   const [detail,         setDetail]         = useState(null)
   const [rows,           setRows]           = useState([])
   const [allAthletes,    setAllAthletes]    = useState([])
@@ -642,7 +643,15 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
   }, [compView, detail?.id])
 
   const loadSeasons = async () => {
-    try { const r = await fetch(`${API}/competitions/seasons`, { headers: h }); if (r.ok) setSeasons(await r.json()) } catch {}
+    try {
+      const r = await fetch(`${API}/competitions/seasons`, { headers: h })
+      if (r.ok) {
+        const years = await r.json()
+        setSeasons(years)
+        if (years.includes(currentSeason)) setSeason(currentSeason)
+        else if (years.length > 0) setSeason(years[0])
+      }
+    } catch {}
   }
 
   const loadComps = async () => {

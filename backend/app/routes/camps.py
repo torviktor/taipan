@@ -79,6 +79,7 @@ def get_camp_seasons(db: Session = Depends(get_db), _: User = Depends(get_curren
 
 
 @router.get("")
+def list_camps(
     date_from: Optional[str] = None,
     date_to:   Optional[str] = None,
     db: Session = Depends(get_db),
