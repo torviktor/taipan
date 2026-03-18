@@ -18,10 +18,13 @@ const seasonLabel = (y) => `${y}/${y+1}`
 const currentSeason = getSeason()
 const currentSeasonLabel = seasonLabel(currentSeason)
 // Диапазон дат сезона
-const seasonRange = (y) => ({
-  start: `${y}-09-01`,
-  end:   `${y+1}-08-31`
-})
+const seasonRange = (y) => {
+  if (!y && y !== 0) return { start: '2000-01-01', end: '2099-12-31' }
+  return {
+    start: `${y}-09-01`,
+    end:   `${y+1}-08-31`
+  }
+}
 
 const GROUPS = ['Младшая группа (6–10 лет)', 'Старшая группа (11+)', 'Взрослые (18+)']
 
@@ -1523,17 +1526,25 @@ function AchievementsLeaderboard({ token }) {
   const [seasons, setSeasons] = useState([currentSeason])
 
   useEffect(() => {
-    // Загружаем доступные сезоны из соревнований (ачивки связаны с активностью)
+    // Загружаем доступные сезоны из соревнований
     fetch(`${API}/competitions/seasons`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [currentSeason])
-      .then(s => setSeasons(s.length ? s : [currentSeason]))
+      .then(s => {
+        const list = s.length ? s : [currentSeason]
+        setSeasons(list)
+        // Устанавливаем текущий сезон если есть, иначе первый
+        if (list.includes(currentSeason)) setSeason(currentSeason)
+        else setSeason(list[0])
+      })
       .catch(() => {})
   }, [])
 
   useEffect(() => {
     setLoading(true)
-    const { start, end } = seasonRange(season)
-    fetch(`${API}/achievements/leaderboard?date_from=${start}&date_to=${end}`, { headers: { Authorization: `Bearer ${token}` } })
+    const url = season !== ''
+      ? (() => { const {start,end} = seasonRange(season); return `${API}/achievements/leaderboard?date_from=${start}&date_to=${end}` })()
+      : `${API}/achievements/leaderboard`
+    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [])
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
