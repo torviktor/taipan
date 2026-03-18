@@ -406,15 +406,18 @@ function ParentAttendanceTab({ token, athletes }) {
           {a.monthly && a.monthly.length > 0 && (
             <div style={{ marginTop:12 }}>
               <div style={{ fontSize:'0.78rem', color:'var(--gray)', marginBottom:6 }}>По месяцам:</div>
-              {a.monthly.map((m, i) => (
-                <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'4px 0', fontSize:'0.84rem' }}>
-                  <span style={{ color:'var(--gray)', minWidth:60 }}>{m.month}</span>
-                  <div style={{ flex:1, height:6, background:'var(--gray-dim)', borderRadius:3, overflow:'hidden' }}>
-                    <div style={{ height:'100%', width: m.total ? `${Math.round(m.present/m.total*100)}%` : '0%', background:'var(--red)', borderRadius:3 }}/>
-                  </div>
-                  <span style={{ color:'var(--white)', minWidth:50, textAlign:'right' }}>{m.present}/{m.total}</span>
-                </div>
-              ))}
+                  {a.monthly.map((m, i) => {
+                    const pct = m.total ? Math.round(m.present/m.total*100) : 0
+                    return (
+                    <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'4px 0', fontSize:'0.84rem' }}>
+                      <span style={{ color:'var(--gray)', minWidth:60 }}>{m.month}</span>
+                      <div style={{ flex:1, height:6, background:'var(--gray-dim)', borderRadius:3, overflow:'hidden' }}>
+                        <div style={{ height:'100%', width: pct+'%', background:'var(--red)', borderRadius:3 }}/>
+                      </div>
+                      <span style={{ color:'var(--white)', minWidth:50, textAlign:'right' }}>{m.present}/{m.total}</span>
+                    </div>
+                    )
+                  })}
             </div>
           )}
         </div>
