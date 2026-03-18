@@ -423,7 +423,6 @@ function ParentAttendanceTab({ token, athletes }) {
         </div>
       ))}
     </div>
-    </div>
   )
 }
 
