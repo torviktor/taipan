@@ -2511,8 +2511,18 @@ export default function Cabinet() {
   }
 
   const deleteAthlete = async (id) => {
-    if (!window.confirm('Удалить спортсмена из базы?')) return
+    if (!window.confirm('Удалить спортсмена из базы безвозвратно?')) return
     await fetch(`${API}/users/athletes/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+    loadAthletes()
+  }
+
+  const archiveAthlete = async (id) => {
+    await fetch(`${API}/users/athletes/${id}/archive`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
+    loadAthletes()
+  }
+
+  const restoreAthlete = async (id) => {
+    await fetch(`${API}/users/athletes/${id}/restore`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
     loadAthletes()
   }
 
@@ -2530,6 +2540,7 @@ export default function Cabinet() {
   const uniqueParents = useMemo(() => [...new Set(athletes.map(a => a.parent_name).filter(Boolean))].sort((a,b) => a.localeCompare(b,'ru')), [athletes])
 
   const filteredAthletes = useMemo(() => athletes.filter(a => {
+    if (a.is_archived) return false  // архивных не показываем в основном списке
     const s = search.toLowerCase()
     if (s && !a.full_name.toLowerCase().includes(s) && !(a.parent_name||'').toLowerCase().includes(s)) return false
     if (cf.gender && a.gender !== cf.gender) return false
@@ -2652,25 +2663,35 @@ export default function Cabinet() {
           <button className="btn-outline cabinet-logout" onClick={logout}>Выйти</button>
         </div>
 
-        {/* п.5 — вкладка Соревнования кликабельна, сбрасывает состояние */}
-        <div className="cabinet-tabs">
-          <button className={`cabinet-tab ${view==='athletes'?'active':''}`} onClick={() => setView('athletes')}>Спортсмены ({athletes.length})</button>
-          <button className={`cabinet-tab ${view==='parents'?'active':''}`} onClick={() => setView('parents')}>Родители ({parents.length})</button>
-          <button className={`cabinet-tab ${view==='applications'?'active':''}`} onClick={() => setView('applications')}>
-            Заявки
-            {applications.filter(a => a.status==='new').length > 0 && (
-              <span className="tab-badge">{applications.filter(a => a.status==='new').length}</span>
-            )}
-          </button>
-          <button className={`cabinet-tab ${view==='attendance'?'active':''}`} onClick={() => setView('attendance')}>Журнал посещаемости</button>
-          <button className={`cabinet-tab ${view==='competitions'?'active':''}`}  onClick={() => setView('competitions')}>Соревнования</button>
-          <button className={`cabinet-tab ${view==='rating'?'active':''}`}        onClick={() => setView('rating')}>Рейтинг</button>
-          <button className={`cabinet-tab ${view==='certification'?'active':''}`} onClick={() => setView('certification')}>Аттестация</button>
-          <button className={`cabinet-tab ${view==='achievements'?'active':''}`}  onClick={() => setView('achievements')}>Ачивки</button>
-          <button className={`cabinet-tab ${view==='camps'?'active':''}`}         onClick={() => setView('camps')}>Сборы</button>
+        {/* Сгруппированные вкладки */}
+        <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:16 }}>
+          {/* Люди */}
+          <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
+            <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.68rem', letterSpacing:'0.1em', color:'var(--gray)', textTransform:'uppercase', minWidth:80, paddingRight:6, borderRight:'1px solid var(--gray-dim)' }}>Люди</span>
+            <button className={`cabinet-tab ${view==='athletes'?'active':''}`} onClick={() => setView('athletes')}>Спортсмены ({athletes.filter(a=>!a.is_archived).length})</button>
+            <button className={`cabinet-tab ${view==='parents'?'active':''}`} onClick={() => setView('parents')}>Родители ({parents.length})</button>
+            <button className={`cabinet-tab ${view==='applications'?'active':''}`} onClick={() => setView('applications')}>
+              Заявки{applications.filter(a => a.status==='new').length > 0 && <span className="tab-badge">{applications.filter(a => a.status==='new').length}</span>}
+            </button>
+            <button className={`cabinet-tab ${view==='archive'?'active':''}`} style={{ color: view==='archive' ? undefined : 'var(--gray)' }} onClick={() => setView('archive')}>Архив ({athletes.filter(a=>a.is_archived).length})</button>
+          </div>
+          {/* События */}
+          <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
+            <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.68rem', letterSpacing:'0.1em', color:'var(--gray)', textTransform:'uppercase', minWidth:80, paddingRight:6, borderRight:'1px solid var(--gray-dim)' }}>События</span>
+            <button className={`cabinet-tab ${view==='attendance'?'active':''}`} onClick={() => setView('attendance')}>Журнал посещаемости</button>
+            <button className={`cabinet-tab ${view==='competitions'?'active':''}`} onClick={() => setView('competitions')}>Соревнования</button>
+            <button className={`cabinet-tab ${view==='certification'?'active':''}`} onClick={() => setView('certification')}>Аттестация</button>
+            <button className={`cabinet-tab ${view==='camps'?'active':''}`} onClick={() => setView('camps')}>Сборы</button>
+          </div>
+          {/* Результаты */}
+          <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
+            <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.68rem', letterSpacing:'0.1em', color:'var(--gray)', textTransform:'uppercase', minWidth:80, paddingRight:6, borderRight:'1px solid var(--gray-dim)' }}>Результаты</span>
+            <button className={`cabinet-tab ${view==='rating'?'active':''}`} onClick={() => setView('rating')}>Рейтинг</button>
+            <button className={`cabinet-tab ${view==='achievements'?'active':''}`} onClick={() => setView('achievements')}>Ачивки</button>
+          </div>
         </div>
 
-        {view !== 'attendance' && view !== 'competitions' && view !== 'rating' && view !== 'certification' && view !== 'achievements' && view !== 'camps' && (
+        {view !== 'attendance' && view !== 'competitions' && view !== 'rating' && view !== 'certification' && view !== 'achievements' && view !== 'camps' && view !== 'archive' && (
           <div className="cabinet-toolbar">
             <div className="cabinet-search">
               <input type="text" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} />
@@ -2684,12 +2705,47 @@ export default function Cabinet() {
 
         {loading && <div className="cabinet-loading">Загрузка...</div>}
 
-        {view === 'attendance'   && <AttendanceTab    token={token} athletes={athletes} />}
-        {view === 'competitions' && <CompetitionsTab  token={token} athletes={athletes} />}
+        {view === 'attendance'   && <AttendanceTab    token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
+        {view === 'competitions' && <CompetitionsTab  token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'rating'        && <RatingTab        token={token} />}
-        {view === 'certification' && <CertificationTab token={token} athletes={athletes} />}
+        {view === 'certification' && <CertificationTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'achievements'  && <AchievementsLeaderboard token={token} />}
-        {view === 'camps'         && <CampsTab token={token} athletes={athletes} />}
+        {view === 'camps'         && <CampsTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
+        {view === 'archive'       && (
+          <div>
+            <div style={{ marginBottom:16, color:'var(--gray)', fontSize:'0.9rem' }}>
+              Архивные спортсмены не отображаются в посещаемости, соревнованиях и рейтинге.
+            </div>
+            {athletes.filter(a => a.is_archived).length === 0
+              ? <div className="cabinet-empty">Архив пуст.</div>
+              : <div className="athletes-table-wrap">
+                  <table className="athletes-table">
+                    <thead><tr>
+                      <th style={{textAlign:'left'}}>Спортсмен</th>
+                      <th>Группа</th>
+                      <th>Возраст</th>
+                      <th>Гып/Дан</th>
+                      <th></th>
+                    </tr></thead>
+                    <tbody>
+                      {athletes.filter(a => a.is_archived).map(a => (
+                        <tr key={a.id} style={{ opacity:0.7 }}>
+                          <td className="td-name">{a.full_name}</td>
+                          <td>{a.group||'—'}</td>
+                          <td>{a.age} лет</td>
+                          <td>{a.dan ? `${a.dan} дан` : a.gup === 0 ? 'Без пояса' : a.gup ? `${a.gup} гып` : '—'}</td>
+                          <td>
+                            <button className="td-btn td-btn-edit" onClick={() => restoreAthlete(a.id)}>Восстановить</button>
+                            <button className="td-btn td-btn-del" onClick={() => deleteAthlete(a.id)}>Удал.</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+            }
+          </div>
+        )}
 
         {/* ── Спортсмены ── */}
         {view === 'athletes' && (
@@ -2749,7 +2805,7 @@ export default function Cabinet() {
                       {editing === a.id ? (
                         <><button className="td-btn td-btn-save" onClick={() => saveEdit(a.id)}>✓</button><button className="td-btn td-btn-cancel" onClick={() => setEditing(null)}>✕</button></>
                       ) : (
-                        <><button className="td-btn td-btn-edit" onClick={() => startEdit(a)}>Ред.</button><button className="td-btn td-btn-del" onClick={() => deleteAthlete(a.id)}>Удал.</button></>
+                        <><button className="td-btn td-btn-edit" onClick={() => startEdit(a)}>Ред.</button><button className="td-btn" style={{color:'var(--gray)',border:'1px solid var(--gray-dim)'}} onClick={() => archiveAthlete(a.id)}>В архив</button><button className="td-btn td-btn-del" onClick={() => deleteAthlete(a.id)}>Удал.</button></>
                       )}
                     </td>
                   </tr>

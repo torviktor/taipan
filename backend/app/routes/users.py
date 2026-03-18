@@ -34,6 +34,7 @@ class AthleteOut(BaseModel):
     auto_group:   Optional[str]
     parent_name:  Optional[str]
     parent_phone: Optional[str]
+    is_archived:  bool = False
     class Config:
         from_attributes = True
 
@@ -47,18 +48,19 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 # ─── Вспомогательная функция ──────────────────────────────────────────────────
-def build_athlete_out(a: Athlete) -> AthleteOut:
+def build_athlete_out(a: Athlete) -> dict:
     today = date.today()
     b = a.birth_date
     age = today.year - b.year - ((today.month, today.day) < (b.month, b.day))
-    return AthleteOut(
-        id=a.id, user_id=a.user_id, full_name=a.full_name,
-        birth_date=a.birth_date, gender=a.gender,
-        gup=a.gup, dan=a.dan,
-        weight=float(a.weight) if a.weight else None,
-        group=a.group, age=age, auto_group=a.auto_group,
-        parent_name=a.user.full_name, parent_phone=a.user.phone,
-    )
+    return {
+        "id": a.id, "user_id": a.user_id, "full_name": a.full_name,
+        "birth_date": str(a.birth_date), "gender": a.gender,
+        "gup": a.gup, "dan": a.dan,
+        "weight": float(a.weight) if a.weight else None,
+        "group": a.group, "age": age, "auto_group": a.auto_group,
+        "parent_name": a.user.full_name, "parent_phone": a.user.phone,
+        "is_archived": bool(getattr(a, 'is_archived', False)),
+    }
 
 # ─── Мой профиль ──────────────────────────────────────────────────────────────
 @router.get("/me", response_model=UserOut)
@@ -66,14 +68,15 @@ def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 # ─── МОИ спортсмены — только свои дети текущего пользователя ─────────────────
-# Этот роут используется в личном кабинете родителя.
-# Возвращает только спортсменов привязанных к текущему аккаунту.
-@router.get("/my-athletes", response_model=List[AthleteOut])
+@router.get("/my-athletes")
 def get_my_athletes(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    athletes = db.query(Athlete).filter(Athlete.user_id == current_user.id).all()
+    athletes = db.query(Athlete).filter(
+        Athlete.user_id == current_user.id,
+        Athlete.is_archived == False
+    ).all()
     return [build_athlete_out(a) for a in athletes]
 
 # ─── Все пользователи (только admin/manager) ──────────────────────────────────
@@ -82,13 +85,13 @@ def get_all_users(db: Session = Depends(get_db), _: User = Depends(require_manag
     return db.query(User).order_by(User.created_at.desc()).all()
 
 # ─── Все спортсмены (только admin/manager) ────────────────────────────────────
-@router.get("/athletes", response_model=List[AthleteOut])
+@router.get("/athletes")
 def get_athletes(db: Session = Depends(get_db), _: User = Depends(require_manager)):
     athletes = db.query(Athlete).join(User, Athlete.user_id == User.id).all()
     return [build_athlete_out(a) for a in athletes]
 
 # ─── Обновить спортсмена (только admin/manager) ───────────────────────────────
-@router.patch("/athletes/{athlete_id}", response_model=AthleteOut)
+@router.patch("/athletes/{athlete_id}")
 def update_athlete(
     athlete_id: int, data: AthleteUpdate,
     db: Session = Depends(get_db), _: User = Depends(require_manager)
@@ -104,7 +107,35 @@ def update_athlete(
     db.refresh(a)
     return build_athlete_out(a)
 
-# ─── Удалить спортсмена (только admin/manager) ────────────────────────────────
+# ─── Архивировать спортсмена ──────────────────────────────────────────────────
+@router.patch("/athletes/{athlete_id}/archive")
+def archive_athlete(
+    athlete_id: int,
+    db: Session = Depends(get_db), _: User = Depends(require_manager)
+):
+    a = db.query(Athlete).filter(Athlete.id == athlete_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Спортсмен не найден")
+    a.is_archived = True
+    a.archived_at = datetime.utcnow()
+    db.commit()
+    return {"ok": True}
+
+# ─── Восстановить из архива ───────────────────────────────────────────────────
+@router.patch("/athletes/{athlete_id}/restore")
+def restore_athlete(
+    athlete_id: int,
+    db: Session = Depends(get_db), _: User = Depends(require_manager)
+):
+    a = db.query(Athlete).filter(Athlete.id == athlete_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Спортсмен не найден")
+    a.is_archived = False
+    a.archived_at = None
+    db.commit()
+    return {"ok": True}
+
+# ─── Удалить спортсмена безвозвратно (только admin/manager) ──────────────────
 @router.delete("/athletes/{athlete_id}")
 def delete_athlete(
     athlete_id: int,

@@ -48,6 +48,8 @@ class Athlete(Base):
 
     weight       = Column(Numeric(5, 2), nullable=True)
     group        = Column(String(100), nullable=True)
+    is_archived  = Column(Boolean, default=False, nullable=False)
+    archived_at  = Column(DateTime, nullable=True)
 
     created_at   = Column(DateTime, default=datetime.utcnow)
     updated_at   = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
