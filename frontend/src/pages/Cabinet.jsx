@@ -2506,8 +2506,10 @@ function CertificationTab({ token, athletes }) {
 // ── УВЕДОМЛЕНИЯ ───────────────────────────────────────────────────────────────
 
 function NotificationsTab({ token }) {
-  const [notifs,  setNotifs]  = useState([])
-  const [loading, setLoading] = useState(false)
+  const [notifs,   setNotifs]   = useState([])
+  const [loading,  setLoading]  = useState(false)
+  const [showAll,  setShowAll]  = useState(false)
+  const LIMIT = 10
 
   useEffect(() => { loadNotifs() }, [])
 
@@ -2549,12 +2551,15 @@ function NotificationsTab({ token }) {
     return                            { text: 'INFO',    color: 'var(--gray)', bg: 'var(--dark)' }
   }
   const unreadCount = notifs.filter(n => !n.is_read).length
+  const visibleNotifs = showAll ? notifs : notifs.slice(0, LIMIT)
+  const hiddenCount = notifs.length - LIMIT
 
   return (
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, flexWrap:'wrap', gap:10 }}>
         <span style={{ color:'var(--gray)', fontSize:'0.9rem' }}>
           {unreadCount > 0 ? `Непрочитанных: ${unreadCount}` : 'Все уведомления прочитаны'}
+          {notifs.length > 0 && <span style={{marginLeft:8, opacity:0.5}}>· Всего: {notifs.length}</span>}
         </span>
         {unreadCount > 0 && <button className="att-all-btn" onClick={markAllRead}>Прочитать все</button>}
       </div>
@@ -2562,7 +2567,7 @@ function NotificationsTab({ token }) {
       {loading && <div className="cabinet-loading">Загрузка...</div>}
       {!loading && notifs.length === 0 && <div className="cabinet-empty">Уведомлений пока нет.</div>}
 
-      {notifs.map(n => (
+      {visibleNotifs.map(n => (
         <div key={n.id}
           style={{
             background: n.is_read ? 'var(--dark2)' : '#1a1500',
@@ -2608,6 +2613,19 @@ function NotificationsTab({ token }) {
           )}
         </div>
       ))}
+
+      {hiddenCount > 0 && !showAll && (
+        <button className="att-all-btn" style={{width:'100%', marginTop:8, textAlign:'center'}}
+          onClick={() => setShowAll(true)}>
+          Показать ещё {hiddenCount} уведомлений
+        </button>
+      )}
+      {showAll && notifs.length > LIMIT && (
+        <button className="att-all-btn" style={{width:'100%', marginTop:8, textAlign:'center'}}
+          onClick={() => setShowAll(false)}>
+          Свернуть
+        </button>
+      )}
     </div>
   )
 }
