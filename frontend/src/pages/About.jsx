@@ -1,5 +1,19 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import './About.css'
+
+function useImageFadeIn(ref) {
+  useEffect(() => {
+    if (!ref.current) return
+    const imgs = ref.current.querySelectorAll('img')
+    imgs.forEach(img => {
+      if (img.complete) {
+        img.classList.add('loaded')
+      } else {
+        img.onload = () => img.classList.add('loaded')
+      }
+    })
+  })
+}
 
 const SECTIONS = [
   { id: 'about',       title: 'О НАС' },
@@ -503,6 +517,7 @@ family: (
 export default function About() {
   const [active, setActive] = useState('about')
   const contentRef = useRef(null)
+  useImageFadeIn(contentRef)
 
   const switchSection = (id) => {
     setActive(id)
