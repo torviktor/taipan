@@ -68,8 +68,14 @@ export default function Champions() {
                     : null
 
                 return (
-                  <div key={item.id} className={`champion-card champion-card--dynamic`}>
+                  <div key={item.id} className={`champion-card champion-card--dynamic`} style={{
+                    border: item.is_featured ? '2px solid #c8962a' : undefined,
+                    boxShadow: item.is_featured ? '0 0 20px rgba(200,150,42,0.35)' : undefined,
+                  }}>
                     <div className="champion-img-wrap">
+                      {item.is_featured && (
+                        <div style={{position:'absolute', top:10, left:10, zIndex:2, background:'#c8962a', borderRadius:'50%', width:28, height:28, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', boxShadow:'0 2px 8px rgba(0,0,0,0.5)'}}>★</div>
+                      )}
                       {item.photo_url ? (
                         <img src={item.photo_url} alt={item.full_name} className="champion-img"/>
                       ) : (

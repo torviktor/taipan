@@ -22,13 +22,15 @@ class HofCreate(BaseModel):
     gup:          Optional[int] = None
     dan:          Optional[int] = None
     sort_order:   Optional[int] = 0
+    is_featured:  Optional[bool] = False
 
 class HofUpdate(BaseModel):
-    full_name:    Optional[str] = None
-    achievements: Optional[str] = None
-    gup:          Optional[int] = None
-    dan:          Optional[int] = None
-    sort_order:   Optional[int] = None
+    full_name:    Optional[str]  = None
+    achievements: Optional[str]  = None
+    gup:          Optional[int]  = None
+    dan:          Optional[int]  = None
+    sort_order:   Optional[int]  = None
+    is_featured:  Optional[bool] = None
 
 
 def _out(h: HallOfFame) -> dict:
@@ -40,6 +42,7 @@ def _out(h: HallOfFame) -> dict:
         "gup":          h.gup,
         "dan":          h.dan,
         "sort_order":   h.sort_order,
+        "is_featured":  bool(getattr(h, 'is_featured', False)),
     }
 
 
@@ -61,6 +64,7 @@ def create_hof(data: HofCreate, db: Session = Depends(get_db), _: User = Depends
         gup=data.gup,
         dan=data.dan,
         sort_order=data.sort_order or 0,
+        is_featured=data.is_featured or False,
     )
     db.add(h)
     db.commit()
@@ -80,6 +84,7 @@ def update_hof(hof_id: int, data: HofUpdate, db: Session = Depends(get_db), _: U
     if data.gup          is not None: h.gup          = data.gup
     if data.dan          is not None: h.dan          = data.dan
     if data.sort_order   is not None: h.sort_order   = data.sort_order
+    if data.is_featured  is not None: h.is_featured  = data.is_featured
     db.commit()
     db.refresh(h)
     return _out(h)

@@ -2643,7 +2643,7 @@ function HallOfFameAdmin({ token }) {
 
   const h  = { Authorization: `Bearer ${token}` }
   const hj = { ...h, 'Content-Type': 'application/json' }
-  const emptyForm = { full_name:'', achievements:'', gup:'', dan:'', sort_order:0 }
+  const emptyForm = { full_name:'', achievements:'', gup:'', dan:'', sort_order:0, is_featured:false }
 
   useEffect(() => { load() }, [])
 
@@ -2667,6 +2667,7 @@ function HallOfFameAdmin({ token }) {
         gup:          editing.gup !== '' ? Number(editing.gup) : null,
         dan:          editing.dan !== '' ? Number(editing.dan) : null,
         sort_order:   Number(editing.sort_order) || 0,
+        is_featured:  !!editing.is_featured,
       })})
       if (r.ok) { setShowForm(false); setEditing(null); setMsg(''); await load() }
       else setMsg('Ошибка сохранения')
@@ -2759,6 +2760,15 @@ function HallOfFameAdmin({ token }) {
 
             {msg && <div style={{color:'var(--red)', marginBottom:12, fontSize:'0.88rem'}}>{msg}</div>}
 
+            <div style={{marginBottom:18, display:'flex', alignItems:'center', gap:10}}>
+              <input type="checkbox" id="hof-featured" checked={!!editing.is_featured}
+                onChange={e => setEditing(p=>({...p, is_featured: e.target.checked}))}
+                style={{width:16, height:16, accentColor:'#c8962a', cursor:'pointer'}}/>
+              <label htmlFor="hof-featured" style={{cursor:'pointer', fontSize:'0.9rem', color:'var(--white)'}}>
+                Золотая рамка <span style={{color:'#c8962a', fontSize:'0.8rem'}}>(чемпионы мира и Европы)</span>
+              </label>
+            </div>
+
             <div style={{display:'flex', gap:10, flexWrap:'wrap'}}>
               <button className="btn-primary" style={{padding:'9px 20px', fontSize:'13px', flex:'0 0 auto'}} onClick={save}>
                 {editing.id ? 'Сохранить' : 'Добавить'}
@@ -2785,7 +2795,12 @@ function HallOfFameAdmin({ token }) {
 
       <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:16}}>
         {items.map(item => (
-          <div key={item.id} style={{background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderRadius:10, overflow:'hidden'}}>
+          <div key={item.id} style={{
+            background:'var(--dark2)',
+            border: item.is_featured ? '2px solid #c8962a' : '1px solid var(--gray-dim)',
+            borderRadius:10, overflow:'hidden',
+            boxShadow: item.is_featured ? '0 0 16px rgba(200,150,42,0.3)' : 'none'
+          }}>
             {/* Фото */}
             <div style={{position:'relative', height:220, background:'var(--dark)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden'}}>
               {item.photo_url

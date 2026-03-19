@@ -13,4 +13,5 @@ class HallOfFame(Base):
     gup          = Column(Integer, nullable=True)
     dan          = Column(Integer, nullable=True)
     sort_order   = Column(Integer, default=0, nullable=False)
+    is_featured  = Column(Boolean, default=False, nullable=False)
     created_at   = Column(DateTime, default=datetime.utcnow)
