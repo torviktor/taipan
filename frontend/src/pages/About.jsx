@@ -16,12 +16,10 @@ const CONTENT = {
 about: (
   <div className="about-body">
 
-    {/* ── Два лого по центру ── */}
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12, marginBottom:36 }}>
-      <div style={{ display:'flex', gap:24, alignItems:'center' }}>
-        <img src="/logo.png"   alt="Тайпан" style={{ width:96, height:96, objectFit:'contain' }} />
-        <img src="/logo_2.png" alt="GTF"    style={{ width:96, height:96, objectFit:'contain' }} />
-      </div>
+    {/* ── Два лого во всю ширину ── */}
+    <div style={{ display:'flex', justifyContent:'center', gap:40, alignItems:'center', marginBottom:36, padding:'24px 0', borderBottom:'1px solid var(--gray-dim)' }}>
+      <img src="/logo.png"   alt="Тайпан" style={{ width:140, height:140, objectFit:'contain' }} />
+      <img src="/logo_2.png" alt="GTF"    style={{ width:140, height:140, objectFit:'contain' }} />
     </div>
 
     {/* ── Лид-блок ── */}
@@ -32,12 +30,12 @@ about: (
       <p>Мы работаем полностью в правовом поле — у нас есть устав, свидетельство о государственной регистрации, ОГРН и все необходимые документы. Клуб создан не ради прибыли, а ради детей и спорта.</p>
     </div>
 
-    {/* ── Фото тренера по центру ── */}
-    <div style={{ display:'flex', justifyContent:'center', margin:'36px 0 16px' }}>
+    {/* ── Фото тренера во всю ширину ── */}
+    <div style={{ width:'100%', height:400, overflow:'hidden', margin:'36px 0 16px', border:'1px solid var(--gray-dim)' }}>
       <img
         src="/coach_2.jpg"
-        alt="Тренер Ротарь Екатерина Валерьевна"
-        style={{ width:220, height:280, objectFit:'cover', objectPosition:'top center', border:'1px solid var(--gray-dim)' }}
+        alt=""
+        style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top center' }}
       />
     </div>
 
@@ -73,25 +71,26 @@ about: (
     <p>Всё прозрачно. Родители всегда могут узнать, на что именно потрачены средства.</p>
 
     <h3>Почему мы — официальный клуб</h3>
+
+    {/* ── Блок документов во всю ширину — над текстом раздела ── */}
+    <div style={{ display:'flex', gap:16, marginBottom:24, flexWrap:'wrap' }}>
+      <div style={{ flex:1, minWidth:200, padding:'40px 24px', border:'1px dashed var(--gray-dim)', borderTop:'3px solid var(--gray-dim)', background:'var(--dark2)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:10 }}>
+        <div style={{ fontFamily:'Barlow Condensed', fontSize:'13px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', textAlign:'center' }}>Документ 1</div>
+        <div style={{ color:'var(--gray-dim)', fontSize:'13px', fontStyle:'italic', textAlign:'center' }}>в разработке</div>
+      </div>
+      <div style={{ flex:1, minWidth:200, padding:'40px 24px', border:'1px dashed var(--gray-dim)', borderTop:'3px solid var(--gray-dim)', background:'var(--dark2)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:10 }}>
+        <div style={{ fontFamily:'Barlow Condensed', fontSize:'13px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', textAlign:'center' }}>Документ 2</div>
+        <div style={{ color:'var(--gray-dim)', fontSize:'13px', fontStyle:'italic', textAlign:'center' }}>в разработке</div>
+      </div>
+    </div>
+    <p style={{ color:'var(--gray)', fontSize:'13px', fontStyle:'italic', marginBottom:20 }}>Здесь будут размещены официальные документы клуба (в разработке)</p>
+
     <p>Мы входим в структуру <strong>Федерации тхэквондо ГТФ России</strong>. Это значит:</p>
     <ul>
       <li>проводим официальные аттестации — пояса и сертификаты признаются по всей России и за рубежом</li>
       <li>наши спортсмены участвуют в официальных соревнованиях всех уровней</li>
       <li>получаем методическую поддержку, судей и развитие от федерации</li>
     </ul>
-
-    {/* ── Блок документов по центру ── */}
-    <div style={{ display:'flex', gap:16, justifyContent:'center', margin:'24px 0', flexWrap:'wrap' }}>
-      <div style={{ width:180, padding:'28px 20px', border:'1px dashed var(--gray-dim)', borderTop:'3px solid var(--gray-dim)', background:'var(--dark2)', display:'flex', flexDirection:'column', alignItems:'center', gap:10 }}>
-        <div style={{ fontFamily:'Barlow Condensed', fontSize:'11px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', textAlign:'center' }}>Документ 1</div>
-        <div style={{ color:'var(--gray-dim)', fontSize:'13px', fontStyle:'italic', textAlign:'center' }}>в разработке</div>
-      </div>
-      <div style={{ width:180, padding:'28px 20px', border:'1px dashed var(--gray-dim)', borderTop:'3px solid var(--gray-dim)', background:'var(--dark2)', display:'flex', flexDirection:'column', alignItems:'center', gap:10 }}>
-        <div style={{ fontFamily:'Barlow Condensed', fontSize:'11px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', textAlign:'center' }}>Документ 2</div>
-        <div style={{ color:'var(--gray-dim)', fontSize:'13px', fontStyle:'italic', textAlign:'center' }}>в разработке</div>
-      </div>
-    </div>
-    <p style={{ textAlign:'center', color:'var(--gray)', fontSize:'13px', fontStyle:'italic', marginBottom:32 }}>Здесь будут размещены официальные документы клуба (в разработке)</p>
 
     <h3>Почему родителям спокойно с нами</h3>
     <p>Мы не просто тренируем удары ногами. Мы воспитываем характер. Здесь ребёнок учится уважать себя и других, не сдаваться, контролировать эмоции и идти к цели.</p>
