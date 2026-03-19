@@ -2630,6 +2630,257 @@ function NotificationsTab({ token }) {
   )
 }
 
+// ── ВКЛАДКА ИНФОРМАЦИЯ ────────────────────────────────────────────────────────
+
+function InfoTab({ isAdmin }) {
+  const [section, setSection] = useState('rating')
+
+  const SectionBtn = ({ id, label }) => (
+    <button
+      onClick={() => setSection(id)}
+      style={{
+        fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: '0.85rem',
+        letterSpacing: '0.08em', textTransform: 'uppercase',
+        padding: '8px 18px', borderRadius: 6, cursor: 'pointer',
+        background: section === id ? 'var(--red)' : 'transparent',
+        color: section === id ? 'var(--white)' : 'var(--gray)',
+        border: section === id ? '1px solid var(--red)' : '1px solid var(--gray-dim)',
+        transition: 'all 0.15s',
+      }}
+    >{label}</button>
+  )
+
+  const H2 = ({ children }) => (
+    <div style={{ fontFamily:'Bebas Neue', fontSize:'1.5rem', letterSpacing:'0.08em', color:'var(--white)', marginTop:28, marginBottom:10, borderBottom:'1px solid var(--gray-dim)', paddingBottom:8 }}>
+      {children}
+    </div>
+  )
+  const H3 = ({ children }) => (
+    <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'1rem', letterSpacing:'0.06em', color:'var(--red)', marginTop:18, marginBottom:6, textTransform:'uppercase' }}>
+      {children}
+    </div>
+  )
+  const P = ({ children }) => (
+    <p style={{ color:'var(--gray)', fontSize:'0.9rem', lineHeight:1.65, marginBottom:10 }}>{children}</p>
+  )
+  const Highlight = ({ children }) => (
+    <span style={{ color:'var(--white)', fontWeight:600 }}>{children}</span>
+  )
+
+  return (
+    <div>
+      {/* Навигация по разделам */}
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:24 }}>
+        <SectionBtn id="rating"      label="Рейтинг"/>
+        <SectionBtn id="achievements" label="Ачивки"/>
+        <SectionBtn id="attendance"  label="Посещаемость"/>
+        <SectionBtn id="seasons"     label="Сезоны"/>
+        {isAdmin && <SectionBtn id="admin" label="Для тренера"/>}
+      </div>
+
+      {/* ── РЕЙТИНГ ── */}
+      {section === 'rating' && (
+        <div>
+          <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderRadius:10, padding:'16px 20px', marginBottom:20 }}>
+            <P>Добрый день, уважаемые родители и ученики клуба! Рейтинг помогает определить лучших спортсменов в категории — по возрасту, весу и уровню — в конце сезона. Мы учитываем не только победы, но и <Highlight>активность</Highlight> (количество боёв и выступлений), чтобы поощрять старания даже без медалей.</P>
+          </div>
+
+          <H2>1. Основная формула</H2>
+          <div style={{ background:'#0a0a14', border:'1px solid var(--red)', borderRadius:8, padding:'14px 18px', marginBottom:16, fontFamily:'monospace', fontSize:'0.95rem', color:'#c8962a' }}>
+            Очки = Значимость × ln(Спарринг + Стоп-балл + Тег-тим + Тули + Медали + 1)
+          </div>
+          <P><Highlight>Натуральный логарифм (ln)</Highlight> — математическая функция, которая сжимает большие числа, чтобы разница в очках была разумной. Например: если сумма = 10, то ln(11) ≈ 2.4; если 100, то ln(101) ≈ 4.6. Это делает рейтинг справедливым — победитель не выглядит «в 10 раз лучше» участника без медалей.</P>
+
+          <H2>2. Значимость турнира</H2>
+          <P>Базовый коэффициент, отражающий уровень соревнований. Чем престижнее — тем больше очков за те же достижения.</P>
+          <div style={{ overflowX:'auto', marginBottom:16 }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'0.85rem' }}>
+              <thead>
+                <tr style={{ background:'var(--dark2)' }}>
+                  {['Уровень','Турнир','Фестиваль','Первенство','Чемпионат'].map(h => (
+                    <th key={h} style={{ padding:'8px 12px', textAlign:'left', color:'var(--gray)', fontFamily:'Barlow Condensed', letterSpacing:'0.05em', borderBottom:'1px solid var(--gray-dim)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ['Клубный / Местный','1.0–1.5','1.0','—','—'],
+                  ['Городской / Региональный','3.0','3.5','4.0','5.0'],
+                  ['Всероссийский','7.0','7.0','8.0','9.0'],
+                  ['Международный','10.0','10.0','11.0','12.0'],
+                ].map((row, i) => (
+                  <tr key={i} style={{ borderBottom:'1px solid var(--gray-dim)', background: i%2===0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                    {row.map((cell, j) => (
+                      <td key={j} style={{ padding:'8px 12px', color: j===0 ? 'var(--white)' : 'var(--gray)' }}>{cell}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <H2>3. Очки за дисциплины</H2>
+          <H3>Спарринг, Стоп-балл, Тег-тим (контактные)</H3>
+          <P>Очки = <Highlight>кол-во боёв × 3</Highlight> + бонус за место (1-е: +40, 2-е: +24, 3-е: +14). Коэффициент ×3 выше — контактная дисциплина, требует большего мастерства и риска. Бонус только за топ-3.</P>
+          <H3>Тули / Хён (бесконтактные)</H3>
+          <P>Очки = <Highlight>кол-во выступлений × 2</Highlight> + бонус за место (1-е: +25, 2-е: +15, 3-е: +9). Коэффициент ×2 — техническая дисциплина без контакта.</P>
+          <H3>Медальный бонус</H3>
+          <P>Применяется один раз поверх всего: 2+ золота → +55, 1 золото + другие медали → +40, 1 золото → +30, 2+ медали (без золота) → +40, 1 серебро → +18, 1 бронза → +10.</P>
+
+          <H2>4. Пример расчёта</H2>
+          <P>Всероссийский фестиваль (значимость = 7). Иван: спарринг 4 боя, 1 место; тули 2 выступления, без места; 1 золото.</P>
+          <div style={{ background:'var(--dark2)', borderRadius:8, padding:'14px 18px', fontFamily:'monospace', fontSize:'0.85rem', color:'var(--gray)', lineHeight:1.8, marginBottom:16 }}>
+            <div>Спарринг = (4 × 3) + 40 = <span style={{color:'#c8962a'}}>52</span></div>
+            <div>Тули = (2 × 2) + 0 = <span style={{color:'#c8962a'}}>4</span></div>
+            <div>Медали = <span style={{color:'#c8962a'}}>30</span> (1 золото)</div>
+            <div>Сумма = 52 + 4 + 30 = <span style={{color:'#c8962a'}}>86</span></div>
+            <div>ln(86 + 1) ≈ <span style={{color:'#c8962a'}}>4.465</span></div>
+            <div style={{color:'var(--white)', fontWeight:700}}>Итог = 7 × 4.465 ≈ 31.26 очков</div>
+          </div>
+
+          <H2>5. Итоговый рейтинг за сезон</H2>
+          <P>Очки за все турниры <Highlight>суммируются</Highlight>. Рейтинги ведутся отдельно по возрастным категориям: 6–7, 8–9, 10–11, 12–14, 15–17 лет. Взрослые (18+) в рейтинге не участвуют. При равных очках спортсмены делят место.</P>
+
+          <div style={{ background:'linear-gradient(135deg, #1a0a0a, #2a0a0a)', border:'1px solid var(--red)', borderRadius:10, padding:'16px 20px', marginTop:20 }}>
+            <P style={{margin:0}}><Highlight>Эта система справедлива и мотивирующая. Удачи на турнирах — мы гордимся каждым!</Highlight></P>
+          </div>
+        </div>
+      )}
+
+      {/* ── АЧИВКИ ── */}
+      {section === 'achievements' && (
+        <div>
+          <H2>Система ачивок</H2>
+          <P>Ачивки — это награды за достижения в клубе. Они выдаются автоматически при выполнении условий и делятся на три уровня редкости.</P>
+
+          <div style={{ display:'flex', gap:12, marginBottom:20, flexWrap:'wrap' }}>
+            {[
+              { label:'Обычная', color:'#888', desc:'Первые шаги в любой активности' },
+              { label:'Редкая', color:'var(--red)', desc:'Стабильные результаты и участие' },
+              { label:'Легендарная', color:'#c8962a', desc:'Выдающиеся достижения' },
+            ].map(t => (
+              <div key={t.label} style={{ flex:1, minWidth:140, background:'var(--dark2)', border:`1px solid ${t.color}`, borderRadius:8, padding:'12px 14px' }}>
+                <div style={{ fontFamily:'Bebas Neue', color:t.color, fontSize:'1.1rem', marginBottom:4 }}>{t.label}</div>
+                <div style={{ color:'var(--gray)', fontSize:'0.82rem' }}>{t.desc}</div>
+              </div>
+            ))}
+          </div>
+
+          <H3>Посещаемость</H3>
+          {[
+            ['Первые шаги','10 тренировок','Обычная'],
+            ['Стабильный боец','50 тренировок','Редкая'],
+            ['Железная дисциплина','100 тренировок','Легендарная'],
+            ['Отличник посещаемости','Все тренировки месяца без пропусков','Редкая'],
+          ].map(([name, cond, tier]) => (
+            <div key={name} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid var(--gray-dim)', fontSize:'0.87rem' }}>
+              <span style={{color:'var(--white)'}}>{name}</span>
+              <span style={{color:'var(--gray)'}}>{cond}</span>
+            </div>
+          ))}
+
+          <H3>Соревнования</H3>
+          {[
+            ['Боевое крещение','Первое участие в соревновании','Обычная'],
+            ['Призёр','1–3 место на любом турнире','Редкая'],
+            ['Чемпион клуба','Топ-3 рейтинга по итогам сезона','Легендарная'],
+          ].map(([name, cond, tier]) => (
+            <div key={name} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid var(--gray-dim)', fontSize:'0.87rem' }}>
+              <span style={{color:'var(--white)'}}>{name}</span>
+              <span style={{color:'var(--gray)'}}>{cond}</span>
+            </div>
+          ))}
+
+          <H3>Аттестация</H3>
+          {[
+            ['Первый пояс','Сдача на 10 гып','Обычная'],
+            ['Восхождение','Любое повышение гыпа или сдача на дан','Редкая'],
+          ].map(([name, cond, tier]) => (
+            <div key={name} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid var(--gray-dim)', fontSize:'0.87rem' }}>
+              <span style={{color:'var(--white)'}}>{name}</span>
+              <span style={{color:'var(--gray)'}}>{cond}</span>
+            </div>
+          ))}
+
+          <H3>Сборы</H3>
+          <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid var(--gray-dim)', fontSize:'0.87rem' }}>
+            <span style={{color:'var(--white)'}}>Боец сборов</span>
+            <span style={{color:'var(--gray)'}}>Первое участие в выездных сборах</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── ПОСЕЩАЕМОСТЬ ── */}
+      {section === 'attendance' && (
+        <div>
+          <H2>Журнал посещаемости</H2>
+          <P>Тренировки проводятся в трёх группах. Посещаемость фиксируется тренером после каждого занятия.</P>
+
+          <H3>Группы</H3>
+          {[
+            ['Младшая группа','6–10 лет','Базовые техники, игровые упражнения, развитие координации'],
+            ['Старшая группа','11–17 лет','Углублённая техника, соревновательная подготовка'],
+            ['Взрослые','18+ лет','Самостоятельная тренировочная программа'],
+          ].map(([name, age, desc]) => (
+            <div key={name} style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderRadius:8, padding:'12px 16px', marginBottom:10 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, color:'var(--white)', fontSize:'0.95rem' }}>{name}</span>
+                <span style={{ color:'var(--red)', fontSize:'0.85rem' }}>{age}</span>
+              </div>
+              <div style={{ color:'var(--gray)', fontSize:'0.82rem' }}>{desc}</div>
+            </div>
+          ))}
+
+          <H3>Как читать статистику</H3>
+          <P>В личном кабинете отображается процент посещаемости за выбранный сезон. <Highlight>70% и выше</Highlight> — хороший показатель, <Highlight>50–70%</Highlight> — средний, <Highlight>ниже 50%</Highlight> — стоит уделить больше внимания тренировкам.</P>
+          <P>График по месяцам показывает динамику: можно отследить периоды активности и пропусков.</P>
+        </div>
+      )}
+
+      {/* ── СЕЗОНЫ ── */}
+      {section === 'seasons' && (
+        <div>
+          <H2>Спортивные сезоны</H2>
+          <P>В клубе используется <Highlight>спортивный сезон</Highlight>, который начинается в сентябре и заканчивается в августе следующего года. Например, сезон 2025/2026 — с 1 сентября 2025 по 31 августа 2026.</P>
+          <P>Это стандарт для спортивных клубов — он совпадает с учебным годом, что удобно для планирования турниров и аттестаций.</P>
+
+          <H3>Фильтрация по сезонам</H3>
+          <P>Во всех вкладках кабинета (соревнования, рейтинг, посещаемость, аттестация, сборы, ачивки) есть фильтр по сезону. По умолчанию показывается <Highlight>текущий сезон</Highlight>. Переключитесь на «Все сезоны» чтобы увидеть полную историю.</P>
+
+          <H3>Итоги сезона</H3>
+          <P>В конце каждого сезона подводятся итоги: определяются лучшие спортсмены по рейтингу в каждой возрастной категории, вручаются награды и ачивки. Лучшие попадают в Зал Славы клуба.</P>
+        </div>
+      )}
+
+      {/* ── ДЛЯ ТРЕНЕРА ── */}
+      {section === 'admin' && isAdmin && (
+        <div>
+          <H2>Памятка тренера</H2>
+
+          <H3>Создание соревнования</H3>
+          <P>При создании соревнования все спортсмены автоматически добавляются в список участников со статусом «Ожидает». Родители получают уведомление и могут ответить «Участвую» / «Не участвую» прямо из кабинета.</P>
+          <P>После завершения турнира — заполните результаты (места и количество боёв/выступлений) и нажмите «Сохранить». Рейтинг пересчитается автоматически.</P>
+
+          <H3>Аттестация</H3>
+          <P>Создайте аттестацию, добавьте участников, заполните результаты (гып/дан) и нажмите «Завершить аттестацию». Гыпы спортсменов обновятся автоматически. Ачивки за аттестацию начислятся сразу.</P>
+
+          <H3>Сборы</H3>
+          <P>При создании сборов все спортсмены добавляются автоматически. Родители получают уведомление и отвечают через кабинет. Статусы обновляются в реальном времени (автоматически каждые 15 сек).</P>
+
+          <H3>Архив</H3>
+          <P>Спортсмен в архиве не отображается в списках посещаемости, соревнований и рейтинга. Родитель архивного спортсмена теряет доступ к кабинету. Восстановить можно в любой момент.</P>
+
+          <H3>Пересчёт ачивок</H3>
+          <P>Если что-то пошло не так с ачивками — можно запустить полный пересчёт через API:</P>
+          <div style={{ background:'#0a0a14', borderRadius:8, padding:'12px 16px', fontFamily:'monospace', fontSize:'0.82rem', color:'#6cba6c', overflowX:'auto' }}>
+            POST /api/achievements/recalculate-all
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── СТАТУСЫ ЗАЯВОК ─────────────────────────────────────────────────────────────
 const STATUS_LABELS = {
   new:        { label: 'Новая',        color: '#FFD700' },
@@ -2958,6 +3209,7 @@ export default function Cabinet() {
               Уведомления
               <UnreadBadge token={token}/>
             </button>
+            <button className={`cabinet-tab ${parentView==='info'?'active':''}`} style={{color: parentView==='info' ? undefined : 'var(--gray)'}} onClick={() => setParentView('info')}>Информация</button>
           </div>
 
           {loading && <div className="cabinet-loading">Загрузка...</div>}
@@ -2994,6 +3246,7 @@ export default function Cabinet() {
           {parentView === 'achievements'  && !loading && <AchievementsTab token={token} athletes={myAthletes}/>}
           {parentView === 'rating'        && !loading && <RatingTab token={token} myAthleteIds={myAthletes.map(a=>a.id)}/>}
           {parentView === 'notifications' && <NotificationsTab token={token}/>}
+          {parentView === 'info'          && <InfoTab isAdmin={false}/>}
         </div>
       </main>
     )
@@ -3038,6 +3291,7 @@ export default function Cabinet() {
             <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.68rem', letterSpacing:'0.1em', color:'var(--gray)', textTransform:'uppercase', minWidth:80, paddingRight:6, borderRight:'1px solid var(--gray-dim)' }}>Результаты</span>
             <button className={`cabinet-tab ${view==='rating'?'active':''}`} onClick={() => setView('rating')}>Рейтинг</button>
             <button className={`cabinet-tab ${view==='achievements'?'active':''}`} onClick={() => setView('achievements')}>Ачивки</button>
+            <button className={`cabinet-tab ${view==='info'?'active':''}`} style={{color: view==='info' ? undefined : 'var(--gray)'}} onClick={() => setView('info')}>Информация</button>
           </div>
         </div>
 
@@ -3061,6 +3315,7 @@ export default function Cabinet() {
         {view === 'certification' && <CertificationTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'achievements'  && <AchievementsLeaderboard token={token} />}
         {view === 'camps'         && <CampsTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
+        {view === 'info'          && <InfoTab isAdmin={true} />}
         {view === 'archive'       && (
           <div>
             <div style={{ marginBottom:16, color:'var(--gray)', fontSize:'0.9rem' }}>
