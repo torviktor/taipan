@@ -15,32 +15,36 @@ const CONTENT = {
 
 about: (
   <div className="about-body">
-    <div style={{ display:'flex', gap:32, alignItems:'flex-start', marginBottom:32, flexWrap:'wrap' }}>
-      <div className="about-lead" style={{ flex:1, minWidth:240, marginBottom:0 }}>
-        <p>Мы — официально зарегистрированная автономная некоммерческая организация</p>
-        <p className="about-lead-name">Спортивный клуб тхэквондо «Тайпан» города Павловский Посад</p>
-        <p>Здесь ваш ребёнок не просто «ходит на секцию». Здесь он растёт как личность: становится сильнее телом, увереннее характером и чище душой.</p>
-        <p>Мы работаем полностью в правовом поле — у нас есть устав, свидетельство о государственной регистрации, ОГРН и все необходимые документы. Клуб создан не ради прибыли, а ради детей и спорта.</p>
-      </div>
-      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16, flexShrink:0 }}>
-        <div style={{ display:'flex', gap:16, alignItems:'center' }}>
-          <img src="/logo.png" alt="Тайпан" style={{ width:90, height:90, objectFit:'contain' }} />
-          <img src="/logo_2.png" alt="GTF" style={{ width:90, height:90, objectFit:'contain' }} />
-        </div>
-        <p style={{ color:'var(--gray)', fontSize:'12px', letterSpacing:'1px', textTransform:'uppercase', fontFamily:'Barlow Condensed', textAlign:'center', margin:0 }}>Член федерации ГТФ России</p>
+
+    {/* ── Два лого по центру ── */}
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12, marginBottom:36 }}>
+      <div style={{ display:'flex', gap:24, alignItems:'center' }}>
+        <img src="/logo.png"   alt="Тайпан" style={{ width:96, height:96, objectFit:'contain' }} />
+        <img src="/logo_2.png" alt="GTF"    style={{ width:96, height:96, objectFit:'contain' }} />
       </div>
     </div>
 
-    <h3>Кто стоит за клубом</h3>
-    <h3>Кто стоит за клубом</h3>
-    <div style={{ display:'flex', gap:28, alignItems:'flex-start', marginBottom:20, flexWrap:'wrap' }}>
-      <img src="/coach_2.jpg" alt="Тренер" style={{ width:200, height:260, objectFit:'cover', objectPosition:'top', flexShrink:0, border:'2px solid var(--gray-dim)' }} />
-      <div>
-        <p>Клубом руководит и лично тренирует <strong>Ротарь Екатерина Валерьевна</strong> — мастер тхэквондо, опытный тренер и мама, которая понимает родителей с полуслова.</p>
-        <p>Она решает все организационные и финансовые вопросы, отвечает за безопасность на каждой тренировке и следит, чтобы в клубе всегда была честная и уважительная атмосфера. Как тренер она проводит занятия, готовит спортсменов к аттестациям и соревнованиям, поддерживает каждого ребёнка и помогает ему раскрыться.</p>
-        <p>Вы всегда можете написать или позвонить Екатерине Валерьевне — она отвечает лично и без «секретарей».</p>
-      </div>
+    {/* ── Лид-блок ── */}
+    <div className="about-lead">
+      <p>Мы — официально зарегистрированная автономная некоммерческая организация</p>
+      <p className="about-lead-name">Спортивный клуб тхэквондо «Тайпан» города Павловский Посад</p>
+      <p>Здесь ваш ребёнок не просто «ходит на секцию». Здесь он растёт как личность: становится сильнее телом, увереннее характером и чище душой.</p>
+      <p>Мы работаем полностью в правовом поле — у нас есть устав, свидетельство о государственной регистрации, ОГРН и все необходимые документы. Клуб создан не ради прибыли, а ради детей и спорта.</p>
     </div>
+
+    {/* ── Фото тренера по центру ── */}
+    <div style={{ display:'flex', justifyContent:'center', margin:'36px 0 16px' }}>
+      <img
+        src="/coach_2.jpg"
+        alt="Тренер Ротарь Екатерина Валерьевна"
+        style={{ width:220, height:280, objectFit:'cover', objectPosition:'top center', border:'1px solid var(--gray-dim)' }}
+      />
+    </div>
+
+    <h3>Кто стоит за клубом</h3>
+    <p>Клубом руководит и лично тренирует <strong>Ротарь Екатерина Валерьевна</strong> — мастер тхэквондо, опытный тренер и мама, которая понимает родителей с полуслова.</p>
+    <p>Она решает все организационные и финансовые вопросы, отвечает за безопасность на каждой тренировке и следит, чтобы в клубе всегда была честная и уважительная атмосфера. Как тренер она проводит занятия, готовит спортсменов к аттестациям и соревнованиям, поддерживает каждого ребёнка и помогает ему раскрыться.</p>
+    <p>Вы всегда можете написать или позвонить Екатерине Валерьевне — она отвечает лично и без «секретарей».</p>
 
     <h3>Дух тхэквондо — это главное, чему мы учим</h3>
     <p>Тхэквондо для нас — это не только удары и пояса. Это целая система воспитания личности.</p>
@@ -75,16 +79,24 @@ about: (
       <li>наши спортсмены участвуют в официальных соревнованиях всех уровней</li>
       <li>получаем методическую поддержку, судей и развитие от федерации</li>
     </ul>
-    <div style={{ marginTop:16, padding:'20px 24px', border:'1px dashed var(--gray-dim)', borderLeft:'3px solid var(--gray-dim)', background:'var(--dark2)' }}>
-      <p style={{ color:'var(--gray)', fontSize:'14px', fontStyle:'italic', margin:0 }}>Документы об аккредитации и регистрации АНО будут размещены здесь.</p>
+
+    {/* ── Блок документов по центру ── */}
+    <div style={{ display:'flex', gap:16, justifyContent:'center', margin:'24px 0', flexWrap:'wrap' }}>
+      <div style={{ width:180, padding:'28px 20px', border:'1px dashed var(--gray-dim)', borderTop:'3px solid var(--gray-dim)', background:'var(--dark2)', display:'flex', flexDirection:'column', alignItems:'center', gap:10 }}>
+        <div style={{ fontFamily:'Barlow Condensed', fontSize:'11px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', textAlign:'center' }}>Документ 1</div>
+        <div style={{ color:'var(--gray-dim)', fontSize:'13px', fontStyle:'italic', textAlign:'center' }}>в разработке</div>
+      </div>
+      <div style={{ width:180, padding:'28px 20px', border:'1px dashed var(--gray-dim)', borderTop:'3px solid var(--gray-dim)', background:'var(--dark2)', display:'flex', flexDirection:'column', alignItems:'center', gap:10 }}>
+        <div style={{ fontFamily:'Barlow Condensed', fontSize:'11px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', textAlign:'center' }}>Документ 2</div>
+        <div style={{ color:'var(--gray-dim)', fontSize:'13px', fontStyle:'italic', textAlign:'center' }}>в разработке</div>
+      </div>
     </div>
+    <p style={{ textAlign:'center', color:'var(--gray)', fontSize:'13px', fontStyle:'italic', marginBottom:32 }}>Здесь будут размещены официальные документы клуба (в разработке)</p>
 
     <h3>Почему родителям спокойно с нами</h3>
     <p>Мы не просто тренируем удары ногами. Мы воспитываем характер. Здесь ребёнок учится уважать себя и других, не сдаваться, контролировать эмоции и идти к цели.</p>
-    <p>Мы открыты для общения, всегда готовы ответить на вопросы и объяснить, почему делаем именно так. Но при этом просим одно — доверять. Мы работаем с детьми каждый день, видим их прогресс и знаем, как помочь каждому стать лучше.</p>
-    <div className="about-cta">
-      Если вы ищете для ребёнка не просто секцию, а место, где его вырастят сильным и достойным человеком — добро пожаловать в «Тайпан».
-    </div>
+    <p>Мы открыты для общения, всегда готовы ответить на вопросы и объяснить, почему делаем именно так. Но при этом просим одно — доверять.</p>
+
   </div>
 ),
 
