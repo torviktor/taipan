@@ -2696,10 +2696,6 @@ function BeltSVG({ colors, stripes = 0, width = 220, height = 32 }) {
       {stripes > 0 && Array.from({length: stripes}).map((_, i) => (
         <rect key={i} x={width - 28 - i*16} y={4} width={10} height={height-8} rx={2} fill="#FFD700" opacity="0.9"/>
       ))}
-
-      {/* Центральный узел */}
-      <rect x={width/2 - 12} y={2} width={24} height={height-4} rx={3} fill="rgba(0,0,0,0.3)"/>
-      <rect x={width/2 - 8} y={5} width={16} height={height-10} rx={2} fill="rgba(255,255,255,0.08)"/>
     </svg>
   )
 }
