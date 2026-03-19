@@ -2714,30 +2714,30 @@ function HallOfFameAdmin({ token }) {
             <h3 style={{marginBottom:20}}>{editing.id ? 'Редактировать запись' : 'Добавить в Зал Славы'}</h3>
 
             <div style={{marginBottom:14}}>
-              <label className="form-label">ФИО *</label>
-              <input className="form-input" value={editing.full_name}
+              <label className="section-label">ФИО *</label>
+              <input className="att-date-input" value={editing.full_name}
                 onChange={e => setEditing(p=>({...p, full_name:e.target.value}))}
                 placeholder="Иванов Иван Иванович"/>
             </div>
 
             <div style={{display:'flex', gap:12, marginBottom:14}}>
               <div style={{flex:1}}>
-                <label className="form-label">Гып (1–11)</label>
-                <input className="form-input" type="number" min="1" max="11"
+                <label className="section-label">Гып (1–11)</label>
+                <input className="att-date-input" type="number" min="1" max="11"
                   value={editing.gup}
                   onChange={e => setEditing(p=>({...p, gup:e.target.value, dan:''}))}
                   placeholder="—"/>
               </div>
               <div style={{flex:1}}>
-                <label className="form-label">Дан (1–9)</label>
-                <input className="form-input" type="number" min="1" max="9"
+                <label className="section-label">Дан (1–9)</label>
+                <input className="att-date-input" type="number" min="1" max="9"
                   value={editing.dan}
                   onChange={e => setEditing(p=>({...p, dan:e.target.value, gup:''}))}
                   placeholder="—"/>
               </div>
               <div style={{flex:1}}>
-                <label className="form-label">Порядок</label>
-                <input className="form-input" type="number"
+                <label className="section-label">Порядок</label>
+                <input className="att-date-input" type="number"
                   value={editing.sort_order}
                   onChange={e => setEditing(p=>({...p, sort_order:e.target.value}))}
                   placeholder="0"/>
@@ -2745,12 +2745,12 @@ function HallOfFameAdmin({ token }) {
             </div>
 
             <div style={{marginBottom:18}}>
-              <label className="form-label">Достижения (каждое с новой строки)</label>
-              <textarea className="form-input" rows={5}
+              <label className="section-label">Достижения (каждое с новой строки)</label>
+              <textarea className="att-date-input" rows={5}
                 value={editing.achievements}
                 onChange={e => setEditing(p=>({...p, achievements:e.target.value}))}
                 placeholder={'Чемпион России 2024\nПризёр первенства ЦФО 2023'}
-                style={{resize:'vertical', width:'100%'}}/>
+                style={{resize:"vertical", width:"100%", minWidth:"100%", maxWidth:"100%"}}/>
             </div>
 
             {msg && <div style={{color:'var(--red)', marginBottom:12, fontSize:'0.88rem'}}>{msg}</div>}
