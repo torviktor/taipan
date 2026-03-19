@@ -2741,7 +2741,7 @@ function InfoTab({ isAdmin }) {
           <H2>5. Итоговый рейтинг за сезон</H2>
           <P>Очки за все турниры <Hl>суммируются</Hl>. Рейтинги ведутся отдельно по возрастным категориям: 6–7, 8–9, 10–11, 12–14, 15–17 лет. При равных очках спортсмены делят место.</P>
 
-          <div style={{ margin:'28px 0 4px', padding:'20px 24px', border:'1px solid var(--gray-dim)', borderRadius:10, background:'var(--dark2)', textAlign:'center' }}>
+          <div style={{ margin:'28px 0 4px', padding:'20px 24px', borderTop:'1px solid var(--gray-dim)', borderRight:'1px solid var(--gray-dim)', borderBottom:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', borderRadius:10, background:'var(--dark2)', textAlign:'center' }}>
             <p style={{ fontStyle:'italic', color:'var(--gray)', fontSize:'0.95rem', lineHeight:1.7, margin:0 }}>
               Эта система справедлива и мотивирующая.<br/>
               <span style={{color:'var(--white)'}}>Удачи на турнирах — мы гордимся каждым!</span>
@@ -2811,7 +2811,7 @@ function InfoTab({ isAdmin }) {
             <span style={{color:'var(--gray)'}}>Подтверждённое участие в сборах (статус «Еду»)</span>
           </div>
 
-          <div style={{ margin:'28px 0 4px', padding:'20px 24px', border:'1px solid var(--gray-dim)', borderRadius:10, background:'var(--dark2)', textAlign:'center' }}>
+          <div style={{ margin:'28px 0 4px', padding:'20px 24px', borderTop:'1px solid var(--gray-dim)', borderRight:'1px solid var(--gray-dim)', borderBottom:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', borderRadius:10, background:'var(--dark2)', textAlign:'center' }}>
             <p style={{ fontStyle:'italic', color:'var(--gray)', fontSize:'0.95rem', lineHeight:1.7, margin:0 }}>
               Ачивки начисляются автоматически — следите за своими достижениями!
             </p>
@@ -2844,7 +2844,7 @@ function InfoTab({ isAdmin }) {
           <P><Hl>70% и выше</Hl> — отличный показатель. <Hl>50–70%</Hl> — средний уровень. <Hl>Ниже 50%</Hl> — стоит уделить тренировкам больше внимания.</P>
           <P>График по месяцам показывает динамику посещаемости — можно отследить периоды активности и пропусков по каждому спортсмену.</P>
 
-          <div style={{ margin:'28px 0 4px', padding:'20px 24px', border:'1px solid var(--gray-dim)', borderRadius:10, background:'var(--dark2)', textAlign:'center' }}>
+          <div style={{ margin:'28px 0 4px', padding:'20px 24px', borderTop:'1px solid var(--gray-dim)', borderRight:'1px solid var(--gray-dim)', borderBottom:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', borderRadius:10, background:'var(--dark2)', textAlign:'center' }}>
             <p style={{ fontStyle:'italic', color:'var(--gray)', fontSize:'0.95rem', lineHeight:1.7, margin:0 }}>
               Регулярные тренировки — основа успеха в тхэквондо.<br/>
               <span style={{color:'var(--white)'}}>Каждое занятие приближает вас к новым достижениям!</span>
@@ -2865,7 +2865,7 @@ function InfoTab({ isAdmin }) {
           <H3>Итоги сезона</H3>
           <P>В конце каждого сезона подводятся итоги: определяются лучшие спортсмены по рейтингу в каждой возрастной категории, вручаются награды и ачивки. Лучшие попадают в Зал Славы клуба.</P>
 
-          <div style={{ margin:'28px 0 4px', padding:'20px 24px', border:'1px solid var(--gray-dim)', borderRadius:10, background:'var(--dark2)', textAlign:'center' }}>
+          <div style={{ margin:'28px 0 4px', padding:'20px 24px', borderTop:'1px solid var(--gray-dim)', borderRight:'1px solid var(--gray-dim)', borderBottom:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', borderRadius:10, background:'var(--dark2)', textAlign:'center' }}>
             <p style={{ fontStyle:'italic', color:'var(--gray)', fontSize:'0.95rem', lineHeight:1.7, margin:0 }}>
               Новый сезон — новые цели и новые возможности.
             </p>
@@ -2910,7 +2910,7 @@ function InfoTab({ isAdmin }) {
           <H3>Технические вопросы</H3>
           <P>По всем техническим вопросам, связанным с работой сайта, обращайтесь к <Hl>системному администратору</Hl>.</P>
 
-          <div style={{ margin:'28px 0 4px', padding:'20px 24px', border:'1px solid var(--gray-dim)', borderRadius:10, background:'var(--dark2)', textAlign:'center' }}>
+          <div style={{ margin:'28px 0 4px', padding:'20px 24px', borderTop:'1px solid var(--gray-dim)', borderRight:'1px solid var(--gray-dim)', borderBottom:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', borderRadius:10, background:'var(--dark2)', textAlign:'center' }}>
             <p style={{ fontStyle:'italic', color:'var(--gray)', fontSize:'0.95rem', lineHeight:1.7, margin:0 }}>
               Система создана для того, чтобы вы тратили меньше времени на администрирование<br/>
               <span style={{color:'var(--white)'}}>и больше — на тренировки.</span>
