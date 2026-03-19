@@ -3526,10 +3526,10 @@ export default function Cabinet() {
             <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.68rem', letterSpacing:'0.1em', color:'var(--gray)', textTransform:'uppercase', minWidth:80, paddingRight:6, borderRight:'1px solid var(--gray-dim)' }}>Люди</span>
             <button className={`cabinet-tab ${view==='athletes'?'active':''}`} onClick={() => setView('athletes')}>Спортсмены ({athletes.filter(a=>!a.is_archived).length})</button>
             <button className={`cabinet-tab ${view==='parents'?'active':''}`} onClick={() => setView('parents')}>Родители ({parents.length})</button>
-            <button className={`cabinet-tab ${view==='applications'?'active':''}`} onClick={() => setView('applications')}>
-              Заявки{applications.filter(a => a.status==='new').length > 0 && <span className="tab-badge">{applications.filter(a => a.status==='new').length}</span>}
-            </button>
             <button className={`cabinet-tab ${view==='archive'?'active':''}`} style={{ color: view==='archive' ? undefined : 'var(--gray)' }} onClick={() => setView('archive')}>Архив ({athletes.filter(a=>a.is_archived).length})</button>
+            <button className={`cabinet-tab ${view==='applications'?'active':''}`} onClick={() => setView('applications')}>
+  Заявки{applications.filter(a => a.status==='new').length > 0 && <span className="tab-badge">{applications.filter(a => a.status==='new').length}</span>}
+</button>
             <button className={`cabinet-tab ${view==='hof'?'active':''}`} style={{ color: view==='hof' ? undefined : '#c8962a' }} onClick={() => setView('hof')}>Зал Славы</button>
           </div>
           {/* События */}
