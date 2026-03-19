@@ -256,7 +256,9 @@
 }
 .modal-input:focus { outline: none; border-color: var(--red); }
 .modal-msg { font-size: 14px; color: #4caf50; margin-bottom: 12px; }
-.modal-btns-row { display: flex; gap: 12px; }
+.modal-btns-row { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.modal-btns-row .btn-primary,
+.modal-btns-row .btn-outline { flex: 0 0 auto; width: auto; padding: 12px 28px; }
 .my-athletes { display: flex; flex-direction: column; gap: 12px; }
 .my-athlete-card {
   background: var(--dark);
