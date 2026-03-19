@@ -2710,56 +2710,60 @@ function HallOfFameAdmin({ token }) {
       {/* Модальная форма */}
       {showForm && editing && (
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="modal-box" onClick={e => e.stopPropagation()} style={{maxWidth:500}}>
+          <div className="modal-box" onClick={e => e.stopPropagation()} style={{maxWidth:480, width:'90vw', boxSizing:'border-box'}}>
             <h3 style={{marginBottom:20}}>{editing.id ? 'Редактировать запись' : 'Добавить в Зал Славы'}</h3>
 
             <div style={{marginBottom:14}}>
-              <label className="section-label">ФИО *</label>
-              <input className="att-date-input" value={editing.full_name}
+              <label style={{color:'var(--gray)', fontSize:'0.78rem', letterSpacing:'0.08em', textTransform:'uppercase', display:'block', marginBottom:6}}>ФИО *</label>
+              <input value={editing.full_name}
                 onChange={e => setEditing(p=>({...p, full_name:e.target.value}))}
-                placeholder="Иванов Иван Иванович"/>
+                placeholder="Иванов Иван Иванович"
+                style={{width:'100%', boxSizing:'border-box', background:'var(--dark)', border:'1px solid var(--gray-dim)', borderRadius:6, padding:'9px 12px', color:'var(--white)', fontSize:'0.9rem'}}/>
             </div>
 
-            <div style={{display:'flex', gap:12, marginBottom:14}}>
-              <div style={{flex:1}}>
-                <label className="section-label">Гып (1–11)</label>
-                <input className="att-date-input" type="number" min="1" max="11"
+            <div style={{display:'flex', gap:10, marginBottom:14, flexWrap:'wrap'}}>
+              <div style={{flex:'1 1 80px'}}>
+                <label style={{color:'var(--gray)', fontSize:'0.78rem', letterSpacing:'0.08em', textTransform:'uppercase', display:'block', marginBottom:6}}>Гып (1–11)</label>
+                <input type="number" min="1" max="11"
                   value={editing.gup}
                   onChange={e => setEditing(p=>({...p, gup:e.target.value, dan:''}))}
-                  placeholder="—"/>
+                  placeholder="—"
+                  style={{width:'100%', boxSizing:'border-box', background:'var(--dark)', border:'1px solid var(--gray-dim)', borderRadius:6, padding:'9px 12px', color:'var(--white)', fontSize:'0.9rem'}}/>
               </div>
-              <div style={{flex:1}}>
-                <label className="section-label">Дан (1–9)</label>
-                <input className="att-date-input" type="number" min="1" max="9"
+              <div style={{flex:'1 1 80px'}}>
+                <label style={{color:'var(--gray)', fontSize:'0.78rem', letterSpacing:'0.08em', textTransform:'uppercase', display:'block', marginBottom:6}}>Дан (1–9)</label>
+                <input type="number" min="1" max="9"
                   value={editing.dan}
                   onChange={e => setEditing(p=>({...p, dan:e.target.value, gup:''}))}
-                  placeholder="—"/>
+                  placeholder="—"
+                  style={{width:'100%', boxSizing:'border-box', background:'var(--dark)', border:'1px solid var(--gray-dim)', borderRadius:6, padding:'9px 12px', color:'var(--white)', fontSize:'0.9rem'}}/>
               </div>
-              <div style={{flex:1}}>
-                <label className="section-label">Порядок</label>
-                <input className="att-date-input" type="number"
+              <div style={{flex:'1 1 80px'}}>
+                <label style={{color:'var(--gray)', fontSize:'0.78rem', letterSpacing:'0.08em', textTransform:'uppercase', display:'block', marginBottom:6}}>Порядок</label>
+                <input type="number"
                   value={editing.sort_order}
                   onChange={e => setEditing(p=>({...p, sort_order:e.target.value}))}
-                  placeholder="0"/>
+                  placeholder="0"
+                  style={{width:'100%', boxSizing:'border-box', background:'var(--dark)', border:'1px solid var(--gray-dim)', borderRadius:6, padding:'9px 12px', color:'var(--white)', fontSize:'0.9rem'}}/>
               </div>
             </div>
 
             <div style={{marginBottom:18}}>
-              <label className="section-label">Достижения (каждое с новой строки)</label>
-              <textarea className="att-date-input" rows={5}
+              <label style={{color:'var(--gray)', fontSize:'0.78rem', letterSpacing:'0.08em', textTransform:'uppercase', display:'block', marginBottom:6}}>Достижения (каждое с новой строки)</label>
+              <textarea rows={5}
                 value={editing.achievements}
                 onChange={e => setEditing(p=>({...p, achievements:e.target.value}))}
                 placeholder={'Чемпион России 2024\nПризёр первенства ЦФО 2023'}
-                style={{resize:"vertical", width:"100%", minWidth:"100%", maxWidth:"100%"}}/>
+                style={{width:'100%', boxSizing:'border-box', resize:'vertical', background:'var(--dark)', border:'1px solid var(--gray-dim)', borderRadius:6, padding:'9px 12px', color:'var(--white)', fontSize:'0.9rem'}}/>
             </div>
 
             {msg && <div style={{color:'var(--red)', marginBottom:12, fontSize:'0.88rem'}}>{msg}</div>}
 
-            <div className="modal-btns-row">
-              <button className="btn-primary" style={{padding:'9px 24px', fontSize:'14px'}} onClick={save}>
+            <div style={{display:'flex', gap:10, flexWrap:'wrap'}}>
+              <button className="btn-primary" style={{padding:'9px 20px', fontSize:'13px', flex:'0 0 auto'}} onClick={save}>
                 {editing.id ? 'Сохранить' : 'Добавить'}
               </button>
-              <button className="btn-outline" style={{padding:'9px 24px', fontSize:'14px'}} onClick={() => { setShowForm(false); setMsg('') }}>
+              <button className="btn-outline" style={{padding:'9px 20px', fontSize:'13px', flex:'0 0 auto'}} onClick={() => { setShowForm(false); setMsg('') }}>
                 Отмена
               </button>
             </div>
