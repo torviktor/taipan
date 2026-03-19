@@ -1,128 +1,34 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import './Champions.css'
 
-const CHAMPIONS = [
-  {
-    level: 'elite',
-    name: 'Кабанова Ольга',
-    achievements: [
-      '4-кратная Чемпионка Европы (Первенство)',
-      '4-кратная Чемпионка России (Первенство)',
-    ],
-  },
-  {
-    level: 'world',
-    name: 'Шамарин Глеб',
-    achievements: [
-      'Чемпион Кубка Мира (2021)',
-      'Чемпион России — Первенство России (2022)',
-    ],
-  },
-  {
-    level: 'world',
-    name: 'Андрюшин Кирилл',
-    achievements: [
-      'Чемпион Кубка Мира (2021)',
-    ],
-  },
-  {
-    level: 'europe',
-    name: 'Фуртаева Анастасия',
-    achievements: [
-      'Бронзовый призёр Европы (2020)',
-      'Чемпионка России (Первенство)',
-      'Призёр России (Первенство)',
-    ],
-  },
-  {
-    level: 'russia',
-    name: 'Дорофеев Максим',
-    achievements: [
-      'Чемпион России — командный массоги (Первенство России, 2021)',
-    ],
-  },
-  {
-    level: 'russia',
-    name: 'Келим Анастасия',
-    achievements: [
-      'Чемпион «Юность России» (2023)',
-      'Чемпион Кубка России (2025)',
-    ],
-  },
-  {
-    level: 'russia',
-    name: 'Козлов Иван',
-    achievements: [
-      'Призёр России (Первенство России, 2020)',
-    ],
-  },
-  {
-    level: 'russia',
-    name: 'Комаров Константин',
-    achievements: [
-      'Призёр России — командный массоги (Первенство России, 2022)',
-    ],
-  },
-  {
-    level: 'russia',
-    name: 'Коростелёва Мария',
-    achievements: [
-      'Призёр России (Чемпионат России, 2022)',
-    ],
-  },
-  {
-    level: 'russia',
-    name: 'Медведев Илья',
-    achievements: [
-      'Призёр России (Первенство России, 2020–2022)',
-    ],
-  },
-  {
-    level: 'russia',
-    name: 'Медведева Анастасия',
-    achievements: [
-      'Призёр России (Первенство России, 2020–2022)',
-    ],
-  },
-  {
-    level: 'russia',
-    name: 'Ротарь Екатерина',
-    achievements: [
-      'Призёр чемпионатов России',
-      'Призёр Всероссийских соревнований',
-      'Тренер клуба «Тайпан»',
-    ],
-  },
-]
+const API = '/api'
 
-const LEVEL_CONFIG = {
-  elite:  { label: 'Чемпион Мира и Европы', color: '#FFD700' },
-  world:  { label: 'Чемпион Мира',          color: '#C0C0C0' },
-  europe: { label: 'Призёр Европы',         color: '#cc4444' },
-  russia: { label: 'Чемпион / призёр России', color: 'var(--red)' },
-}
-
-function GoldIcon()   { return <svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,1 10,6 15,6 11,9.5 12.5,15 8,11.5 3.5,15 5,9.5 1,6 6,6" fill="#FFD700"/></svg> }
-function SilverIcon() { return <svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,1 10,6 15,6 11,9.5 12.5,15 8,11.5 3.5,15 5,9.5 1,6 6,6" fill="#C0C0C0"/></svg> }
-function BronzeIcon() { return <svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,1 10,6 15,6 11,9.5 12.5,15 8,11.5 3.5,15 5,9.5 1,6 6,6" fill="#cc4444"/></svg> }
-function RussiaIcon() {
-  return (
-    <svg width="20" height="14" viewBox="0 0 20 14">
-      <rect width="20" height="4.67" y="0"    fill="#ffffff"/>
-      <rect width="20" height="4.67" y="4.67" fill="#0039A6"/>
-      <rect width="20" height="4.67" y="9.33" fill="#D52B1E"/>
-    </svg>
-  )
-}
-
-function LevelIcon({ level }) {
-  if (level === 'elite')  return <GoldIcon />
-  if (level === 'world')  return <SilverIcon />
-  if (level === 'europe') return <BronzeIcon />
-  return <RussiaIcon />
+const BELT_COLORS = {
+  11: { bg: '#FF8C00', text: '#fff' },
+  10: { bg: '#f0f0f0', text: '#111' },
+  9:  { bg: '#f0f0f0', text: '#111' },
+  8:  { bg: '#FFD700', text: '#111' },
+  7:  { bg: '#FFD700', text: '#111' },
+  6:  { bg: '#3a9a3a', text: '#fff' },
+  5:  { bg: '#3a9a3a', text: '#fff' },
+  4:  { bg: '#1a6ab5', text: '#fff' },
+  3:  { bg: '#1a6ab5', text: '#fff' },
+  2:  { bg: '#CC0000', text: '#fff' },
+  1:  { bg: '#CC0000', text: '#fff' },
 }
 
 export default function Champions() {
+  const [items,   setItems]   = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch(`${API}/hall-of-fame`)
+      .then(r => r.ok ? r.json() : [])
+      .then(d => { setItems(d); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
   return (
     <main className="champions-page">
       <section className="champions-hero">
@@ -140,37 +46,58 @@ export default function Champions() {
       <section className="champions-grid-section">
         <div className="container">
 
-          <div className="champions-legend">
-            {Object.entries(LEVEL_CONFIG).map(([key, cfg]) => (
-              <div className="legend-item" key={key} style={{color: cfg.color}}>
-                <LevelIcon level={key} />
-                {cfg.label}
-              </div>
-            ))}
-          </div>
+          {loading && (
+            <div style={{ textAlign:'center', color:'var(--gray)', padding:'60px 0' }}>
+              Загрузка...
+            </div>
+          )}
 
-          <div className="champions-grid">
-            {CHAMPIONS.map((c) => {
-              const cfg = LEVEL_CONFIG[c.level]
-              return (
-                <div key={c.name} className={`champion-card champion-card--${c.level}`}>
-                  <div className="champion-img-placeholder">
-                    <span>Фото</span>
-                  </div>
-                  <div className="champion-info">
-                    <div className="champion-level" style={{color: cfg.color}}>
-                      <LevelIcon level={c.level} />
-                      {cfg.label}
+          {!loading && items.length === 0 && (
+            <div style={{ textAlign:'center', color:'var(--gray)', padding:'60px 0' }}>
+              <p style={{ fontSize:'1.1rem' }}>Зал Славы пока пополняется.</p>
+            </div>
+          )}
+
+          {!loading && items.length > 0 && (
+            <div className="champions-grid">
+              {items.map(item => {
+                const belt = item.dan
+                  ? { bg: '#111', text: '#FFD700', label: `${item.dan} дан` }
+                  : item.gup
+                    ? { ...(BELT_COLORS[item.gup] || { bg:'var(--gray)', text:'#fff' }), label: `${item.gup} гып` }
+                    : null
+
+                return (
+                  <div key={item.id} className={`champion-card champion-card--dynamic`}>
+                    <div className="champion-img-wrap">
+                      {item.photo_url ? (
+                        <img src={item.photo_url} alt={item.full_name} className="champion-img"/>
+                      ) : (
+                        <div className="champion-img-placeholder">
+                          <span>Фото</span>
+                        </div>
+                      )}
+                      {belt && (
+                        <div className="champion-belt-badge" style={{ background: belt.bg, color: belt.text }}>
+                          {belt.label}
+                        </div>
+                      )}
                     </div>
-                    <div className="champion-name">{c.name}</div>
-                    <ul className="champion-achievements">
-                      {c.achievements.map((a, i) => <li key={i}>{a}</li>)}
-                    </ul>
+                    <div className="champion-info">
+                      <div className="champion-name">{item.full_name}</div>
+                      {item.achievements && (
+                        <ul className="champion-achievements">
+                          {item.achievements.split('\n').filter(Boolean).map((line, i) => (
+                            <li key={i}>{line}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
 
           <div className="champions-back">
             <Link to="/" className="btn-outline">← На главную</Link>

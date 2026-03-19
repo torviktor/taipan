@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.core.database import engine, Base
 from app.routes import auth, applications, schedule, users, payments
 from app.routes import events, telegram
@@ -9,7 +10,10 @@ from app.routes.competitions import router as competitions_router
 from app.routes.certifications import router as certifications_router, notif_router as notifications_router
 from app.routes.achievements import router as achievements_router
 from app.routes.camps import router as camps_router
+from app.routes.hall_of_fame_routes import router as hof_router
 from app.models import user, event, attendance, competition, certification, achievement, camp
+from app.models import hall_of_fame
+import os
 
 Base.metadata.create_all(bind=engine)
 
@@ -27,6 +31,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+os.makedirs("/app/static/hall-of-fame", exist_ok=True)
+app.mount("/static", StaticFiles(directory="/app/static"), name="static")
+
 app.include_router(auth.router,              prefix="/api/auth",         tags=["Авторизация"])
 app.include_router(users.router,             prefix="/api/users",        tags=["Пользователи"])
 app.include_router(applications.router,      prefix="/api/applications", tags=["Заявки"])
@@ -41,6 +48,7 @@ app.include_router(certifications_router,    prefix="/api",              tags=["
 app.include_router(notifications_router,     prefix="/api",              tags=["Уведомления"])
 app.include_router(achievements_router,      prefix="/api",              tags=["Ачивки"])
 app.include_router(camps_router,             prefix="/api",              tags=["Сборы"])
+app.include_router(hof_router,               prefix="/api",              tags=["Зал Славы"])
 
 @app.get("/")
 def root():

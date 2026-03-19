@@ -2630,6 +2630,165 @@ function NotificationsTab({ token }) {
   )
 }
 
+// ── ЗАЛ СЛАВЫ — УПРАВЛЕНИЕ ────────────────────────────────────────────────────
+
+function HallOfFameAdmin({ token }) {
+  const [items,   setItems]   = useState([])
+  const [loading, setLoading] = useState(false)
+  const [editing, setEditing] = useState(null)  // { id?, full_name, achievements, gup, dan, sort_order }
+  const [msg,     setMsg]     = useState('')
+  const [uploading, setUploading] = useState(null)
+
+  const h  = { Authorization: `Bearer ${token}` }
+  const hj = { ...h, 'Content-Type': 'application/json' }
+
+  useEffect(() => { load() }, [])
+
+  const load = async () => {
+    setLoading(true)
+    try { const r = await fetch(`${API}/hall-of-fame`, { headers: h }); if (r.ok) setItems(await r.json()) } catch {}
+    setLoading(false)
+  }
+
+  const save = async () => {
+    if (!editing?.full_name?.trim()) { setMsg('Введите ФИО'); return }
+    try {
+      const method = editing.id ? 'PATCH' : 'POST'
+      const url    = editing.id ? `${API}/hall-of-fame/${editing.id}` : `${API}/hall-of-fame`
+      const r = await fetch(url, { method, headers: hj, body: JSON.stringify({
+        full_name:    editing.full_name,
+        achievements: editing.achievements || null,
+        gup:          editing.gup ? Number(editing.gup) : null,
+        dan:          editing.dan ? Number(editing.dan) : null,
+        sort_order:   Number(editing.sort_order) || 0,
+      })})
+      if (r.ok) { setEditing(null); setMsg(''); await load() }
+      else setMsg('Ошибка сохранения')
+    } catch { setMsg('Ошибка') }
+  }
+
+  const remove = async (id) => {
+    if (!window.confirm('Удалить из Зала Славы?')) return
+    await fetch(`${API}/hall-of-fame/${id}`, { method: 'DELETE', headers: h })
+    await load()
+  }
+
+  const uploadPhoto = async (id, file) => {
+    setUploading(id)
+    const fd = new FormData(); fd.append('file', file)
+    try {
+      const r = await fetch(`${API}/hall-of-fame/${id}/photo`, {
+        method: 'POST', headers: h, body: fd
+      })
+      if (r.ok) await load()
+    } catch {}
+    setUploading(null)
+  }
+
+  const belt = (gup, dan) => {
+    if (dan) return `${dan} дан`
+    if (gup === 0) return 'Без пояса'
+    if (gup) return `${gup} гып`
+    return '—'
+  }
+
+  return (
+    <div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+        <span style={{ color:'var(--gray)', fontSize:'0.9rem' }}>Спортсмены в Зале Славы: {items.length}</span>
+        <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }}
+          onClick={() => setEditing({ full_name:'', achievements:'', gup:'', dan:'', sort_order:0 })}>
+          + Добавить
+        </button>
+      </div>
+
+      {msg && <div style={{ color:'var(--red)', marginBottom:12, fontSize:'0.9rem' }}>{msg}</div>}
+
+      {/* Форма редактирования */}
+      {editing && (
+        <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderRadius:10, padding:20, marginBottom:24 }}>
+          <div style={{ fontFamily:'Bebas Neue', fontSize:'1.2rem', marginBottom:16, color:'var(--white)' }}>
+            {editing.id ? 'Редактировать' : 'Добавить в Зал Славы'}
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+            <div>
+              <label style={{ color:'var(--gray)', fontSize:'0.8rem', display:'block', marginBottom:4 }}>ФИО *</label>
+              <input className="form-input" value={editing.full_name} onChange={e => setEditing(p=>({...p, full_name:e.target.value}))} placeholder="Иванов Иван Иванович"/>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <div style={{ flex:1 }}>
+                <label style={{ color:'var(--gray)', fontSize:'0.8rem', display:'block', marginBottom:4 }}>Гып</label>
+                <input className="form-input" type="number" min="0" max="11" value={editing.gup} onChange={e => setEditing(p=>({...p, gup:e.target.value, dan:''}))} placeholder="1–11"/>
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ color:'var(--gray)', fontSize:'0.8rem', display:'block', marginBottom:4 }}>Дан</label>
+                <input className="form-input" type="number" min="1" max="9" value={editing.dan} onChange={e => setEditing(p=>({...p, dan:e.target.value, gup:''}))} placeholder="1–9"/>
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ color:'var(--gray)', fontSize:'0.8rem', display:'block', marginBottom:4 }}>Порядок</label>
+                <input className="form-input" type="number" value={editing.sort_order} onChange={e => setEditing(p=>({...p, sort_order:e.target.value}))} placeholder="0"/>
+              </div>
+            </div>
+          </div>
+          <div style={{ marginBottom:12 }}>
+            <label style={{ color:'var(--gray)', fontSize:'0.8rem', display:'block', marginBottom:4 }}>Достижения</label>
+            <textarea className="form-input" rows={4} value={editing.achievements} onChange={e => setEditing(p=>({...p, achievements:e.target.value}))}
+              placeholder="Чемпион России 2024&#10;Призёр первенства ЦФО 2023&#10;..."
+              style={{ resize:'vertical', width:'100%' }}/>
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button className="btn-primary" style={{ padding:'8px 20px', fontSize:'13px' }} onClick={save}>Сохранить</button>
+            <button className="btn-outline" style={{ padding:'8px 20px', fontSize:'13px' }} onClick={() => { setEditing(null); setMsg('') }}>Отмена</button>
+          </div>
+        </div>
+      )}
+
+      {loading && <div className="cabinet-loading">Загрузка...</div>}
+      {!loading && items.length === 0 && <div className="cabinet-empty">Зал Славы пока пуст. Добавьте первого спортсмена.</div>}
+
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:16 }}>
+        {items.map(item => (
+          <div key={item.id} style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderRadius:10, overflow:'hidden' }}>
+            {/* Фото */}
+            <div style={{ position:'relative', height:200, background:'var(--dark)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              {item.photo_url
+                ? <img src={item.photo_url} alt={item.full_name} style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+                : <div style={{ color:'var(--gray-dim)', fontSize:'3rem' }}>👤</div>
+              }
+              <label style={{
+                position:'absolute', bottom:8, right:8,
+                background:'rgba(0,0,0,0.7)', border:'1px solid var(--gray-dim)',
+                borderRadius:6, padding:'4px 10px', cursor:'pointer',
+                fontSize:'0.78rem', color:'var(--white)'
+              }}>
+                {uploading === item.id ? 'Загрузка...' : 'Фото'}
+                <input type="file" accept="image/*" style={{ display:'none' }}
+                  onChange={e => e.target.files[0] && uploadPhoto(item.id, e.target.files[0])}/>
+              </label>
+            </div>
+            {/* Данные */}
+            <div style={{ padding:16 }}>
+              <div style={{ fontFamily:'Bebas Neue', fontSize:'1.2rem', letterSpacing:'0.05em', color:'var(--white)', marginBottom:4 }}>
+                {item.full_name}
+              </div>
+              <div style={{ color:'#c8962a', fontSize:'0.85rem', marginBottom:8 }}>{belt(item.gup, item.dan)}</div>
+              {item.achievements && (
+                <div style={{ color:'var(--gray)', fontSize:'0.82rem', lineHeight:1.6, marginBottom:12, whiteSpace:'pre-line' }}>
+                  {item.achievements}
+                </div>
+              )}
+              <div style={{ display:'flex', gap:8 }}>
+                <button className="td-btn td-btn-edit" onClick={() => setEditing({...item})}>Ред.</button>
+                <button className="td-btn td-btn-del" onClick={() => remove(item.id)}>Удал.</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── ВКЛАДКА ИНФОРМАЦИЯ ────────────────────────────────────────────────────────
 
 function InfoTab({ isAdmin }) {
@@ -3317,6 +3476,7 @@ export default function Cabinet() {
               Заявки{applications.filter(a => a.status==='new').length > 0 && <span className="tab-badge">{applications.filter(a => a.status==='new').length}</span>}
             </button>
             <button className={`cabinet-tab ${view==='archive'?'active':''}`} style={{ color: view==='archive' ? undefined : 'var(--gray)' }} onClick={() => setView('archive')}>Архив ({athletes.filter(a=>a.is_archived).length})</button>
+            <button className={`cabinet-tab ${view==='hof'?'active':''}`} style={{ color: view==='hof' ? undefined : '#c8962a' }} onClick={() => setView('hof')}>Зал Славы</button>
           </div>
           {/* События */}
           <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
@@ -3356,6 +3516,7 @@ export default function Cabinet() {
         {view === 'achievements'  && <AchievementsLeaderboard token={token} />}
         {view === 'camps'         && <CampsTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'info'          && <InfoTab isAdmin={true} />}
+        {view === 'hof'           && <HallOfFameAdmin token={token} />}
         {view === 'archive'       && (
           <div>
             <div style={{ marginBottom:16, color:'var(--gray)', fontSize:'0.9rem' }}>
