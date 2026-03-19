@@ -224,9 +224,16 @@ members: (
 structure: (
   <div className="about-body">
 
+    {/* ── 3 фото вверху раздела ── */}
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:32 }}>
+      <img src="/photo10.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+      <img src="/photo11.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+      <img src="/photo12.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+    </div>
+
     <h3>Тренировочный сезон: сентябрь — май</h3>
     <p>
-      Годовая работа клуба строится по сезону, принятому в Федерации тхэквондо Московской области.
+      Годовая работа клуба строится по сезону, принятому в региональной Федерации тхэквондо ГТФ России.
       Тренировочный сезон стартует в сентябре и длится до конца мая. В это время проходят регулярные
       занятия, аттестации, соревнования и учебно-методические мероприятия. Это основное, плановое
       время для активного обучения и роста учеников.
