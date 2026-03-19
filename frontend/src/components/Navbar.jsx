@@ -7,8 +7,8 @@ const STATIC_INDEX = [
   { path: '/about',     title: 'О клубе',           keywords: 'о клубе тренер ротарь екатерина история эмблема обязанности сезон аттестация сборы семья' },
   { path: '/schedule',  title: 'Расписание',         keywords: 'расписание тренировки группа младшая старшая вторник четверг суббота время 17:30 19:00' },
   { path: '/calendar',  title: 'Календарь событий',  keywords: 'календарь события соревнования сборы турнир' },
+  { path: '/champions', title: 'Зал Славы',          keywords: 'зал славы чемпионы кабанова шамарин фуртаева андрюшин келим медведев козлов комаров коростелёва дорофеев ротарь' },
   { path: '/apply',     title: 'Записаться',         keywords: 'записаться заявка вступление пробное занятие регистрация' },
-  { path: '/champions', title: 'Зал славы',          keywords: 'зал славы чемпионы кабанова шамарин фуртаева андрюшин келим медведев козлов комаров коростелёва дорофеев ротарь' },
   { path: '/groups/kids-6-10',  title: 'Группа 6–10 лет',  keywords: 'младшая группа дети 6 7 8 9 10 лет' },
   { path: '/groups/kids-11-16', title: 'Группа 11–16 лет', keywords: 'старшая группа дети 11 12 13 14 15 16 лет' },
   { path: '/groups/adults',     title: 'Взрослая группа',  keywords: 'взрослые группа 16 лет' },
@@ -99,14 +99,14 @@ export default function Navbar() {
 
   const token   = localStorage.getItem('token')
   const role    = localStorage.getItem('role')
-  const isAdmin = ['admin', 'manager'].includes(role)
 
   const links = [
-    { to: '/',         label: 'Главная'    },
-    { to: '/about',    label: 'О клубе'   },
-    { to: '/schedule', label: 'Расписание' },
-    { to: '/calendar', label: 'Календарь'  },
-    { to: '/apply',    label: 'Записаться' },
+    { to: '/',          label: 'Главная'    },
+    { to: '/about',     label: 'О клубе'   },
+    { to: '/schedule',  label: 'Расписание' },
+    { to: '/calendar',  label: 'Календарь'  },
+    { to: '/champions', label: 'Зал Славы'  },
+    { to: '/apply',     label: 'Записаться' },
   ]
 
   return (
@@ -123,7 +123,6 @@ export default function Navbar() {
               <Link to={l.to} className={location.pathname === l.to ? 'active' : ''}>{l.label}</Link>
             </li>
           ))}
-          {/* Панель убрана — кнопка Кабинет одна для всех */}
         </ul>
 
         <div className="navbar-actions">
