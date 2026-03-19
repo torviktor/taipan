@@ -18,8 +18,8 @@ about: (
 
     {/* ── Два лого во всю ширину ── */}
     <div style={{ display:'flex', justifyContent:'center', gap:40, alignItems:'center', marginBottom:36, padding:'24px 0', borderBottom:'1px solid var(--gray-dim)' }}>
-      <img src="/logo.png"   alt="Тайпан" style={{ width:140, height:140, objectFit:'contain' }} />
-      <img src="/logo_2.png" alt="GTF"    style={{ width:140, height:140, objectFit:'contain' }} />
+      <img src="/logo.png"   alt="Тайпан" style={{ width:180, height:180, objectFit:'contain' }} />
+      <img src="/logo_2.png" alt="GTF"    style={{ width:180, height:180, objectFit:'contain' }} />
     </div>
 
     {/* ── Лид-блок ── */}
@@ -31,11 +31,11 @@ about: (
     </div>
 
     {/* ── Фото тренера во всю ширину ── */}
-    <div style={{ width:'100%', height:400, overflow:'hidden', margin:'36px 0 16px', border:'1px solid var(--gray-dim)' }}>
+    <div style={{ width:'100%', margin:'36px 0 16px', border:'1px solid var(--gray-dim)' }}>
       <img
         src="/coach_2.jpg"
         alt=""
-        style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top center' }}
+        style={{ width:'100%', height:'auto', display:'block' }}
       />
     </div>
 
