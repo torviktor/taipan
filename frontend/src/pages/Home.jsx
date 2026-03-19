@@ -152,21 +152,26 @@ export default function Home() {
       {/* ── ФОТО БЛОК ────────────────────────────────────────────── */}
       <section className="photo-block">
         <div className="photo-grid">
-          <div className="photo-main photo-placeholder">
+          <div className="photo-main">
+            <img src="/photo1.jpg" alt="Тренировка" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
             <div className="photo-caption">
               <span>ТРЕНИРОВКИ</span>
               <p>Тренировки в группах, индивидуальные занятия</p>
             </div>
           </div>
           <div className="photo-side">
-            <div className="photo-placeholder-sm" />
-            <div className="photo-placeholder-sm" />
+            <div style={{ flex:1, overflow:'hidden', position:'relative' }}>
+              <img src="/photo2.jpg" alt="Соревнования" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+            </div>
+            <div style={{ flex:1, overflow:'hidden', position:'relative' }}>
+              <img src="/photo3.jpg" alt="Победители" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+            </div>
           </div>
         </div>
         <div className="photo-label">
           <span className="section-label">Зал в центре города</span>
           <h2 className="section-title">МЕСТО ГДЕ<br/>РОЖДАЮТСЯ<br/>ЧЕМПИОНЫ</h2>
-          <p className="photo-label-desc">Скоро здесь появятся фотографии с наших тренировок и соревнований</p>
+          <p className="photo-label-desc">Тренировки, соревнования, победы — всё начинается здесь</p>
           <Link to="/apply" className="btn-primary">Первое занятие бесплатно</Link>
         </div>
       </section>
@@ -179,7 +184,7 @@ export default function Home() {
           <div className="divider" />
           <div className="trainer-single">
             <div className="trainer-img-wrap">
-              <div className="trainer-img-placeholder"><span>Фото тренера</span></div>
+              <img src="/coach.jpg" alt="Тренер" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }} />
               <div className="trainer-overlay" />
             </div>
             <div className="trainer-info">
