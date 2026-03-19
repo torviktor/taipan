@@ -340,6 +340,12 @@ attestation: (
 camps: (
   <div className="about-body">
 
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:32 }}>
+      <img src="/photo14.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+      <img src="/photo15.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+      <img src="/photo16.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+    </div>
+
     <div className="about-lead">
       <p>Тхэквондо — это не только регулярные тренировки, но и система испытаний и роста, которая реализуется через сборы и участие в соревнованиях.</p>
       <p>Эти мероприятия помогают спортсменам развивать силу воли, уверенность, соревновательный дух и командную сплочённость.</p>
@@ -373,6 +379,12 @@ camps: (
       <li>подготовка к аттестациям и соревнованиям</li>
       <li>развитие самостоятельности, дисциплины и ответственности у детей</li>
     </ul>
+
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, margin:'32px 0' }}>
+      <img src="/photo17.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+      <img src="/photo18.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+      <img src="/photo19.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+    </div>
 
     <h3>Участие в турнирах</h3>
     <p>Соревнования — важная часть спортивной жизни клуба. В течение сезона спортсмены участвуют в:</p>
