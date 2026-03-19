@@ -163,6 +163,8 @@ def overall_rating(
     for i, (a, total, cnt) in enumerate(rows):
         age = _calc_age(a.birth_date)
         cat = _age_category(age)
+        if cat is None:  # взрослые 18+ не участвуют в рейтинге
+            continue
         if age_category and cat != age_category:
             continue
         result.append({
