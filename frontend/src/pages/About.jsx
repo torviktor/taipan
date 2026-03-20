@@ -31,9 +31,10 @@ about: (
   <div className="about-body">
 
     {/* ── Два лого во всю ширину ── */}
-    <div style={{ display:'flex', justifyContent:'center', gap:40, alignItems:'center', marginBottom:36, padding:'24px 0', borderBottom:'1px solid var(--gray-dim)' }}>
-      <img src="/logo.png"   alt="Тайпан" style={{ width:180, height:180, objectFit:'contain' }} />
-      <img src="/logo_2.png" alt="GTF"    style={{ width:180, height:180, objectFit:'contain' }} />
+    <div style={{ display:'flex', justifyContent:'center', gap:40, alignItems:'center', marginBottom:36, padding:'24px 0', borderBottom:'1px solid var(--gray-dim)', flexWrap:'wrap' }}>
+      <img src="/logo_1.png" alt="GTF World"  style={{ width:160, height:160, objectFit:'contain' }} />
+      <img src="/logo_2.png" alt="GTF Russia" style={{ width:160, height:160, objectFit:'contain' }} />
+      <img src="/logo.png"   alt="Тайпан"     style={{ width:160, height:160, objectFit:'contain' }} />
     </div>
 
     {/* ── Лид-блок ── */}
@@ -116,7 +117,7 @@ about: (
 emblem: (
   <div className="about-body">
     <div className="about-emblem-hero">
-      <img src="/logo.png" alt="Эмблема клуба Тайпан" className="about-emblem-img" />
+      <img src="/logo.png" alt="Эмблема клуба Тайпан" className="about-emblem-img" style={{ background:'none' }} />
     </div>
 
     <h3>Форма</h3>
