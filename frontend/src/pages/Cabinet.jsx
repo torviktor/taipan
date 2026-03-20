@@ -1386,6 +1386,35 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
 
 // ── СОРЕВНОВАНИЯ ДЛЯ РОДИТЕЛЯ ─────────────────────────────────────────────────
 
+function CompFilesBlock({ token, compId }) {
+  const [files, setFiles] = useState([])
+  useEffect(() => {
+    fetch(`${API}/competitions/${compId}/files`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then(setFiles)
+      .catch(() => {})
+  }, [compId])
+
+  if (!files.length) return null
+
+  return (
+    <div style={{ marginTop:10, paddingTop:10, borderTop:'1px solid var(--gray-dim)' }}>
+      <div style={{ fontFamily:'Barlow Condensed', fontSize:'11px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:6 }}>
+        Документы
+      </div>
+      {files.map(f => (
+        <a key={f.id} href={f.file_url} target="_blank" rel="noreferrer"
+          style={{ display:'flex', alignItems:'center', gap:8, color:'var(--white)', fontSize:'13px', textDecoration:'none', padding:'4px 0' }}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}>
+            <path d="M8 1v9M4 7l4 4 4-4M2 13h12" stroke="var(--red)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          {f.filename}
+        </a>
+      ))}
+    </div>
+  )
+}
+
 function ParentCompetitionsTab({ token, athletes }) {
   const [data,    setData]    = useState([])
   const [loading, setLoading] = useState(false)
@@ -1477,6 +1506,7 @@ function ParentCompetitionsTab({ token, athletes }) {
                   </div>
                 ))}
               </div>
+              <CompFilesBlock token={token} compId={r.competition_id} />
             </div>
           ))}
         </div>
