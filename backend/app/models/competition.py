@@ -36,6 +36,7 @@ class Competition(Base):
     updated_at   = Column(DateTime(timezone=True), onupdate=func.now())
 
     results = relationship("CompetitionResult", back_populates="competition", cascade="all, delete-orphan")
+    files   = relationship("CompetitionFile",   back_populates="competition", cascade="all, delete-orphan")
     creator = relationship("User", foreign_keys=[created_by])
 
 
