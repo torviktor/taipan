@@ -45,13 +45,18 @@ about: (
       <p>Мы работаем полностью в правовом поле — у нас есть устав, свидетельство о государственной регистрации, ОГРН и все необходимые документы. Клуб создан не ради прибыли, а ради детей и спорта.</p>
       <div style={{ marginTop:16, paddingTop:16, borderTop:'1px solid rgba(204,0,0,0.15)' }}>
         <p style={{ color:'var(--gray)', fontSize:'14px', marginBottom:10 }}>
-          Клуб «Тайпан» является официальным членом Глобальной федерации тхэквондо (GTF) и работает в структуре российского и регионального отделений федерации:
+          Клуб «Тайпан» является официальным членом Глобальной федерации тхэквондо (GTF) и работает в структуре российского и регионального отделений федерации.
         </p>
-        <div style={{ display:'flex', flexWrap:'wrap', gap:12 }}>
-          <a href="https://taekwondogtf.com/" target="_blank" rel="noreferrer" style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--red)', textDecoration:'none', borderBottom:'1px solid rgba(204,0,0,0.3)', paddingBottom:2 }}>GTF Международная →</a>
-          <a href="https://rusgtf.ru/" target="_blank" rel="noreferrer" style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--red)', textDecoration:'none', borderBottom:'1px solid rgba(204,0,0,0.3)', paddingBottom:2 }}>ГТФ Россия →</a>
-          <a href="https://gtf.moscow/" target="_blank" rel="noreferrer" style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--red)', textDecoration:'none', borderBottom:'1px solid rgba(204,0,0,0.3)', paddingBottom:2 }}>ГТФ Москва →</a>
-          <a href="http://gtf71.ru/" target="_blank" rel="noreferrer" style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--red)', textDecoration:'none', borderBottom:'1px solid rgba(204,0,0,0.3)', paddingBottom:2 }}>ГТФ Тула →</a>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:12, justifyContent:'center', marginBottom:20 }}>
+          <a href="https://taekwondogtf.com/" target="_blank" rel="noreferrer" style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--red)', textDecoration:'none', borderBottom:'1px solid rgba(204,0,0,0.3)', paddingBottom:2 }}>GTF Международная</a>
+          <a href="https://rusgtf.ru/" target="_blank" rel="noreferrer" style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--red)', textDecoration:'none', borderBottom:'1px solid rgba(204,0,0,0.3)', paddingBottom:2 }}>ГТФ Россия</a>
+        </div>
+        <p style={{ color:'var(--gray)', fontSize:'14px', marginBottom:10 }}>
+          Отдельную благодарность выражаем нашим коллегам и друзьям — федерациям, с которыми нас связывают годы совместной работы, турниров и взаимной поддержки:
+        </p>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:12, justifyContent:'center' }}>
+          <a href="https://gtf.moscow/" target="_blank" rel="noreferrer" style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--red)', textDecoration:'none', borderBottom:'1px solid rgba(204,0,0,0.3)', paddingBottom:2 }}>ГТФ Москва</a>
+          <a href="http://gtf71.ru/" target="_blank" rel="noreferrer" style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--red)', textDecoration:'none', borderBottom:'1px solid rgba(204,0,0,0.3)', paddingBottom:2 }}>ГТФ Тула</a>
         </div>
       </div>
     </div>
