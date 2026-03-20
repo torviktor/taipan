@@ -14,7 +14,7 @@ from app.routes.hall_of_fame_routes import router as hof_router
 from app.models import user, event, attendance, competition, certification, achievement, camp
 from app.models import hall_of_fame
 from app.models import competition_file
-from app.routes.competition_files import router as competition_files_routerfrom app.routes.competition_files import router as competition_files_router
+from app.routes.competition_files import router as competition_files_router
 import os
 
 Base.metadata.create_all(bind=engine)
