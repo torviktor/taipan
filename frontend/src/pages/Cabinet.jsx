@@ -1131,45 +1131,18 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
             }
           </div>
 {/* ── Матрица заявок ── */}
-          {!readOnly && (
-            <CompApplicationMatrix
-              rows={rows}
-              athletes={athletes}
-              detail={detail}
-              token={token}
-            />
-          )}
-
-          {/* Блок участвуют */}
-          {rows.filter(r => r.status === 'confirmed' || r.status === 'paid').length > 0 && (
-            <div style={{ marginBottom:24 }}>
-              <div style={{
-                fontFamily:'Bebas Neue', fontSize:'1.1rem', letterSpacing:'0.12em',
-                color:'#6cba6c', marginBottom:16, marginTop:8,
-                paddingBottom:8, borderBottom:'1px solid #1a3a1a',
-                textAlign:'center', textShadow:'0 0 12px rgba(108,186,108,0.4)'
-              }}>▸ УЧАСТВУЮТ — {rows.filter(r => r.status === 'confirmed' || r.status === 'paid').length} чел.</div>
-              <div className="athletes-table-wrap">
-                <table className="athletes-table comp-results-table">
-                  <thead><tr>
-                    <th rowSpan="2" style={{textAlign:'left'}}>Спортсмен</th>
-                    <th colSpan="2">Спарринг</th><th colSpan="2">Стоп-балл</th>
-                    <th colSpan="2">Тег-тим</th><th colSpan="2">Тули</th>
-                    <th rowSpan="2">Рейтинг</th><th rowSpan="2">Взнос</th>
-                    {!readOnly && <th rowSpan="2">Статус</th>}
-                    {!readOnly && <th rowSpan="2"></th>}
-                  </tr><tr>
-                    <th>Место</th><th>Бои</th><th>Место</th><th>Бои</th>
-                    <th>Место</th><th>Бои</th><th>Место</th><th>Выст.</th>
-                  </tr></thead>
-                  <tbody>
-                    {rows.filter(r => r.status === 'confirmed' || r.status === 'paid').map(r => renderResultRow(r))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
+<CompApplicationMatrix
+  rows={rows}
+  athletes={athletes}
+  detail={detail}
+  token={token}
+  readOnly={readOnly}
+  updateRow={updateRow}
+  updateRowStatus={updateRowStatus}
+  removeRow={removeRow}
+  calcRatingPreview={calcRatingPreview}
+/>
+          
           {/* Блок ожидают ответа */}
           {rows.filter(r => r.status === 'pending').length > 0 && (
             <div style={{ marginBottom:20, opacity:0.55 }}>
