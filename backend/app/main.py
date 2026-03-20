@@ -13,6 +13,8 @@ from app.routes.camps import router as camps_router
 from app.routes.hall_of_fame_routes import router as hof_router
 from app.models import user, event, attendance, competition, certification, achievement, camp
 from app.models import hall_of_fame
+from app.models import competition_file
+from app.routes.competition_files import router as competition_files_routerfrom app.routes.competition_files import router as competition_files_router
 import os
 
 Base.metadata.create_all(bind=engine)
@@ -49,6 +51,7 @@ app.include_router(notifications_router,     prefix="/api",              tags=["
 app.include_router(achievements_router,      prefix="/api",              tags=["Ачивки"])
 app.include_router(camps_router,             prefix="/api",              tags=["Сборы"])
 app.include_router(hof_router,               prefix="/api",              tags=["Зал Славы"])
+app.include_router(competition_files_router, prefix="/api")
 
 @app.get("/")
 def root():

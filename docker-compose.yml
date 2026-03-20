@@ -18,6 +18,8 @@ services:
     depends_on:
       - db
       - redis
+    volumes:
+      - competition_files:/app/static/competition-files
     environment:
       DATABASE_URL:        postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       SECRET_KEY:          ${SECRET_KEY}
@@ -58,3 +60,4 @@ services:
 
 volumes:
   postgres_data:
+  competition_files:
