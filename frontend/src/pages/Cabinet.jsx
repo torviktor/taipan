@@ -1113,7 +1113,9 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
                   <div key={f.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid var(--gray-dim)' }}>
                     <a href={f.file_url} target="_blank" rel="noreferrer"
                       style={{ color:'var(--white)', fontSize:'14px', textDecoration:'none', display:'flex', alignItems:'center', gap:8 }}>
-                      <span style={{ color:'var(--red)', fontSize:'16px' }}>↓</span>
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}>
+                      <path d="M8 1v9M4 7l4 4 4-4M2 13h12" stroke="var(--red)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
                       {f.filename}
                     </a>
                     {!readOnly && (
