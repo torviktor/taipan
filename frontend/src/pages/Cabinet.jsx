@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import './Cabinet.css'
 import './Competitions.css'
+import CompApplicationMatrix from './CompApplicationMatrix'
 
 const API = '/api'
 
@@ -772,6 +773,10 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
           saved_rating:    ex.rating          ?? null,
           status:          ex.status          ?? 'pending',
           paid:            ex.paid            ?? false,
+          weight:          a.weight           || null,
+          birth_date:      a.birth_date       || '',
+          dan:             a.dan,
+          auto_group:      a.auto_group       || '',
           _inList:         true,
         }
       })
@@ -1125,6 +1130,15 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
                 ))
             }
           </div>
+{/* ── Матрица заявок ── */}
+          {!readOnly && (
+            <CompApplicationMatrix
+              rows={rows}
+              athletes={athletes}
+              detail={detail}
+              token={token}
+            />
+          )}
 
           {/* Блок участвуют */}
           {rows.filter(r => r.status === 'confirmed' || r.status === 'paid').length > 0 && (
