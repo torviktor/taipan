@@ -16,6 +16,7 @@ import GroupKids2 from './pages/GroupKids2'
 import GroupAdults from './pages/GroupAdults'
 import Champions from './pages/Champions'
 import Privacy from './pages/Privacy'
+import Quiz from './pages/Quiz'
 // import TaipanGPT from './components/TaipanGPT'
 
 export default function App() {
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/groups/adults"     element={<GroupAdults />} />
         <Route path="/champions"         element={<Champions />} />
         <Route path="/privacy"           element={<Privacy />} />
+        <Route path="/quiz"              element={<Quiz />} />
       </Routes>
       <Footer />
       {/* <TaipanGPT /> */}

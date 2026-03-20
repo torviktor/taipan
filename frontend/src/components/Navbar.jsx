@@ -107,6 +107,7 @@ export default function Navbar() {
     { to: '/calendar',  label: 'Календарь'  },
     { to: '/champions', label: 'Зал Славы'  },
     { to: '/apply',     label: 'Записаться' },
+    { to: '/quiz',      label: 'Тест' },
   ]
 
   return (
