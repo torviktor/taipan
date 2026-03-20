@@ -1,97 +1,169 @@
 # backend/app/models/achievement.py
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, func
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 
 # ── Определения ачивок ────────────────────────────────────────────────────────
-# Хранятся в коде, не в БД — так проще менять без миграций
+# Все ачивки посезонные — при новом сезоне начисляются заново
 
 ACHIEVEMENTS = [
+
     # ── Посещаемость ──────────────────────────────────────────────────────────
     {
-        "code":        "attendance_10",
-        "name":        "Первые шаги",
-        "description": "Посетил 10 тренировок",
+        "code":        "attendance_first",
+        "name":        "Первый шаг",
+        "description": "Первая тренировка в сезоне",
         "category":    "attendance",
-        "tier":        "common",      # common / rare / legendary
+        "tier":        "common",
         "icon":        "steps",
     },
     {
-        "code":        "attendance_50",
-        "name":        "Стабильный боец",
-        "description": "Посетил 50 тренировок",
+        "code":        "attendance_30",
+        "name":        "Стабильный",
+        "description": "30 тренировок за сезон",
         "category":    "attendance",
-        "tier":        "rare",
+        "tier":        "common",
         "icon":        "shield",
     },
     {
-        "code":        "attendance_100",
-        "name":        "Железная дисциплина",
-        "description": "Посетил 100 тренировок",
+        "code":        "attendance_60",
+        "name":        "Железный",
+        "description": "60 тренировок за сезон",
         "category":    "attendance",
-        "tier":        "legendary",
+        "tier":        "rare",
         "icon":        "iron",
     },
     {
+        "code":        "attendance_90",
+        "name":        "Легенда зала",
+        "description": "90 тренировок за сезон",
+        "category":    "attendance",
+        "tier":        "legendary",
+        "icon":        "legend",
+    },
+    {
         "code":        "attendance_perfect_month",
-        "name":        "Отличник посещаемости",
-        "description": "100% посещаемость за календарный месяц",
+        "name":        "Отличник",
+        "description": "100% посещаемость за любой месяц сезона",
         "category":    "attendance",
         "tier":        "rare",
         "icon":        "star",
     },
+
     # ── Соревнования ─────────────────────────────────────────────────────────
     {
         "code":        "competition_first",
         "name":        "Боевое крещение",
-        "description": "Участвовал в первом соревновании",
+        "description": "Первое соревнование в сезоне",
         "category":    "competition",
         "tier":        "common",
         "icon":        "sword",
     },
     {
+        "code":        "competition_medal",
+        "name":        "Медалист",
+        "description": "Любой призовой результат в сезоне",
+        "category":    "competition",
+        "tier":        "rare",
+        "icon":        "medal",
+    },
+    {
         "code":        "competition_gold",
         "name":        "Призёр",
-        "description": "Занял 1-е место на соревновании",
+        "description": "1-е место на соревновании в сезоне",
         "category":    "competition",
         "tier":        "rare",
         "icon":        "trophy",
     },
     {
-        "code":        "competition_top3_season",
-        "name":        "Чемпион клуба",
-        "description": "Топ-3 общего рейтинга за сезон",
+        "code":        "competition_allround",
+        "name":        "Многоборец",
+        "description": "Участие в 3 и более видах на одном соревновании",
         "category":    "competition",
-        "tier":        "legendary",
-        "icon":        "crown",
+        "tier":        "rare",
+        "icon":        "allround",
     },
+    {
+        "code":        "competition_3season",
+        "name":        "Турнирный боец",
+        "description": "3 и более соревнований за сезон",
+        "category":    "competition",
+        "tier":        "rare",
+        "icon":        "warrior",
+    },
+
     # ── Аттестация ────────────────────────────────────────────────────────────
     {
-        "code":        "certification_first",
-        "name":        "Первый пояс",
-        "description": "Сдал первую аттестацию",
+        "code":        "certification_passed",
+        "name":        "Новый пояс",
+        "description": "Прошёл аттестацию в сезоне",
         "category":    "certification",
         "tier":        "common",
         "icon":        "belt",
     },
     {
-        "code":        "certification_upgrade",
-        "name":        "Восхождение",
-        "description": "Повысил гып или дан",
+        "code":        "certification_double",
+        "name":        "Двойной рост",
+        "description": "Повысил пояс дважды за сезон",
         "category":    "certification",
         "tier":        "rare",
         "icon":        "upgrade",
     },
+
     # ── Сборы ─────────────────────────────────────────────────────────────────
     {
         "code":        "camp_first",
-        "name":        "Боец сборов",
-        "description": "Принял участие в спортивных сборах",
+        "name":        "Полевой боец",
+        "description": "Участие в спортивных сборах в сезоне",
+        "category":    "camp",
+        "tier":        "common",
+        "icon":        "camp",
+    },
+    {
+        "code":        "camp_veteran",
+        "name":        "Ветеран сборов",
+        "description": "2 и более сборов за сезон",
         "category":    "camp",
         "tier":        "rare",
-        "icon":        "camp",
+        "icon":        "veteran",
+    },
+
+    # ── Комбо ─────────────────────────────────────────────────────────────────
+    {
+        "code":        "combo_full",
+        "name":        "Полное комбо",
+        "description": "Соревнование + аттестация + сборы в одном сезоне",
+        "category":    "combo",
+        "tier":        "legendary",
+        "icon":        "combo",
+    },
+
+    # ── За ачивки ─────────────────────────────────────────────────────────────
+    {
+        "code":        "meta_5",
+        "name":        "Коллекционер",
+        "description": "5 ачивок за сезон",
+        "category":    "meta",
+        "tier":        "common",
+        "icon":        "collection",
+    },
+    {
+        "code":        "meta_10",
+        "name":        "Охотник за наградами",
+        "description": "10 ачивок за сезон",
+        "category":    "meta",
+        "tier":        "rare",
+        "icon":        "hunter",
+    },
+    {
+        "code":        "meta_15",
+        "name":        "Абсолютный чемпион",
+        "description": "15 ачивок за сезон",
+        "category":    "meta",
+        "tier":        "legendary",
+        "icon":        "absolute",
     },
 ]
 
@@ -108,8 +180,9 @@ class AthleteAchievement(Base):
 
     id         = Column(Integer, primary_key=True, index=True)
     athlete_id = Column(Integer, ForeignKey("athletes.id", ondelete="CASCADE"), nullable=False)
-    code       = Column(String(60), nullable=False)   # ключ из ACHIEVEMENT_MAP
+    code       = Column(String(60), nullable=False)
+    season     = Column(Integer, nullable=True)    # сезон (год начала, напр. 2025)
     granted_at = Column(DateTime(timezone=True), server_default=func.now())
-    seen       = Column(Boolean, default=False)       # родитель видел уведомление
+    seen       = Column(Boolean, default=False)
 
     athlete = relationship("Athlete", back_populates="achievements")

@@ -3085,13 +3085,13 @@ function InfoTab({ isAdmin }) {
       {section === 'achievements' && (
         <div>
           <H2>Система ачивок</H2>
-          <P>Ачивки — награды за достижения в клубе. Выдаются автоматически при выполнении условий и делятся на три уровня редкости.</P>
+          <P>Ачивки — награды за достижения в клубе. Выдаются автоматически при выполнении условий и обнуляются каждый новый сезон (1 сентября). Всего 18 ачивок трёх уровней редкости.</P>
 
           <div style={{ display:'flex', gap:12, marginBottom:24, flexWrap:'wrap' }}>
             {[
-              { label:'Обычная',      color:'#888',        desc:'Первые шаги в любой активности' },
-              { label:'Редкая',       color:'var(--red)',   desc:'Стабильные результаты и участие' },
-              { label:'Легендарная',  color:'#c8962a',      desc:'Выдающиеся достижения' },
+              { label:'Обычная',     color:'#888',       desc:'Первые шаги в любой активности' },
+              { label:'Редкая',      color:'var(--red)', desc:'Стабильные результаты и участие' },
+              { label:'Легендарная', color:'#c8962a',    desc:'Выдающиеся достижения' },
             ].map(t => (
               <div key={t.label} style={{ flex:1, minWidth:140, background:'var(--dark2)', border:`1px solid ${t.color}`, borderRadius:8, padding:'14px 16px' }}>
                 <div style={{ fontFamily:'Bebas Neue', color:t.color, fontSize:'1.1rem', marginBottom:4 }}>{t.label}</div>
@@ -3102,49 +3102,70 @@ function InfoTab({ isAdmin }) {
 
           <H3>Посещаемость</H3>
           {[
-            ['Первые шаги',              '10 тренировок'],
-            ['Стабильный боец',          '50 тренировок'],
-            ['Железная дисциплина',      '100 тренировок'],
-            ['Отличник посещаемости',    'Все тренировки месяца без единого пропуска'],
-          ].map(([name, cond]) => (
-            <div key={name} style={{ display:'flex', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid var(--gray-dim)', fontSize:'0.92rem' }}>
-              <span style={{color:'var(--white)'}}>{name}</span>
+            ['Первый шаг',       'common',    'Первая тренировка в сезоне'],
+            ['Стабильный',       'common',    '30 тренировок за сезон'],
+            ['Железный',         'rare',      '60 тренировок за сезон'],
+            ['Легенда зала',     'legendary', '90 тренировок за сезон'],
+            ['Отличник',         'rare',      '100% посещаемость за любой месяц сезона'],
+          ].map(([name, tier, cond]) => (
+            <div key={name} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:'1px solid var(--gray-dim)', fontSize:'0.92rem' }}>
+              <span style={{color: tier==='legendary'?'#c8962a': tier==='rare'?'var(--red)':'var(--white)'}}>{name}</span>
               <span style={{color:'var(--gray)'}}>{cond}</span>
             </div>
           ))}
 
           <H3>Соревнования</H3>
           {[
-            ['Боевое крещение',   'Первое участие в соревновании'],
-            ['Призёр',            '1–3 место на любом турнире'],
-            ['Чемпион клуба',     'Топ-3 рейтинга по итогам сезона'],
-          ].map(([name, cond]) => (
-            <div key={name} style={{ display:'flex', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid var(--gray-dim)', fontSize:'0.92rem' }}>
-              <span style={{color:'var(--white)'}}>{name}</span>
+            ['Боевое крещение',  'common',    'Первое соревнование в сезоне'],
+            ['Медалист',         'rare',      'Любой призовой результат в сезоне'],
+            ['Призёр',           'rare',      '1-е место на соревновании в сезоне'],
+            ['Многоборец',       'rare',      'Участие в 3+ видах на одном соревновании'],
+            ['Турнирный боец',   'rare',      '3 и более соревнований за сезон'],
+          ].map(([name, tier, cond]) => (
+            <div key={name} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:'1px solid var(--gray-dim)', fontSize:'0.92rem' }}>
+              <span style={{color: tier==='legendary'?'#c8962a': tier==='rare'?'var(--red)':'var(--white)'}}>{name}</span>
               <span style={{color:'var(--gray)'}}>{cond}</span>
             </div>
           ))}
 
           <H3>Аттестация</H3>
           {[
-            ['Первый пояс',  'Сдача на 10 гып'],
-            ['Восхождение',  'Любое повышение гыпа или сдача на дан'],
-          ].map(([name, cond]) => (
-            <div key={name} style={{ display:'flex', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid var(--gray-dim)', fontSize:'0.92rem' }}>
-              <span style={{color:'var(--white)'}}>{name}</span>
+            ['Новый пояс',    'common', 'Прошёл аттестацию в сезоне'],
+            ['Двойной рост',  'rare',   'Повысил пояс дважды за сезон'],
+          ].map(([name, tier, cond]) => (
+            <div key={name} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:'1px solid var(--gray-dim)', fontSize:'0.92rem' }}>
+              <span style={{color: tier==='rare'?'var(--red)':'var(--white)'}}>{name}</span>
               <span style={{color:'var(--gray)'}}>{cond}</span>
             </div>
           ))}
 
           <H3>Сборы</H3>
-          <div style={{ display:'flex', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid var(--gray-dim)', fontSize:'0.92rem' }}>
-            <span style={{color:'var(--white)'}}>Боец сборов</span>
-            <span style={{color:'var(--gray)'}}>Подтверждённое участие в сборах (статус «Еду»)</span>
-          </div>
+          {[
+            ['Полевой боец',    'common', 'Участие в спортивных сборах в сезоне'],
+            ['Ветеран сборов',  'rare',   '2 и более сборов за сезон'],
+          ].map(([name, tier, cond]) => (
+            <div key={name} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:'1px solid var(--gray-dim)', fontSize:'0.92rem' }}>
+              <span style={{color: tier==='rare'?'var(--red)':'var(--white)'}}>{name}</span>
+              <span style={{color:'var(--gray)'}}>{cond}</span>
+            </div>
+          ))}
+
+          <H3>Комбо и мета-ачивки</H3>
+          {[
+            ['Полное комбо',            'legendary', 'Соревнование + аттестация + сборы в одном сезоне'],
+            ['Коллекционер',            'common',    '5 ачивок за сезон'],
+            ['Охотник за наградами',    'rare',      '10 ачивок за сезон'],
+            ['Абсолютный чемпион',      'legendary', '15 ачивок за сезон'],
+          ].map(([name, tier, cond]) => (
+            <div key={name} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:'1px solid var(--gray-dim)', fontSize:'0.92rem' }}>
+              <span style={{color: tier==='legendary'?'#c8962a': tier==='rare'?'var(--red)':'var(--white)'}}>{name}</span>
+              <span style={{color:'var(--gray)'}}>{cond}</span>
+            </div>
+          ))}
 
           <div style={{ margin:'28px 0 4px', padding:'20px 24px', borderTop:'1px solid var(--gray-dim)', borderRight:'1px solid var(--gray-dim)', borderBottom:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', borderRadius:10, background:'var(--dark2)', textAlign:'center' }}>
             <p style={{ fontStyle:'italic', color:'var(--gray)', fontSize:'0.95rem', lineHeight:1.7, margin:0 }}>
-              Ачивки начисляются автоматически — следите за своими достижениями!
+              Ачивки начисляются автоматически и обнуляются каждый сезон 1 сентября — стремитесь собрать все 18!
             </p>
           </div>
         </div>
