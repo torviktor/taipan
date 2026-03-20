@@ -642,6 +642,45 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
   const [msg,            setMsg]            = useState('')
   const [form, setForm] = useState({ name:'', date:'', time:'09:00', location:'', level:'Местный', comp_type:'Турнир', notes:'', add_to_calendar: false })
 
+  const [compFiles,    setCompFiles]    = useState([])
+  const [filesLoading, setFilesLoading] = useState(false)
+
+  const loadFiles = async (compId) => {
+    try {
+      const r = await fetch(`${API}/competitions/${compId}/files`, { headers: h })
+      if (r.ok) setCompFiles(await r.json())
+    } catch {}
+  }
+
+  const uploadFile = async (e) => {
+    const file = e.target.files[0]
+    if (!file || !detail) return
+    const fd = new FormData()
+    fd.append('file', file)
+    setFilesLoading(true)
+    try {
+      const r = await fetch(`${API}/competitions/${detail.id}/files`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd
+      })
+      if (r.ok) await loadFiles(detail.id)
+      else { const d = await r.json(); setMsg(d.detail || 'Ошибка загрузки') }
+    } catch { setMsg('Ошибка загрузки') }
+    setFilesLoading(false)
+    e.target.value = ''
+  }
+
+  const deleteFile = async (fileId) => {
+    if (!detail) return
+    try {
+      await fetch(`${API}/competitions/${detail.id}/files/${fileId}`, {
+        method: 'DELETE', headers: h
+      })
+      await loadFiles(detail.id)
+    } catch {}
+  }
+
   const h  = { Authorization: `Bearer ${token}` }
   const hj = { ...h, 'Content-Type': 'application/json' }
 
@@ -739,6 +778,7 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
       setRows(baseList)
       setAllAthletes(athletes)
       setCompView('detail')
+      await loadFiles(comp.id)
     } catch {}
     setLoading(false)
   }
@@ -1048,6 +1088,40 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
                 </button>
               )}
             </div>
+          </div>
+
+          {/* ── Файлы соревнования ── */}
+          <div style={{ margin:'16px 0', padding:'16px 20px', background:'var(--dark2)', border:'1px solid var(--gray-dim)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: compFiles.length > 0 ? 12 : 0 }}>
+              <span style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)' }}>
+                Документы к соревнованию
+              </span>
+              {!readOnly && (
+                <label style={{ cursor:'pointer' }}>
+                  <input type="file" style={{ display:'none' }} onChange={uploadFile} />
+                  <span className="att-all-btn" style={{ fontSize:'12px' }}>
+                    {filesLoading ? 'Загрузка...' : '+ Прикрепить файл'}
+                  </span>
+                </label>
+              )}
+            </div>
+            {compFiles.length === 0
+              ? <p style={{ color:'var(--gray)', fontSize:'13px', margin:'8px 0 0', fontStyle:'italic' }}>
+                  {readOnly ? 'Документы не прикреплены' : 'Файлы не прикреплены'}
+                </p>
+              : compFiles.map(f => (
+                  <div key={f.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid var(--gray-dim)' }}>
+                    <a href={f.file_url} target="_blank" rel="noreferrer"
+                      style={{ color:'var(--white)', fontSize:'14px', textDecoration:'none', display:'flex', alignItems:'center', gap:8 }}>
+                      <span style={{ color:'var(--red)', fontSize:'16px' }}>↓</span>
+                      {f.filename}
+                    </a>
+                    {!readOnly && (
+                      <button className="td-btn td-btn-del" style={{ fontSize:'11px', padding:'3px 8px' }} onClick={() => deleteFile(f.id)}>✕</button>
+                    )}
+                  </div>
+                ))
+            }
           </div>
 
           {/* Блок участвуют */}
