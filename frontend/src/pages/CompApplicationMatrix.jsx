@@ -1,5 +1,9 @@
 import { useState } from 'react'
 import * as XLSX from 'xlsx'
+import {
+  Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+  WidthType, AlignmentType, VerticalAlign, BorderStyle, PageOrientation
+} from 'docx'
 
 const DISC = [
   { key: 'hyung',      label: 'Хъёнг',      resultKeys: ['tuli_place','tuli_perfs'],     type: 'plus'   },
@@ -132,11 +136,7 @@ export default function CompApplicationMatrix({ rows, athletes, detail, token, r
   // ── Word ───────────────────────────────────────────────────────────────────
   const genWord = async (type) => {
     try {
-      const {
-        Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-        WidthType, AlignmentType, VerticalAlign, BorderStyle, PageOrientation
-      } = await import('docx')
-
+      
       const borders = {
         top:             {style:BorderStyle.SINGLE,size:6},
         bottom:          {style:BorderStyle.SINGLE,size:6},
