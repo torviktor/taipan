@@ -780,7 +780,24 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
           _inList:         true,
         }
       })
-      setRows(baseList)
+// Восстанавливаем черновик из кэша если есть
+      try {
+        const draft = localStorage.getItem(`comp_draft_${comp.id}`)
+        if (draft) {
+          const parsed = JSON.parse(draft)
+          // Мержим: берём статусы из БД, результаты из кэша
+          const merged = baseList.map(b => {
+            const d = parsed.find(p => p.athlete_id === b.athlete_id)
+            return d ? { ...b, sparring_place: d.sparring_place, sparring_fights: d.sparring_fights,
+              stopball_place: d.stopball_place, stopball_fights: d.stopball_fights,
+              tegtim_place: d.tegtim_place, tegtim_fights: d.tegtim_fights,
+              tuli_place: d.tuli_place, tuli_perfs: d.tuli_perfs } : b
+          })
+          setRows(merged)
+        } else {
+          setRows(baseList)
+        }
+      } catch { setRows(baseList) }
       setAllAthletes(athletes)
       setCompView('detail')
       await loadFiles(comp.id)
@@ -828,6 +845,7 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
         method: 'PUT', headers: hj, body: JSON.stringify({ results: payload })
       })
       if (r.ok) {
+        try { localStorage.removeItem(`comp_draft_${detail.id}`) } catch {}
         setMsg('Результаты сохранены')
         await openDetail(detail)
       } else setMsg('Ошибка сохранения')
@@ -929,8 +947,15 @@ function CompetitionsTab({ token, athletes, readOnly = false }) {
     XLSX.writeFile(wb, `${detail.name}_${detail.date}.xlsx`)
   }
 
-  const updateRow = (athleteId, field, value) =>
-    setRows(prev => prev.map(r => r.athlete_id === athleteId ? { ...r, [field]: value } : r))
+  const updateRow = (athleteId, field, value) => {
+    setRows(prev => {
+      const updated = prev.map(r => r.athlete_id === athleteId ? { ...r, [field]: value } : r)
+      if (detail) {
+        try { localStorage.setItem(`comp_draft_${detail.id}`, JSON.stringify(updated)) } catch {}
+      }
+      return updated
+    })
+  }
 
   const updateRowStatus = async (athleteId, status) => {
     updateRow(athleteId, 'status', status)
