@@ -1637,8 +1637,7 @@ function AchievementsTab({ token, athletes }) {
   if (loading) return <div className="cabinet-loading">Загрузка...</div>
   if (athletes.length === 0) return <div className="cabinet-empty">Нет спортсменов.</div>
 
-  const categories = ['attendance', 'competition', 'certification', 'camp']
-
+  const categories = ['attendance', 'competition', 'certification', 'camp', 'combo', 'meta']
   return (
     <div>
       <div style={{marginBottom:12}}>
