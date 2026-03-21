@@ -3026,6 +3026,19 @@ function NewsTab({ token }) {
       await loadNews()
     } catch {}
   }
+const generateWithGPT = async (compId) => {
+    setSaving(true); setMsg('')
+    try {
+      const r = await fetch(`${API}/news-admin/generate-comp-news`, {
+        method: 'POST', headers: hj,
+        body: JSON.stringify({ comp_id: compId })
+      })
+      const d = await r.json()
+      setMsg(d.message || (r.ok ? 'Готово' : 'Ошибка'))
+      if (r.ok) await loadNews()
+    } catch { setMsg('Ошибка') }
+    setSaving(false)
+  }
 
   const publishFromComp = async (compId) => {
     setSaving(true); setMsg('')
@@ -3044,38 +3057,54 @@ function NewsTab({ token }) {
   return (
     <div>
       {/* Шапка */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, flexWrap:'wrap', gap:8 }}>
-        <span style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.06em', color:'var(--white)' }}>
-          Новости клуба
-        </span>
-        <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={() => setShowForm(true)}>
-          + Новость
-        </button>
-      </div>
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+          <button className="att-all-btn" style={{ fontSize:'13px' }}
+            onClick={async () => {
+              setSaving(true); setMsg('')
+              try {
+                const r = await fetch(`${API}/news-admin/generate-announcement`, { method:'POST', headers:hj })
+                const d = await r.json()
+                setMsg(d.message || 'Готово')
+                if (r.ok) await loadNews()
+              } catch { setMsg('Ошибка') }
+              setSaving(false)
+            }} disabled={saving}>
+            Анонс соревнований
+          </button>
+          <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={() => setShowForm(true)}>
+            + Новость
+          </button>
+        </div>
 
       {msg && <div className="att-msg" style={{ marginBottom:12 }}>{msg}</div>}
 
       {/* Автоновость из соревнования */}
-      {compsWithoutNews.length > 0 && (
-        <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', padding:'16px 20px', marginBottom:20 }}>
-          <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
-            Опубликовать автоновость о соревновании
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            {compsWithoutNews.slice(0, 5).map(c => (
-              <div key={c.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
-                <span style={{ color:'var(--white)', fontSize:'14px' }}>
-                  {c.name} — {new Date(c.date).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
-                </span>
-                <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap' }}
-                  onClick={() => publishFromComp(c.id)} disabled={saving}>
-                  Опубликовать
-                </button>
-              </div>
-            ))}
+{compsWithoutNews.length > 0 && (
+  <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', padding:'16px 20px', marginBottom:20 }}>
+    <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
+      Опубликовать автоновость о соревновании
+    </div>
+    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+      {compsWithoutNews.slice(0, 5).map(c => (
+        <div key={c.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+          <span style={{ color:'var(--white)', fontSize:'14px', flex:1 }}>
+            {c.name} — {new Date(c.date).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
+          </span>
+          <div style={{ display:'flex', gap:8 }}>
+            <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap' }}
+              onClick={() => publishFromComp(c.id)} disabled={saving}>
+              Стандартная
+            </button>
+            <button className="btn-primary" style={{ fontSize:'12px', padding:'6px 12px', whiteSpace:'nowrap' }}
+              onClick={() => generateWithGPT(c.id)} disabled={saving}>
+              YandexGPT
+            </button>
           </div>
         </div>
-      )}
+      ))}
+    </div>
+  </div>
+)}
 
       {/* Список новостей */}
       {loading && <div className="cabinet-loading">Загрузка...</div>}
