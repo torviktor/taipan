@@ -2971,6 +2971,8 @@ function NewsTab({ token }) {
 
   const [items,       setItems]       = useState([])
   const [comps,       setComps]       = useState([])
+  const [certs,       setCerts]       = useState([])
+  const [camps,       setCamps]       = useState([])
   const [loading,     setLoading]     = useState(false)
   const [saving,      setSaving]      = useState(false)
   const [msg,         setMsg]         = useState('')
@@ -2979,10 +2981,11 @@ function NewsTab({ token }) {
   const [editingId,   setEditingId]   = useState(null)
   const [editForm,    setEditForm]    = useState({ title: '', body: '' })
   const [editPhoto,   setEditPhoto]   = useState(null)
+  const [editHasPhoto, setEditHasPhoto] = useState(false)
   const [confirm,     setConfirm]     = useState(null)
   const [form, setForm] = useState({ title: '', body: '' })
 
-  useEffect(() => { loadNews(); loadComps() }, [])
+  useEffect(() => { loadNews(); loadComps(); loadCerts(); loadCamps() }, [])
 
   const loadNews = async () => {
     setLoading(true)
@@ -2997,6 +3000,20 @@ function NewsTab({ token }) {
     try {
       const r = await fetch(`${API}/competitions`, { headers: h })
       if (r.ok) setComps(await r.json())
+    } catch {}
+  }
+
+  const loadCerts = async () => {
+    try {
+      const r = await fetch(`${API}/certifications`, { headers: h })
+      if (r.ok) { const d = await r.json(); setCerts(d) }
+    } catch {}
+  }
+
+  const loadCamps = async () => {
+    try {
+      const r = await fetch(`${API}/camps`, { headers: h })
+      if (r.ok) { const d = await r.json(); setCamps(d) }
     } catch {}
   }
 
@@ -3041,6 +3058,14 @@ function NewsTab({ token }) {
     setSaving(false)
   }
 
+  const deletePhoto = async (newsId) => {
+    try {
+      await fetch(`${API}/news/${newsId}/photo`, { method: 'DELETE', headers: h })
+      setEditHasPhoto(false)
+      await loadNews()
+    } catch {}
+  }
+
   const generateWithGPT = async (compId) => {
     setSaving(true); setMsg('')
     try {
@@ -3064,8 +3089,47 @@ function NewsTab({ token }) {
     setSaving(false)
   }
 
+  const publishFromCert = async (certId, certName, certDate) => {
+    setSaving(true); setMsg('')
+    try {
+      const dateStr = new Date(certDate).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
+      const title = `${certName} — ${dateStr}`
+      const body  = `${dateStr} в клубе «Тайпан» прошла аттестация: ${certName}.\n\nПоздравляем всех участников с получением новых поясов! Каждый пояс — это результат упорного труда, дисциплины и преданности тхэквондо ГТФ.\n\nПродолжаем расти и совершенствоваться!`
+      const r = await fetch(`${API}/news`, {
+        method: 'POST', headers: hj,
+        body: JSON.stringify({ title, body })
+      })
+      if (r.ok) { setMsg('Новость об аттестации опубликована'); await loadNews() }
+      else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
+    } catch { setMsg('Ошибка') }
+    setSaving(false)
+  }
+
+  const publishFromCamp = async (campId, campName, campDateStart, campDateEnd, campLocation) => {
+    setSaving(true); setMsg('')
+    try {
+      const ds = new Date(campDateStart).toLocaleDateString('ru-RU', { day:'numeric', month:'long' })
+      const de = new Date(campDateEnd).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
+      const loc = campLocation ? ` в ${campLocation}` : ''
+      const title = `Учебно-тренировочные сборы «${campName}» — ${ds}–${de}`
+      const body  = `С ${ds} по ${de} наши спортсмены приняли участие в учебно-тренировочных сборах «${campName}»${loc}.\n\nСборы — важная часть подготовки каждого спортсмена. Интенсивные тренировки, работа над техникой хъёнгов и массоги, командный дух и взаимная поддержка — всё это делает наших бойцов сильнее.\n\nБлагодарим всех участников за старание и самоотдачу!`
+      const r = await fetch(`${API}/news`, {
+        method: 'POST', headers: hj,
+        body: JSON.stringify({ title, body })
+      })
+      if (r.ok) { setMsg('Новость о сборах опубликована'); await loadNews() }
+      else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
+    } catch { setMsg('Ошибка') }
+    setSaving(false)
+  }
+
+  // Соревнования/аттестации/сборы без опубликованной новости
   const publishedCompIds = new Set(items.filter(n => n.competition_id).map(n => n.competition_id))
   const compsWithoutNews = comps.filter(c => !publishedCompIds.has(c.id))
+
+  // Последние 5 аттестаций и сборов для автоновостей
+  const recentCerts = certs.slice(0, 5)
+  const recentCamps = camps.slice(0, 5)
 
   return (
     <div>
@@ -3110,11 +3174,11 @@ function NewsTab({ token }) {
 
       {msg && <div className="att-msg" style={{ marginBottom:12 }}>{msg}</div>}
 
-      {/* Автоновость из соревнования */}
+      {/* Автоновости о соревнованиях */}
       {compsWithoutNews.length > 0 && (
-        <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', padding:'16px 20px', marginBottom:20 }}>
+        <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', padding:'16px 20px', marginBottom:12 }}>
           <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
-            Опубликовать автоновость о соревновании
+            Соревнования без новости
           </div>
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {compsWithoutNews.slice(0, 5).map(c => (
@@ -3138,6 +3202,50 @@ function NewsTab({ token }) {
         </div>
       )}
 
+      {/* Автоновости об аттестациях */}
+      {recentCerts.length > 0 && (
+        <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid #c8962a', padding:'16px 20px', marginBottom:12 }}>
+          <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
+            Опубликовать новость об аттестации
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {recentCerts.map(c => (
+              <div key={c.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                <span style={{ color:'var(--white)', fontSize:'14px', flex:1, minWidth:0 }}>
+                  {c.name} — {new Date(c.date).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
+                </span>
+                <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap', flexShrink:0 }}
+                  onClick={() => publishFromCert(c.id, c.name, c.date)} disabled={saving}>
+                  Опубликовать
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Автоновости о сборах */}
+      {recentCamps.length > 0 && (
+        <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid #4caf50', padding:'16px 20px', marginBottom:20 }}>
+          <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
+            Опубликовать новость о сборах
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {recentCamps.map(c => (
+              <div key={c.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                <span style={{ color:'var(--white)', fontSize:'14px', flex:1, minWidth:0 }}>
+                  {c.name} — {new Date(c.date_start).toLocaleDateString('ru-RU', { day:'numeric', month:'long' })}–{new Date(c.date_end).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
+                </span>
+                <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap', flexShrink:0 }}
+                  onClick={() => publishFromCamp(c.id, c.name, c.date_start, c.date_end, c.location)} disabled={saving}>
+                  Опубликовать
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Список новостей */}
       {loading && <div className="cabinet-loading">Загрузка...</div>}
       {!loading && items.length === 0 && <div className="cabinet-empty">Новостей пока нет</div>}
@@ -3149,7 +3257,7 @@ function NewsTab({ token }) {
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontFamily:'Barlow Condensed', fontSize:'11px', fontWeight:700, letterSpacing:'2px', color:'var(--red)', marginBottom:4 }}>
                   {new Date(n.published_at).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
-                  {n.competition_id && <span style={{ marginLeft:8, color:'var(--gray)' }}>· авто</span>}
+                  {n.competition_id && <span style={{ marginLeft:8, color:'var(--gray)' }}>· соревнование</span>}
                 </div>
                 <div style={{ fontWeight:600, color:'var(--white)', fontSize:'15px', marginBottom:4 }}>{n.title}</div>
                 <div style={{ color:'var(--gray)', fontSize:'13px', lineHeight:1.5 }}>
@@ -3158,11 +3266,16 @@ function NewsTab({ token }) {
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:6, flexShrink:0, alignItems:'flex-end' }}>
                 {n.photo_url && (
-                  <img src={n.photo_url} alt="" style={{ width:80, height:55, objectFit:'cover' }} />
+                  <img src={n.photo_url} alt="" style={{ width:100, height:70, objectFit:'cover', borderRadius:2 }} />
                 )}
                 <div style={{ display:'flex', gap:6 }}>
                   <button className="att-all-btn" style={{ fontSize:'11px', padding:'4px 10px' }}
-                    onClick={() => { setEditingId(n.id); setEditForm({ title: n.title, body: n.body }); setEditPhoto(null) }}>
+                    onClick={() => {
+                      setEditingId(n.id)
+                      setEditForm({ title: n.title, body: n.body })
+                      setEditPhoto(null)
+                      setEditHasPhoto(!!n.photo_url)
+                    }}>
                     Ред.
                   </button>
                   <button className="td-btn td-btn-del" onClick={() => setConfirm(n.id)}>✕</button>
@@ -3216,7 +3329,16 @@ function NewsTab({ token }) {
                 value={editForm.body} onChange={e => setEditForm(p => ({ ...p, body: e.target.value }))} />
             </div>
             <div style={{ marginBottom:16 }}>
-              <label style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', display:'block', marginBottom:6 }}>Заменить фото (необязательно)</label>
+              <label style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', display:'block', marginBottom:6 }}>Фото</label>
+              {editHasPhoto && (
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                  <span style={{ color:'var(--gray)', fontSize:'13px' }}>Фото прикреплено</span>
+                  <button className="td-btn td-btn-del" style={{ fontSize:'11px' }}
+                    onClick={() => deletePhoto(editingId)}>
+                    Удалить фото
+                  </button>
+                </div>
+              )}
               <input type="file" accept="image/*" onChange={e => setEditPhoto(e.target.files[0])} />
               {editPhoto && <div style={{ color:'var(--gray)', fontSize:'12px', marginTop:4 }}>{editPhoto.name}</div>}
             </div>
@@ -3932,34 +4054,55 @@ export default function Cabinet() {
 
         {/* Сгруппированные вкладки */}
         <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:16 }}>
-          {/* Люди */}
-          <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
-            <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.68rem', letterSpacing:'0.1em', color:'var(--gray)', textTransform:'uppercase', minWidth:80, paddingRight:6, borderRight:'1px solid var(--gray-dim)' }}>Люди</span>
-            <button className={`cabinet-tab ${view==='athletes'?'active':''}`} onClick={() => setView('athletes')}>Спортсмены ({athletes.filter(a=>!a.is_archived).length})</button>
-            <button className={`cabinet-tab ${view==='parents'?'active':''}`} onClick={() => setView('parents')}>Родители ({parents.length})</button>
-            <button className={`cabinet-tab ${view==='archive'?'active':''}`} style={{ color: view==='archive' ? undefined : 'var(--gray)' }} onClick={() => setView('archive')}>Архив ({athletes.filter(a=>a.is_archived).length})</button>
-            <button className={`cabinet-tab ${view==='applications'?'active':''}`} onClick={() => setView('applications')}>
-  Заявки{applications.filter(a => a.status==='new').length > 0 && <span className="tab-badge">{applications.filter(a => a.status==='new').length}</span>}
-</button>
-            <button className={`cabinet-tab ${view==='hof'?'active':''}`} style={{ color: view==='hof' ? undefined : '#c8962a' }} onClick={() => setView('hof')}>Зал Славы</button>
+                    {/* ── Вкладки тренера ── */}
+          <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+
+          {/* ── Вкладки тренера ── */}
+          <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+
+            {/* Люди */}
+            <div style={{ display:'flex', alignItems:'stretch', gap:0 }}>
+              <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.65rem', letterSpacing:'0.12em', color:'var(--gray)', textTransform:'uppercase', width:90, flexShrink:0, display:'flex', alignItems:'center', padding:'0 10px 0 0', borderRight:'1px solid var(--gray-dim)' }}>
+                Люди
+              </div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:2, paddingLeft:8 }}>
+                <button className={`cabinet-tab ${view==='athletes'?'active':''}`} onClick={() => setView('athletes')}>Спортсмены ({athletes.filter(a=>!a.is_archived).length})</button>
+                <button className={`cabinet-tab ${view==='parents'?'active':''}`} onClick={() => setView('parents')}>Родители ({parents.length})</button>
+                <button className={`cabinet-tab ${view==='archive'?'active':''}`} style={{ color: view==='archive' ? undefined : 'var(--gray)' }} onClick={() => setView('archive')}>Архив ({athletes.filter(a=>a.is_archived).length})</button>
+                <button className={`cabinet-tab ${view==='applications'?'active':''}`} onClick={() => setView('applications')}>
+                  Заявки{applications.filter(a => a.status==='new').length > 0 && <span className="tab-badge">{applications.filter(a => a.status==='new').length}</span>}
+                </button>
+                <button className={`cabinet-tab ${view==='hof'?'active':''}`} style={{ color: view==='hof' ? undefined : '#c8962a' }} onClick={() => setView('hof')}>Зал Славы</button>
+              </div>
+            </div>
+
+            {/* События */}
+            <div style={{ display:'flex', alignItems:'stretch', gap:0 }}>
+              <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.65rem', letterSpacing:'0.12em', color:'var(--gray)', textTransform:'uppercase', width:90, flexShrink:0, display:'flex', alignItems:'center', padding:'0 10px 0 0', borderRight:'1px solid var(--gray-dim)' }}>
+                События
+              </div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:2, paddingLeft:8 }}>
+                <button className={`cabinet-tab ${view==='attendance'?'active':''}`} onClick={() => setView('attendance')}>Посещаемость</button>
+                <button className={`cabinet-tab ${view==='competitions'?'active':''}`} onClick={() => setView('competitions')}>Соревнования</button>
+                <button className={`cabinet-tab ${view==='certification'?'active':''}`} onClick={() => setView('certification')}>Аттестация</button>
+                <button className={`cabinet-tab ${view==='camps'?'active':''}`} onClick={() => setView('camps')}>Сборы</button>
+                <button className={`cabinet-tab ${view==='news'?'active':''}`} onClick={() => setView('news')}>Новости</button>
+              </div>
+            </div>
+
+            {/* Результаты */}
+            <div style={{ display:'flex', alignItems:'stretch', gap:0 }}>
+              <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.65rem', letterSpacing:'0.12em', color:'var(--gray)', textTransform:'uppercase', width:90, flexShrink:0, display:'flex', alignItems:'center', padding:'0 10px 0 0', borderRight:'1px solid var(--gray-dim)' }}>
+                Результаты
+              </div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:2, paddingLeft:8 }}>
+                <button className={`cabinet-tab ${view==='rating'?'active':''}`} onClick={() => setView('rating')}>Рейтинг</button>
+                <button className={`cabinet-tab ${view==='achievements'?'active':''}`} onClick={() => setView('achievements')}>Ачивки</button>
+                <button className={`cabinet-tab ${view==='info'?'active':''}`} style={{color: view==='info' ? undefined : 'var(--gray)'}} onClick={() => setView('info')}>Информация</button>
+              </div>
+            </div>
+
           </div>
-          {/* События */}
-          <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
-            <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.68rem', letterSpacing:'0.1em', color:'var(--gray)', textTransform:'uppercase', minWidth:80, paddingRight:6, borderRight:'1px solid var(--gray-dim)' }}>События</span>
-            <button className={`cabinet-tab ${view==='attendance'?'active':''}`} onClick={() => setView('attendance')}>Журнал посещаемости</button>
-            <button className={`cabinet-tab ${view==='competitions'?'active':''}`} onClick={() => setView('competitions')}>Соревнования</button>
-            <button className={`cabinet-tab ${view==='certification'?'active':''}`} onClick={() => setView('certification')}>Аттестация</button>
-            <button className={`cabinet-tab ${view==='camps'?'active':''}`} onClick={() => setView('camps')}>Сборы</button>
-          </div>
-          {/* Результаты */}
-          <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
-            <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.68rem', letterSpacing:'0.1em', color:'var(--gray)', textTransform:'uppercase', minWidth:80, paddingRight:6, borderRight:'1px solid var(--gray-dim)' }}>Результаты</span>
-            <button className={`cabinet-tab ${view==='rating'?'active':''}`} onClick={() => setView('rating')}>Рейтинг</button>
-            <button className={`cabinet-tab ${view==='news'?'active':''}`} onClick={() => setView('news')}>Новости</button>
-            <button className={`cabinet-tab ${view==='achievements'?'active':''}`} onClick={() => setView('achievements')}>Ачивки</button>
-            <button className={`cabinet-tab ${view==='info'?'active':''}`} style={{color: view==='info' ? undefined : 'var(--gray)'}} onClick={() => setView('info')}>Информация</button>
-          </div>
-        </div>
 
         {view !== 'attendance' && view !== 'competitions' && view !== 'rating' && view !== 'certification' && view !== 'achievements' && view !== 'camps' && view !== 'archive' && (
           <div className="cabinet-toolbar">
