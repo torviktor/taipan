@@ -4259,7 +4259,6 @@ export default function Cabinet() {
             </table>
             {sortedAthletes.length === 0 && !loading && <div className="cabinet-empty">Спортсменов не найдено</div>}
           </div>
-          </div>
         )}
 
         {/* ── Родители ── */}
