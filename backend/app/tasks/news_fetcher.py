@@ -10,6 +10,9 @@ from app.core.database import SessionLocal
 from app.models.news import News
 from app.models.user import User
 
+# Импортируем все модели чтобы SQLAlchemy правильно настроил relationships
+from app.models import user, event, attendance, competition, certification, achievement, camp, hall_of_fame, news, competition_file
+
 
 # ── Хелперы ───────────────────────────────────────────────────────────────────
 
