@@ -7,6 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 
+# Импортируем все модели чтобы SQLAlchemy правильно настроил relationships
+from app.models import user, event, attendance, competition, certification, achievement, camp, hall_of_fame, news, competition_file
+
 YANDEX_API_KEY   = os.getenv("YANDEX_API_KEY", "")
 YANDEX_FOLDER_ID = os.getenv("YANDEX_FOLDER_ID", "")
 YANDEX_GPT_URL   = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
