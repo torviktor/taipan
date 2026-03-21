@@ -15,6 +15,7 @@ from app.models import user, event, attendance, competition, certification, achi
 from app.models import hall_of_fame
 from app.models import news
 from app.routes.news_routes import router as news_router
+from app.routes.news_admin import router as news_admin_router
 from app.models import competition_file
 from app.routes.competition_files import router as competition_files_router
 import os
@@ -55,6 +56,7 @@ app.include_router(achievements_router,      prefix="/api",              tags=["
 app.include_router(camps_router,             prefix="/api",              tags=["Сборы"])
 app.include_router(hof_router,               prefix="/api",              tags=["Зал Славы"])
 app.include_router(news_router,              prefix="/api",              tags=["Новости"])
+app.include_router(news_admin_router,        prefix="/api",              tags=["Новости-Админ"])
 app.include_router(competition_files_router, prefix="/api")
 
 @app.get("/")
