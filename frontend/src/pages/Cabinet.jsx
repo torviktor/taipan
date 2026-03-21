@@ -4353,6 +4353,8 @@ export default function Cabinet() {
           </div>
         )}
       </div>
+        </div>
+        </div>
     </main>
   )
 }
