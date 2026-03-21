@@ -2960,6 +2960,203 @@ function HallOfFameAdmin({ token }) {
     </div>
   )
 }
+
+// ── ВКЛАДКА НОВОСТИ (тренер) ─────────────────────────────────────────────────
+
+function NewsTab({ token }) {
+  const API = '/api'
+  const h   = { Authorization: `Bearer ${token}` }
+  const hj  = { ...h, 'Content-Type': 'application/json' }
+
+  const [items,       setItems]       = useState([])
+  const [comps,       setComps]       = useState([])
+  const [loading,     setLoading]     = useState(false)
+  const [saving,      setSaving]      = useState(false)
+  const [msg,         setMsg]         = useState('')
+  const [showForm,    setShowForm]    = useState(false)
+  const [photoFile,   setPhotoFile]   = useState(null)
+  const [form, setForm] = useState({ title: '', body: '' })
+
+  useEffect(() => { loadNews(); loadComps() }, [])
+
+  const loadNews = async () => {
+    setLoading(true)
+    try {
+      const r = await fetch(`${API}/news?limit=50`, { headers: h })
+      if (r.ok) { const d = await r.json(); setItems(d.items) }
+    } catch {}
+    setLoading(false)
+  }
+
+  const loadComps = async () => {
+    try {
+      const r = await fetch(`${API}/competitions`, { headers: h })
+      if (r.ok) setComps(await r.json())
+    } catch {}
+  }
+
+  const createNews = async () => {
+    if (!form.title.trim() || !form.body.trim()) { setMsg('Заполните заголовок и текст'); return }
+    setSaving(true); setMsg('')
+    try {
+      const r = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify(form) })
+      if (!r.ok) { const d = await r.json(); setMsg(d.detail || 'Ошибка'); setSaving(false); return }
+      const created = await r.json()
+
+      // Загружаем фото если выбрано
+      if (photoFile) {
+        const fd = new FormData()
+        fd.append('file', photoFile)
+        await fetch(`${API}/news/${created.id}/photo`, { method: 'POST', headers: h, body: fd })
+      }
+
+      setShowForm(false)
+      setForm({ title: '', body: '' })
+      setPhotoFile(null)
+      setMsg('Новость опубликована')
+      await loadNews()
+    } catch { setMsg('Ошибка') }
+    setSaving(false)
+  }
+
+  const deleteNews = async (id) => {
+    if (!confirm('Удалить новость?')) return
+    try {
+      await fetch(`${API}/news/${id}`, { method: 'DELETE', headers: h })
+      await loadNews()
+    } catch {}
+  }
+
+  const publishFromComp = async (compId) => {
+    setSaving(true); setMsg('')
+    try {
+      const r = await fetch(`${API}/news/from-competition/${compId}`, { method: 'POST', headers: h })
+      if (r.ok) { setMsg('Новость о соревновании опубликована'); await loadNews() }
+      else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
+    } catch { setMsg('Ошибка') }
+    setSaving(false)
+  }
+
+  // Соревнования без опубликованной новости
+  const publishedCompIds = new Set(items.filter(n => n.competition_id).map(n => n.competition_id))
+  const compsWithoutNews = comps.filter(c => !publishedCompIds.has(c.id))
+
+  return (
+    <div>
+      {/* Шапка */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, flexWrap:'wrap', gap:8 }}>
+        <span style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.06em', color:'var(--white)' }}>
+          Новости клуба
+        </span>
+        <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={() => setShowForm(true)}>
+          + Новость
+        </button>
+      </div>
+
+      {msg && <div className="att-msg" style={{ marginBottom:12 }}>{msg}</div>}
+
+      {/* Автоновость из соревнования */}
+      {compsWithoutNews.length > 0 && (
+        <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', padding:'16px 20px', marginBottom:20 }}>
+          <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
+            Опубликовать автоновость о соревновании
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {compsWithoutNews.slice(0, 5).map(c => (
+              <div key={c.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
+                <span style={{ color:'var(--white)', fontSize:'14px' }}>
+                  {c.name} — {new Date(c.date).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
+                </span>
+                <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap' }}
+                  onClick={() => publishFromComp(c.id)} disabled={saving}>
+                  Опубликовать
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Список новостей */}
+      {loading && <div className="cabinet-loading">Загрузка...</div>}
+      {!loading && items.length === 0 && <div className="cabinet-empty">Новостей пока нет</div>}
+
+      <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+        {items.map(n => (
+          <div key={n.id} style={{ background:'var(--dark)', border:'1px solid var(--gray-dim)', padding:'16px 20px' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12 }}>
+              <div style={{ flex:1 }}>
+                <div style={{ fontFamily:'Barlow Condensed', fontSize:'11px', fontWeight:700, letterSpacing:'2px', color:'var(--red)', marginBottom:4 }}>
+                  {new Date(n.published_at).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
+                  {n.competition_id && <span style={{ marginLeft:8, color:'var(--gray)' }}>· авто</span>}
+                </div>
+                <div style={{ fontWeight:600, color:'var(--white)', fontSize:'15px' }}>{n.title}</div>
+                <div style={{ color:'var(--gray)', fontSize:'13px', marginTop:4, lineHeight:1.5 }}>
+                  {n.body.slice(0, 120).replace(/\n/g, ' ')}{n.body.length > 120 ? '…' : ''}
+                </div>
+              </div>
+              {n.photo_url && (
+                <img src={n.photo_url} alt="" style={{ width:80, height:60, objectFit:'cover', flexShrink:0 }} />
+              )}
+              <button className="td-btn td-btn-del" onClick={() => deleteNews(n.id)}>✕</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Форма создания новости */}
+      {showForm && (
+        <div className="modal-overlay" onClick={() => setShowForm(false)}>
+          <div className="modal-box" style={{ maxWidth:600 }} onClick={e => e.stopPropagation()}>
+            <h3>Новая новость</h3>
+
+            <div style={{ marginBottom:12 }}>
+              <label style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', display:'block', marginBottom:6 }}>
+                Заголовок
+              </label>
+              <input
+                className="modal-input"
+                placeholder="Заголовок новости..."
+                value={form.title}
+                onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+              />
+            </div>
+
+            <div style={{ marginBottom:12 }}>
+              <label style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', display:'block', marginBottom:6 }}>
+                Текст
+              </label>
+              <textarea
+                style={{ width:'100%', minHeight:160, background:'var(--dark2)', border:'1px solid var(--gray-dim)', color:'var(--white)', padding:'10px 14px', fontSize:'14px', fontFamily:'Barlow, sans-serif', resize:'vertical', boxSizing:'border-box' }}
+                placeholder="Текст новости..."
+                value={form.body}
+                onChange={e => setForm(p => ({ ...p, body: e.target.value }))}
+              />
+            </div>
+
+            <div style={{ marginBottom:16 }}>
+              <label style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', display:'block', marginBottom:6 }}>
+                Фото (необязательно)
+              </label>
+              <input type="file" accept="image/*" onChange={e => setPhotoFile(e.target.files[0])} />
+              {photoFile && <div style={{ color:'var(--gray)', fontSize:'12px', marginTop:4 }}>{photoFile.name}</div>}
+            </div>
+
+            {msg && <div className="modal-msg" style={{ marginBottom:8 }}>{msg}</div>}
+
+            <div className="modal-btns-row">
+              <button className="btn-primary" onClick={createNews} disabled={saving}>
+                {saving ? 'Публикация...' : 'Опубликовать'}
+              </button>
+              <button className="btn-outline" onClick={() => { setShowForm(false); setMsg('') }}>Отмена</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── ВКЛАДКА ИНФОРМАЦИЯ ────────────────────────────────────────────────────────
 
 function InfoTab({ isAdmin }) {
@@ -3272,6 +3469,7 @@ function InfoTab({ isAdmin }) {
     </div>
   )
 }
+
 // ── СТАТУСЫ ЗАЯВОК ─────────────────────────────────────────────────────────────
 const STATUS_LABELS = {
   new:        { label: 'Новая',        color: '#FFD700' },
@@ -3682,6 +3880,7 @@ export default function Cabinet() {
           <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
             <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.68rem', letterSpacing:'0.1em', color:'var(--gray)', textTransform:'uppercase', minWidth:80, paddingRight:6, borderRight:'1px solid var(--gray-dim)' }}>Результаты</span>
             <button className={`cabinet-tab ${view==='rating'?'active':''}`} onClick={() => setView('rating')}>Рейтинг</button>
+            <button className={`cabinet-tab ${view==='news'?'active':''}`} onClick={() => setView('news')}>Новости</button>
             <button className={`cabinet-tab ${view==='achievements'?'active':''}`} onClick={() => setView('achievements')}>Ачивки</button>
             <button className={`cabinet-tab ${view==='info'?'active':''}`} style={{color: view==='info' ? undefined : 'var(--gray)'}} onClick={() => setView('info')}>Информация</button>
           </div>
@@ -3707,6 +3906,7 @@ export default function Cabinet() {
         {view === 'certification' && <CertificationTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'achievements'  && <AchievementsLeaderboard token={token} />}
         {view === 'camps'         && <CampsTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
+        {view === 'news'          && <NewsTab token={token} />}
         {view === 'info'          && <InfoTab isAdmin={true} />}
         {view === 'hof'           && <HallOfFameAdmin token={token} />}
         {view === 'archive'       && (

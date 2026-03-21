@@ -108,6 +108,7 @@ export default function Navbar() {
     { to: '/champions', label: 'Зал Славы'  },
     { to: '/apply',     label: 'Записаться' },
     { to: '/quiz',      label: 'Тест' },
+    { to: '/news',      label: 'Новости' },
   ]
 
   return (
