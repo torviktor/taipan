@@ -4054,9 +4054,6 @@ export default function Cabinet() {
 
         {/* Сгруппированные вкладки */}
         <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:16 }}>
-                    {/* ── Вкладки тренера ── */}
-          <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-
           {/* ── Вкладки тренера ── */}
           <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
 
