@@ -2961,6 +2961,7 @@ function HallOfFameAdmin({ token }) {
   )
 }
 
+
 // ── ВКЛАДКА НОВОСТИ (тренер) ─────────────────────────────────────────────────
 
 function NewsTab({ token }) {
@@ -2975,6 +2976,10 @@ function NewsTab({ token }) {
   const [msg,         setMsg]         = useState('')
   const [showForm,    setShowForm]    = useState(false)
   const [photoFile,   setPhotoFile]   = useState(null)
+  const [editingId,   setEditingId]   = useState(null)
+  const [editForm,    setEditForm]    = useState({ title: '', body: '' })
+  const [editPhoto,   setEditPhoto]   = useState(null)
+  const [confirm,     setConfirm]     = useState(null)
   const [form, setForm] = useState({ title: '', body: '' })
 
   useEffect(() => { loadNews(); loadComps() }, [])
@@ -3002,36 +3007,45 @@ function NewsTab({ token }) {
       const r = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify(form) })
       if (!r.ok) { const d = await r.json(); setMsg(d.detail || 'Ошибка'); setSaving(false); return }
       const created = await r.json()
-
-      // Загружаем фото если выбрано
       if (photoFile) {
-        const fd = new FormData()
-        fd.append('file', photoFile)
+        const fd = new FormData(); fd.append('file', photoFile)
         await fetch(`${API}/news/${created.id}/photo`, { method: 'POST', headers: h, body: fd })
       }
-
-      setShowForm(false)
-      setForm({ title: '', body: '' })
-      setPhotoFile(null)
-      setMsg('Новость опубликована')
-      await loadNews()
+      setShowForm(false); setForm({ title: '', body: '' }); setPhotoFile(null)
+      setMsg('Новость опубликована'); await loadNews()
     } catch { setMsg('Ошибка') }
     setSaving(false)
   }
 
   const deleteNews = async (id) => {
-    if (!confirm('Удалить новость?')) return
     try {
       await fetch(`${API}/news/${id}`, { method: 'DELETE', headers: h })
-      await loadNews()
+      await loadNews(); setConfirm(null)
     } catch {}
   }
-const generateWithGPT = async (compId) => {
+
+  const saveEdit = async () => {
+    if (!editingId) return
+    setSaving(true); setMsg('')
+    try {
+      const r = await fetch(`${API}/news/${editingId}`, {
+        method: 'PATCH', headers: hj, body: JSON.stringify(editForm)
+      })
+      if (!r.ok) { setMsg('Ошибка сохранения'); setSaving(false); return }
+      if (editPhoto) {
+        const fd = new FormData(); fd.append('file', editPhoto)
+        await fetch(`${API}/news/${editingId}/photo`, { method: 'POST', headers: h, body: fd })
+      }
+      setEditingId(null); setEditPhoto(null); await loadNews()
+    } catch { setMsg('Ошибка') }
+    setSaving(false)
+  }
+
+  const generateWithGPT = async (compId) => {
     setSaving(true); setMsg('')
     try {
       const r = await fetch(`${API}/news-admin/generate-comp-news`, {
-        method: 'POST', headers: hj,
-        body: JSON.stringify({ comp_id: compId })
+        method: 'POST', headers: hj, body: JSON.stringify({ comp_id: compId })
       })
       const d = await r.json()
       setMsg(d.message || (r.ok ? 'Готово' : 'Ошибка'))
@@ -3044,20 +3058,37 @@ const generateWithGPT = async (compId) => {
     setSaving(true); setMsg('')
     try {
       const r = await fetch(`${API}/news/from-competition/${compId}`, { method: 'POST', headers: h })
-      if (r.ok) { setMsg('Новость о соревновании опубликована'); await loadNews() }
+      if (r.ok) { setMsg('Новость опубликована'); await loadNews() }
       else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
     setSaving(false)
   }
 
-  // Соревнования без опубликованной новости
   const publishedCompIds = new Set(items.filter(n => n.competition_id).map(n => n.competition_id))
   const compsWithoutNews = comps.filter(c => !publishedCompIds.has(c.id))
 
   return (
     <div>
+      {/* Подтверждение удаления */}
+      {confirm && (
+        <div className="modal-overlay" onClick={() => setConfirm(null)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <h3>Удалить новость?</h3>
+            <p style={{ color:'var(--gray)', marginBottom:20 }}>Это действие необратимо.</p>
+            <div className="modal-btns-row">
+              <button className="btn-primary" style={{ background:'var(--red)' }} onClick={() => deleteNews(confirm)}>Удалить</button>
+              <button className="btn-outline" onClick={() => setConfirm(null)}>Отмена</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Шапка */}
-      <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, flexWrap:'wrap', gap:8 }}>
+        <span style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.06em', color:'var(--white)' }}>
+          Новости клуба
+        </span>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
           <button className="att-all-btn" style={{ fontSize:'13px' }}
             onClick={async () => {
               setSaving(true); setMsg('')
@@ -3075,36 +3106,37 @@ const generateWithGPT = async (compId) => {
             + Новость
           </button>
         </div>
+      </div>
 
       {msg && <div className="att-msg" style={{ marginBottom:12 }}>{msg}</div>}
 
       {/* Автоновость из соревнования */}
-{compsWithoutNews.length > 0 && (
-  <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', padding:'16px 20px', marginBottom:20 }}>
-    <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
-      Опубликовать автоновость о соревновании
-    </div>
-    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-      {compsWithoutNews.slice(0, 5).map(c => (
-        <div key={c.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-          <span style={{ color:'var(--white)', fontSize:'14px', flex:1 }}>
-            {c.name} — {new Date(c.date).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
-          </span>
-          <div style={{ display:'flex', gap:8 }}>
-            <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap' }}
-              onClick={() => publishFromComp(c.id)} disabled={saving}>
-              Стандартная
-            </button>
-            <button className="btn-primary" style={{ fontSize:'12px', padding:'6px 12px', whiteSpace:'nowrap' }}
-              onClick={() => generateWithGPT(c.id)} disabled={saving}>
-              YandexGPT
-            </button>
+      {compsWithoutNews.length > 0 && (
+        <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', padding:'16px 20px', marginBottom:20 }}>
+          <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
+            Опубликовать автоновость о соревновании
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {compsWithoutNews.slice(0, 5).map(c => (
+              <div key={c.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                <span style={{ color:'var(--white)', fontSize:'14px', flex:1, minWidth:0 }}>
+                  {c.name} — {new Date(c.date).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
+                </span>
+                <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                  <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap' }}
+                    onClick={() => publishFromComp(c.id)} disabled={saving}>
+                    Стандартная
+                  </button>
+                  <button className="btn-primary" style={{ fontSize:'12px', padding:'6px 12px', whiteSpace:'nowrap' }}
+                    onClick={() => generateWithGPT(c.id)} disabled={saving}>
+                    YandexGPT
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      ))}
-    </div>
-  </div>
-)}
+      )}
 
       {/* Список новостей */}
       {loading && <div className="cabinet-loading">Загрузка...</div>}
@@ -3114,70 +3146,83 @@ const generateWithGPT = async (compId) => {
         {items.map(n => (
           <div key={n.id} style={{ background:'var(--dark)', border:'1px solid var(--gray-dim)', padding:'16px 20px' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12 }}>
-              <div style={{ flex:1 }}>
+              <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontFamily:'Barlow Condensed', fontSize:'11px', fontWeight:700, letterSpacing:'2px', color:'var(--red)', marginBottom:4 }}>
                   {new Date(n.published_at).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
                   {n.competition_id && <span style={{ marginLeft:8, color:'var(--gray)' }}>· авто</span>}
                 </div>
-                <div style={{ fontWeight:600, color:'var(--white)', fontSize:'15px' }}>{n.title}</div>
-                <div style={{ color:'var(--gray)', fontSize:'13px', marginTop:4, lineHeight:1.5 }}>
+                <div style={{ fontWeight:600, color:'var(--white)', fontSize:'15px', marginBottom:4 }}>{n.title}</div>
+                <div style={{ color:'var(--gray)', fontSize:'13px', lineHeight:1.5 }}>
                   {n.body.slice(0, 120).replace(/\n/g, ' ')}{n.body.length > 120 ? '…' : ''}
                 </div>
               </div>
-              {n.photo_url && (
-                <img src={n.photo_url} alt="" style={{ width:80, height:60, objectFit:'cover', flexShrink:0 }} />
-              )}
-              <button className="td-btn td-btn-del" onClick={() => deleteNews(n.id)}>✕</button>
+              <div style={{ display:'flex', flexDirection:'column', gap:6, flexShrink:0, alignItems:'flex-end' }}>
+                {n.photo_url && (
+                  <img src={n.photo_url} alt="" style={{ width:80, height:55, objectFit:'cover' }} />
+                )}
+                <div style={{ display:'flex', gap:6 }}>
+                  <button className="att-all-btn" style={{ fontSize:'11px', padding:'4px 10px' }}
+                    onClick={() => { setEditingId(n.id); setEditForm({ title: n.title, body: n.body }); setEditPhoto(null) }}>
+                    Ред.
+                  </button>
+                  <button className="td-btn td-btn-del" onClick={() => setConfirm(n.id)}>✕</button>
+                </div>
+              </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Форма создания новости */}
+      {/* Модал: создать новость */}
       {showForm && (
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
           <div className="modal-box" style={{ maxWidth:600 }} onClick={e => e.stopPropagation()}>
             <h3>Новая новость</h3>
-
             <div style={{ marginBottom:12 }}>
-              <label style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', display:'block', marginBottom:6 }}>
-                Заголовок
-              </label>
-              <input
-                className="modal-input"
-                placeholder="Заголовок новости..."
-                value={form.title}
-                onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-              />
+              <label style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', display:'block', marginBottom:6 }}>Заголовок</label>
+              <input className="modal-input" placeholder="Заголовок новости..." value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} />
             </div>
-
             <div style={{ marginBottom:12 }}>
-              <label style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', display:'block', marginBottom:6 }}>
-                Текст
-              </label>
-              <textarea
-                style={{ width:'100%', minHeight:160, background:'var(--dark2)', border:'1px solid var(--gray-dim)', color:'var(--white)', padding:'10px 14px', fontSize:'14px', fontFamily:'Barlow, sans-serif', resize:'vertical', boxSizing:'border-box' }}
-                placeholder="Текст новости..."
-                value={form.body}
-                onChange={e => setForm(p => ({ ...p, body: e.target.value }))}
-              />
+              <label style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', display:'block', marginBottom:6 }}>Текст</label>
+              <textarea style={{ width:'100%', minHeight:160, background:'var(--dark2)', border:'1px solid var(--gray-dim)', color:'var(--white)', padding:'10px 14px', fontSize:'14px', fontFamily:'Barlow, sans-serif', resize:'vertical', boxSizing:'border-box' }}
+                placeholder="Текст новости..." value={form.body} onChange={e => setForm(p => ({ ...p, body: e.target.value }))} />
             </div>
-
             <div style={{ marginBottom:16 }}>
-              <label style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', display:'block', marginBottom:6 }}>
-                Фото (необязательно)
-              </label>
+              <label style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', display:'block', marginBottom:6 }}>Фото (необязательно)</label>
               <input type="file" accept="image/*" onChange={e => setPhotoFile(e.target.files[0])} />
               {photoFile && <div style={{ color:'var(--gray)', fontSize:'12px', marginTop:4 }}>{photoFile.name}</div>}
             </div>
-
             {msg && <div className="modal-msg" style={{ marginBottom:8 }}>{msg}</div>}
-
             <div className="modal-btns-row">
-              <button className="btn-primary" onClick={createNews} disabled={saving}>
-                {saving ? 'Публикация...' : 'Опубликовать'}
-              </button>
+              <button className="btn-primary" onClick={createNews} disabled={saving}>{saving ? 'Публикация...' : 'Опубликовать'}</button>
               <button className="btn-outline" onClick={() => { setShowForm(false); setMsg('') }}>Отмена</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модал: редактировать новость */}
+      {editingId && (
+        <div className="modal-overlay" onClick={() => setEditingId(null)}>
+          <div className="modal-box" style={{ maxWidth:600 }} onClick={e => e.stopPropagation()}>
+            <h3>Редактировать новость</h3>
+            <div style={{ marginBottom:12 }}>
+              <label style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', display:'block', marginBottom:6 }}>Заголовок</label>
+              <input className="modal-input" value={editForm.title} onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))} />
+            </div>
+            <div style={{ marginBottom:12 }}>
+              <label style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', display:'block', marginBottom:6 }}>Текст</label>
+              <textarea style={{ width:'100%', minHeight:200, background:'var(--dark2)', border:'1px solid var(--gray-dim)', color:'var(--white)', padding:'10px 14px', fontSize:'14px', fontFamily:'Barlow, sans-serif', resize:'vertical', boxSizing:'border-box' }}
+                value={editForm.body} onChange={e => setEditForm(p => ({ ...p, body: e.target.value }))} />
+            </div>
+            <div style={{ marginBottom:16 }}>
+              <label style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', display:'block', marginBottom:6 }}>Заменить фото (необязательно)</label>
+              <input type="file" accept="image/*" onChange={e => setEditPhoto(e.target.files[0])} />
+              {editPhoto && <div style={{ color:'var(--gray)', fontSize:'12px', marginTop:4 }}>{editPhoto.name}</div>}
+            </div>
+            <div className="modal-btns-row">
+              <button className="btn-primary" onClick={saveEdit} disabled={saving}>{saving ? 'Сохранение...' : 'Сохранить'}</button>
+              <button className="btn-outline" onClick={() => setEditingId(null)}>Отмена</button>
             </div>
           </div>
         </div>
@@ -3185,6 +3230,7 @@ const generateWithGPT = async (compId) => {
     </div>
   )
 }
+
 
 // ── ВКЛАДКА ИНФОРМАЦИЯ ────────────────────────────────────────────────────────
 
