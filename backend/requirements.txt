@@ -9,6 +9,7 @@ passlib==1.7.4
 bcrypt==4.0.1
 python-multipart==0.0.9
 alembic==1.13.1
+beautifulsoup4==4.12.3
 
 # Календарь и уведомления
 httpx==0.27.0          # HTTP клиент для Telegram API
