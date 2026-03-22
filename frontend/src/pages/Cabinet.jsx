@@ -3099,7 +3099,10 @@ function NewsTab({ token }) {
       const dateStr = new Date(certDate).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
       const title = `${certName} — ${dateStr}`
       const body  = `${dateStr} в клубе «Тайпан» прошла аттестация: ${certName}.\n\nПоздравляем всех участников с получением новых поясов! Каждый пояс — это результат упорного труда, дисциплины и преданности тхэквондо ГТФ.\n\nПродолжаем расти и совершенствоваться!`
-      const r = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title, body }) })
+      const r = await fetch(`${API}/news`, {
+        method: 'POST', headers: hj,
+        body: JSON.stringify({ title, body, certification_id: certId })
+      })
       if (r.ok) { setMsg('Новость об аттестации опубликована'); await loadNews() }
       else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
@@ -3111,10 +3114,7 @@ function NewsTab({ token }) {
     try {
       const dateStr = new Date(certDate).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
       const prompt = `Напиши новость об аттестации по тхэквондо ГТФ для сайта клуба «Тайпан».\n\nДанные:\nНазвание аттестации: ${certName}\nДата: ${dateStr}\nКлуб: Тайпан, г. Павловский Посад\nФедерация: ГТФ (GTF)\n\nСтиль — торжественный, поддерживающий, гордый. Не используй эмодзи. Зал называется доянг. Пояса — гыпы (ученические) и даны (мастерские).\nОбъём 100-180 слов.\nВерни:\nЗАГОЛОВОК: [заголовок]\nТЕКСТ: [текст]`
-      const r = await fetch(`${API}/ai/chat`, {
-        method: 'POST', headers: hj,
-        body: JSON.stringify({ message: prompt, history: [] })
-      })
+      const r2 = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title: title.slice(0,255), body, certification_id: certId }) })
       if (!r.ok) { setMsg('Ошибка YandexGPT'); setSaving(false); return }
       const data = await r.json()
       const reply = data.reply || ''
@@ -3154,10 +3154,7 @@ function NewsTab({ token }) {
       const de = new Date(campDateEnd).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
       const loc = campLocation ? `, место: ${campLocation}` : ''
       const prompt = `Напиши новость об учебно-тренировочных сборах по тхэквондо ГТФ для сайта клуба «Тайпан».\n\nДанные:\nНазвание: ${campName}\nДаты: ${ds}–${de}${loc}\nКлуб: Тайпан, г. Павловский Посад\nФедерация: ГТФ (GTF)\n\nСтиль — живой, мотивирующий, командный. Не используй эмодзи. Зал называется доянг, техника — хъёнги и массоги.\nОбъём 120-200 слов.\nВерни:\nЗАГОЛОВОК: [заголовок]\nТЕКСТ: [текст]`
-      const r = await fetch(`${API}/ai/chat`, {
-        method: 'POST', headers: hj,
-        body: JSON.stringify({ message: prompt, history: [] })
-      })
+      const r2 = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title: title.slice(0,255), body, camp_id: campId }) })
       if (!r.ok) { setMsg('Ошибка YandexGPT'); setSaving(false); return }
       const data = await r.json()
       const reply = data.reply || ''

@@ -27,9 +27,12 @@ def require_manager(u: User = Depends(get_current_user)) -> User:
 
 
 class NewsCreate(BaseModel):
-    title:          str
-    body:           str
-    competition_id: Optional[int] = None
+    title:            str
+    body:             str
+    competition_id:   Optional[int] = None
+    certification_id: Optional[int] = None
+    camp_id:          Optional[int] = None
+
 
 class NewsUpdate(BaseModel):
     title: Optional[str] = None
@@ -38,13 +41,15 @@ class NewsUpdate(BaseModel):
 
 def _out(n: News) -> dict:
     return {
-        "id":             n.id,
-        "title":          n.title,
-        "body":           n.body,
-        "photo_url":      n.photo_url,
-        "published_at":   str(n.published_at),
-        "competition_id": n.competition_id,
-        "author":         n.author.full_name if n.author else None,
+        "id":               n.id,
+        "title":            n.title,
+        "body":             n.body,
+        "photo_url":        n.photo_url,
+        "published_at":     str(n.published_at),
+        "competition_id":   n.competition_id,
+        "certification_id": n.certification_id,
+        "camp_id":          n.camp_id,
+        "author":           n.author.full_name if n.author else None,
     }
 
 
@@ -67,7 +72,20 @@ def create_news(data: NewsCreate, db: Session = Depends(get_db), user: User = De
     if data.competition_id:
         existing = db.query(News).filter(News.competition_id == data.competition_id, News.is_published == True).first()
         if existing: raise HTTPException(400, "Новость об этом соревновании уже опубликована")
-    n = News(title=data.title, body=data.body, competition_id=data.competition_id, created_by=user.id)
+    if data.certification_id:
+        existing = db.query(News).filter(News.certification_id == data.certification_id, News.is_published == True).first()
+        if existing: raise HTTPException(400, "Новость об этой аттестации уже опубликована")
+    if data.camp_id:
+        existing = db.query(News).filter(News.camp_id == data.camp_id, News.is_published == True).first()
+        if existing: raise HTTPException(400, "Новость об этих сборах уже опубликована")
+
+    n = News(
+        title=data.title, body=data.body,
+        competition_id=data.competition_id,
+        certification_id=data.certification_id,
+        camp_id=data.camp_id,
+        created_by=user.id
+    )
     db.add(n); db.commit(); db.refresh(n)
     return _out(n)
 
@@ -132,7 +150,6 @@ def news_from_competition(comp_id: int, db: Session = Depends(get_db), user: Use
     existing = db.query(News).filter(News.competition_id == comp_id, News.is_published == True).first()
     if existing: raise HTTPException(400, "Новость об этом соревновании уже опубликована")
 
-    # Без фильтра по статусу — берём всех у кого есть места
     results = db.query(CompetitionResult).filter(CompetitionResult.competition_id == comp_id).all()
 
     date_str = comp.date.strftime("%d.%m.%Y") if comp.date else ""
