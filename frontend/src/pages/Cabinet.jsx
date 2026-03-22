@@ -159,6 +159,7 @@ function AttendanceTab({ token, athletes }) {
   const [viewMode, setViewMode] = useState('history')
   const [showChart, setShowChart] = useState(false)
   const [chartData, setChartData] = useState([])
+  const [shownSessions, setShownSessions] = useState(10)
 
   const groupAthletes = useMemo(() =>
     athletes.filter(a => {
@@ -176,7 +177,7 @@ function AttendanceTab({ token, athletes }) {
       .catch(() => {})
   }, [])
 
-  useEffect(() => { loadSessions() }, [group, season])
+  useEffect(() => { loadSessions(); setShownSessions(10) }, [group, season])
   useEffect(() => { if (showChart) loadChartData(group) }, [showChart, group])
 
   const loadSessions = async () => {
@@ -302,7 +303,7 @@ function AttendanceTab({ token, athletes }) {
       {viewMode === 'history' && !showChart && (
         <div className="att-history">
           {sessions.length === 0 && <div className="cabinet-empty">Тренировок пока нет</div>}
-          {sessions.map(s => (
+          {sessions.slice(0, shownSessions).map(s => (
             <div key={s.id} className="att-session-row" onClick={() => openSession(s)}>
               <span className="att-session-date">{new Date(s.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
               <span className="att-session-stat">{s.present} / {s.total} присутствовали{s.total > 0 && <span className="att-pct"> ({Math.round(s.present/s.total*100)}%)</span>}</span>
@@ -310,6 +311,12 @@ function AttendanceTab({ token, athletes }) {
               <span className="att-session-edit">Открыть →</span>
             </div>
           ))}
+          {sessions.length > shownSessions && (
+            <button className="btn-outline" style={{ marginTop:12, width:'100%' }}
+              onClick={() => setShownSessions(s => s + 10)}>
+              Показать ещё ({sessions.length - shownSessions} тренировок)
+            </button>
+          )}
         </div>
       )}
       {viewMode !== 'history' && !showChart && (
@@ -2967,20 +2974,20 @@ function NewsTab({ token }) {
   const h   = { Authorization: `Bearer ${token}` }
   const hj  = { ...h, 'Content-Type': 'application/json' }
 
-  const [items,       setItems]       = useState([])
-  const [comps,       setComps]       = useState([])
-  const [certs,       setCerts]       = useState([])
-  const [camps,       setCamps]       = useState([])
-  const [loading,     setLoading]     = useState(false)
-  const [saving,      setSaving]      = useState(false)
-  const [msg,         setMsg]         = useState('')
-  const [showForm,    setShowForm]    = useState(false)
-  const [photoFile,   setPhotoFile]   = useState(null)
-  const [editingId,   setEditingId]   = useState(null)
-  const [editForm,    setEditForm]    = useState({ title: '', body: '' })
-  const [editPhoto,   setEditPhoto]   = useState(null)
+  const [items,        setItems]        = useState([])
+  const [comps,        setComps]        = useState([])
+  const [certs,        setCerts]        = useState([])
+  const [camps,        setCamps]        = useState([])
+  const [loading,      setLoading]      = useState(false)
+  const [saving,       setSaving]       = useState(false)
+  const [msg,          setMsg]          = useState('')
+  const [showForm,     setShowForm]     = useState(false)
+  const [photoFile,    setPhotoFile]    = useState(null)
+  const [editingId,    setEditingId]    = useState(null)
+  const [editForm,     setEditForm]     = useState({ title: '', body: '' })
+  const [editPhoto,    setEditPhoto]    = useState(null)
   const [editHasPhoto, setEditHasPhoto] = useState(false)
-  const [confirm,     setConfirm]     = useState(null)
+  const [confirm,      setConfirm]      = useState(null)
   const [form, setForm] = useState({ title: '', body: '' })
 
   useEffect(() => { loadNews(); loadComps(); loadCerts(); loadCamps() }, [])
@@ -3059,8 +3066,7 @@ function NewsTab({ token }) {
   const deletePhoto = async (newsId) => {
     try {
       await fetch(`${API}/news/${newsId}/photo`, { method: 'DELETE', headers: h })
-      setEditHasPhoto(false)
-      await loadNews()
+      setEditHasPhoto(false); await loadNews()
     } catch {}
   }
 
@@ -3093,12 +3099,35 @@ function NewsTab({ token }) {
       const dateStr = new Date(certDate).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
       const title = `${certName} — ${dateStr}`
       const body  = `${dateStr} в клубе «Тайпан» прошла аттестация: ${certName}.\n\nПоздравляем всех участников с получением новых поясов! Каждый пояс — это результат упорного труда, дисциплины и преданности тхэквондо ГТФ.\n\nПродолжаем расти и совершенствоваться!`
-      const r = await fetch(`${API}/news`, {
-        method: 'POST', headers: hj,
-        body: JSON.stringify({ title, body })
-      })
+      const r = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title, body }) })
       if (r.ok) { setMsg('Новость об аттестации опубликована'); await loadNews() }
       else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
+    } catch { setMsg('Ошибка') }
+    setSaving(false)
+  }
+
+  const generateCertWithGPT = async (certId, certName, certDate) => {
+    setSaving(true); setMsg('')
+    try {
+      const dateStr = new Date(certDate).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
+      const prompt = `Напиши новость об аттестации по тхэквондо ГТФ для сайта клуба «Тайпан».\n\nДанные:\nНазвание аттестации: ${certName}\nДата: ${dateStr}\nКлуб: Тайпан, г. Павловский Посад\nФедерация: ГТФ (GTF)\n\nСтиль — торжественный, поддерживающий, гордый. Не используй эмодзи. Зал называется доянг. Пояса — гыпы (ученические) и даны (мастерские).\nОбъём 100-180 слов.\nВерни:\nЗАГОЛОВОК: [заголовок]\nТЕКСТ: [текст]`
+      const r = await fetch(`${API}/ai/chat`, {
+        method: 'POST', headers: hj,
+        body: JSON.stringify({ message: prompt, history: [] })
+      })
+      if (!r.ok) { setMsg('Ошибка YandexGPT'); setSaving(false); return }
+      const data = await r.json()
+      const reply = data.reply || ''
+      let title = `${certName} — ${dateStr}`
+      let body  = reply
+      if (reply.includes('ЗАГОЛОВОК:') && reply.includes('ТЕКСТ:')) {
+        const parts = reply.split('ТЕКСТ:')
+        title = parts[0].replace('ЗАГОЛОВОК:', '').trim() || title
+        body  = parts[1].trim()
+      }
+      const r2 = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title: title.slice(0,255), body }) })
+      if (r2.ok) { setMsg('Новость об аттестации сгенерирована YandexGPT'); await loadNews() }
+      else { const d = await r2.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
     setSaving(false)
   }
@@ -3111,27 +3140,48 @@ function NewsTab({ token }) {
       const loc = campLocation ? ` в ${campLocation}` : ''
       const title = `Учебно-тренировочные сборы «${campName}» — ${ds}–${de}`
       const body  = `С ${ds} по ${de} наши спортсмены приняли участие в учебно-тренировочных сборах «${campName}»${loc}.\n\nСборы — важная часть подготовки каждого спортсмена. Интенсивные тренировки, работа над техникой хъёнгов и массоги, командный дух и взаимная поддержка — всё это делает наших бойцов сильнее.\n\nБлагодарим всех участников за старание и самоотдачу!`
-      const r = await fetch(`${API}/news`, {
-        method: 'POST', headers: hj,
-        body: JSON.stringify({ title, body })
-      })
+      const r = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title, body }) })
       if (r.ok) { setMsg('Новость о сборах опубликована'); await loadNews() }
       else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
     setSaving(false)
   }
 
-  // Соревнования/аттестации/сборы без опубликованной новости
+  const generateCampWithGPT = async (campId, campName, campDateStart, campDateEnd, campLocation) => {
+    setSaving(true); setMsg('')
+    try {
+      const ds = new Date(campDateStart).toLocaleDateString('ru-RU', { day:'numeric', month:'long' })
+      const de = new Date(campDateEnd).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
+      const loc = campLocation ? `, место: ${campLocation}` : ''
+      const prompt = `Напиши новость об учебно-тренировочных сборах по тхэквондо ГТФ для сайта клуба «Тайпан».\n\nДанные:\nНазвание: ${campName}\nДаты: ${ds}–${de}${loc}\nКлуб: Тайпан, г. Павловский Посад\nФедерация: ГТФ (GTF)\n\nСтиль — живой, мотивирующий, командный. Не используй эмодзи. Зал называется доянг, техника — хъёнги и массоги.\nОбъём 120-200 слов.\nВерни:\nЗАГОЛОВОК: [заголовок]\nТЕКСТ: [текст]`
+      const r = await fetch(`${API}/ai/chat`, {
+        method: 'POST', headers: hj,
+        body: JSON.stringify({ message: prompt, history: [] })
+      })
+      if (!r.ok) { setMsg('Ошибка YandexGPT'); setSaving(false); return }
+      const data = await r.json()
+      const reply = data.reply || ''
+      let title = `Сборы «${campName}» — ${ds}–${de}`
+      let body  = reply
+      if (reply.includes('ЗАГОЛОВОК:') && reply.includes('ТЕКСТ:')) {
+        const parts = reply.split('ТЕКСТ:')
+        title = parts[0].replace('ЗАГОЛОВОК:', '').trim() || title
+        body  = parts[1].trim()
+      }
+      const r2 = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title: title.slice(0,255), body }) })
+      if (r2.ok) { setMsg('Новость о сборах сгенерирована YandexGPT'); await loadNews() }
+      else { const d = await r2.json(); setMsg(d.detail || 'Ошибка') }
+    } catch { setMsg('Ошибка') }
+    setSaving(false)
+  }
+
   const publishedCompIds = new Set(items.filter(n => n.competition_id).map(n => n.competition_id))
   const compsWithoutNews = comps.filter(c => !publishedCompIds.has(c.id))
-
-  // Последние 5 аттестаций и сборов для автоновостей
   const recentCerts = certs.slice(0, 5)
   const recentCamps = camps.slice(0, 5)
 
   return (
     <div>
-      {/* Подтверждение удаления */}
       {confirm && (
         <div className="modal-overlay" onClick={() => setConfirm(null)}>
           <div className="modal-box" onClick={e => e.stopPropagation()}>
@@ -3145,7 +3195,6 @@ function NewsTab({ token }) {
         </div>
       )}
 
-      {/* Шапка */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, flexWrap:'wrap', gap:8 }}>
         <span style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.06em', color:'var(--white)' }}>
           Новости клуба
@@ -3172,7 +3221,7 @@ function NewsTab({ token }) {
 
       {msg && <div className="att-msg" style={{ marginBottom:12 }}>{msg}</div>}
 
-      {/* Автоновости о соревнованиях */}
+      {/* Соревнования без новости */}
       {compsWithoutNews.length > 0 && (
         <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', padding:'16px 20px', marginBottom:12 }}>
           <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
@@ -3186,13 +3235,9 @@ function NewsTab({ token }) {
                 </span>
                 <div style={{ display:'flex', gap:8, flexShrink:0 }}>
                   <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap' }}
-                    onClick={() => publishFromComp(c.id)} disabled={saving}>
-                    Стандартная
-                  </button>
+                    onClick={() => publishFromComp(c.id)} disabled={saving}>Стандартная</button>
                   <button className="btn-primary" style={{ fontSize:'12px', padding:'6px 12px', whiteSpace:'nowrap' }}
-                    onClick={() => generateWithGPT(c.id)} disabled={saving}>
-                    YandexGPT
-                  </button>
+                    onClick={() => generateWithGPT(c.id)} disabled={saving}>YandexGPT</button>
                 </div>
               </div>
             ))}
@@ -3200,11 +3245,11 @@ function NewsTab({ token }) {
         </div>
       )}
 
-      {/* Автоновости об аттестациях */}
+      {/* Аттестации */}
       {recentCerts.length > 0 && (
         <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid #c8962a', padding:'16px 20px', marginBottom:12 }}>
           <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
-            Опубликовать новость об аттестации
+            Аттестации без новости
           </div>
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {recentCerts.map(c => (
@@ -3212,21 +3257,23 @@ function NewsTab({ token }) {
                 <span style={{ color:'var(--white)', fontSize:'14px', flex:1, minWidth:0 }}>
                   {c.name} — {new Date(c.date).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
                 </span>
-                <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap', flexShrink:0 }}
-                  onClick={() => publishFromCert(c.id, c.name, c.date)} disabled={saving}>
-                  Опубликовать
-                </button>
+                <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                  <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap' }}
+                    onClick={() => publishFromCert(c.id, c.name, c.date)} disabled={saving}>Стандартная</button>
+                  <button className="btn-primary" style={{ fontSize:'12px', padding:'6px 12px', whiteSpace:'nowrap' }}
+                    onClick={() => generateCertWithGPT(c.id, c.name, c.date)} disabled={saving}>YandexGPT</button>
+                </div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Автоновости о сборах */}
+      {/* Сборы */}
       {recentCamps.length > 0 && (
         <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid #4caf50', padding:'16px 20px', marginBottom:20 }}>
           <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
-            Опубликовать новость о сборах
+            Сборы без новости
           </div>
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {recentCamps.map(c => (
@@ -3234,17 +3281,18 @@ function NewsTab({ token }) {
                 <span style={{ color:'var(--white)', fontSize:'14px', flex:1, minWidth:0 }}>
                   {c.name} — {new Date(c.date_start).toLocaleDateString('ru-RU', { day:'numeric', month:'long' })}–{new Date(c.date_end).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
                 </span>
-                <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap', flexShrink:0 }}
-                  onClick={() => publishFromCamp(c.id, c.name, c.date_start, c.date_end, c.location)} disabled={saving}>
-                  Опубликовать
-                </button>
+                <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                  <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap' }}
+                    onClick={() => publishFromCamp(c.id, c.name, c.date_start, c.date_end, c.location)} disabled={saving}>Стандартная</button>
+                  <button className="btn-primary" style={{ fontSize:'12px', padding:'6px 12px', whiteSpace:'nowrap' }}
+                    onClick={() => generateCampWithGPT(c.id, c.name, c.date_start, c.date_end, c.location)} disabled={saving}>YandexGPT</button>
+                </div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Список новостей */}
       {loading && <div className="cabinet-loading">Загрузка...</div>}
       {!loading && items.length === 0 && <div className="cabinet-empty">Новостей пока нет</div>}
 
@@ -3263,17 +3311,10 @@ function NewsTab({ token }) {
                 </div>
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:6, flexShrink:0, alignItems:'flex-end' }}>
-                {n.photo_url && (
-                  <img src={n.photo_url} alt="" style={{ width:100, height:70, objectFit:'cover', borderRadius:2 }} />
-                )}
+                {n.photo_url && <img src={n.photo_url} alt="" style={{ width:100, height:70, objectFit:'cover', borderRadius:2 }} />}
                 <div style={{ display:'flex', gap:6 }}>
                   <button className="att-all-btn" style={{ fontSize:'11px', padding:'4px 10px' }}
-                    onClick={() => {
-                      setEditingId(n.id)
-                      setEditForm({ title: n.title, body: n.body })
-                      setEditPhoto(null)
-                      setEditHasPhoto(!!n.photo_url)
-                    }}>
+                    onClick={() => { setEditingId(n.id); setEditForm({ title: n.title, body: n.body }); setEditPhoto(null); setEditHasPhoto(!!n.photo_url) }}>
                     Ред.
                   </button>
                   <button className="td-btn td-btn-del" onClick={() => setConfirm(n.id)}>✕</button>
@@ -3284,7 +3325,6 @@ function NewsTab({ token }) {
         ))}
       </div>
 
-      {/* Модал: создать новость */}
       {showForm && (
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
           <div className="modal-box" style={{ maxWidth:600 }} onClick={e => e.stopPropagation()}>
@@ -3312,7 +3352,6 @@ function NewsTab({ token }) {
         </div>
       )}
 
-      {/* Модал: редактировать новость */}
       {editingId && (
         <div className="modal-overlay" onClick={() => setEditingId(null)}>
           <div className="modal-box" style={{ maxWidth:600 }} onClick={e => e.stopPropagation()}>
@@ -3331,10 +3370,7 @@ function NewsTab({ token }) {
               {editHasPhoto && (
                 <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
                   <span style={{ color:'var(--gray)', fontSize:'13px' }}>Фото прикреплено</span>
-                  <button className="td-btn td-btn-del" style={{ fontSize:'11px' }}
-                    onClick={() => deletePhoto(editingId)}>
-                    Удалить фото
-                  </button>
+                  <button className="td-btn td-btn-del" style={{ fontSize:'11px' }} onClick={() => deletePhoto(editingId)}>Удалить фото</button>
                 </div>
               )}
               <input type="file" accept="image/*" onChange={e => setEditPhoto(e.target.files[0])} />
@@ -3350,6 +3386,7 @@ function NewsTab({ token }) {
     </div>
   )
 }
+
 
 
 // ── ВКЛАДКА ИНФОРМАЦИЯ ────────────────────────────────────────────────────────
