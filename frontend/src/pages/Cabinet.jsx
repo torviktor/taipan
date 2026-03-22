@@ -4255,6 +4255,7 @@ export default function Cabinet() {
               </tbody>
             </table>
             {sortedAthletes.length === 0 && !loading && <div className="cabinet-empty">Спортсменов не найдено</div>}
+            </div>
           </div>
         )}
 
@@ -4353,8 +4354,7 @@ export default function Cabinet() {
           </div>
         )}
       </div>
-        </div>
-        </div>
+    </div>
     </main>
   )
 }
