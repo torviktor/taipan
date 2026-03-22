@@ -27,7 +27,7 @@ const seasonRange = (y) => {
   }
 }
 
-const GROUPS = ['Младшая группа (6–10 лет)', 'Старшая группа (11+)', 'Взрослые (18+)']
+const GROUPS = ['Младшая группа (6–10 лет)', 'Старшая группа (11+)']
 
 function useSorted(data) {
   const [sort, setSort] = useState({ key: null, dir: 'asc' })
@@ -164,8 +164,7 @@ function AttendanceTab({ token, athletes }) {
     athletes.filter(a => {
       const g = a.group || a.auto_group || ''
       if (group === 'junior')  return g.includes('6') || g.includes('Младшая')
-      if (group === 'senior')  return g.includes('11') || g.includes('Старшая')
-      if (group === 'adults')  return g.includes('18') || g.includes('Взрослые')
+      if (group === 'senior')  return g.includes('11') || g.includes('Старшая') || g.includes('18') || g.includes('Взрослые')
       return false
     })
   , [athletes, group])
@@ -274,7 +273,6 @@ function AttendanceTab({ token, athletes }) {
         <div className="attendance-group-tabs">
           <button className={`att-group-btn ${group === 'junior' ? 'active' : ''}`} onClick={() => { setGroup('junior'); setViewMode('history') }}>Младшая (6–10 лет)</button>
           <button className={`att-group-btn ${group === 'senior' ? 'active' : ''}`} onClick={() => { setGroup('senior'); setViewMode('history') }}>Старшая (11+)</button>
-          <button className={`att-group-btn ${group === 'adults' ? 'active' : ''}`} onClick={() => { setGroup('adults'); setViewMode('history') }}>Взрослые (18+)</button>
           <button className={`att-group-btn ${showChart ? 'active' : ''}`} onClick={() => {
             const next = !showChart
             setShowChart(next)
