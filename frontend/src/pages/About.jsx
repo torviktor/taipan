@@ -558,7 +558,7 @@ export default function About() {
           ))}
         </nav>
 
-        <div className="about-content" 
+        <div className="about-content"> 
           <h2 className="about-section-title">{section.title}</h2>
           <div className="about-divider" />
 
