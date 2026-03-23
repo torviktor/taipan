@@ -291,10 +291,10 @@ export default function CalendarPage() {
         <div className="modal-overlay">
           <div className="modal modal-small">
             <div className="modal-header"><h2>Удалить событие?</h2></div>
-            <p style={{color:'var(--gray)', padding:'0 0 24px'}}>
+            <p style={{ color: 'var(--gray)', marginBottom: '24px' }}>
               Это действие нельзя отменить. Все напоминания будут отменены.
             </p>
-            <div className="modal-actions">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <button className="btn-outline" onClick={() => setDeleteConfirm(null)}>Отмена</button>
               <button className="btn-delete" onClick={deleteEvent}>Да, удалить</button>
             </div>

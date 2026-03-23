@@ -44,7 +44,10 @@ export default function Footer() {
           <Link to="/">Главная</Link>
           <Link to="/about">О клубе</Link>
           <Link to="/schedule">Расписание</Link>
+          <Link to="/news">Новости</Link>
           <Link to="/calendar">Календарь</Link>
+          <Link to="/champions">Зал Славы</Link>
+          <Link to="/quiz">Тест</Link>
           <Link to="/apply">Записаться</Link>
           <Link to="/cabinet">Личный кабинет</Link>
         </div>

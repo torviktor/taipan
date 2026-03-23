@@ -104,11 +104,11 @@ export default function Navbar() {
     { to: '/',          label: 'Главная'    },
     { to: '/about',     label: 'О клубе'   },
     { to: '/schedule',  label: 'Расписание' },
+    { to: '/news',      label: 'Новости'    },
     { to: '/calendar',  label: 'Календарь'  },
-    { to: '/champions', label: 'Зал Славы'  },
+    { to: '/champions', label: 'Зал Славы', gold: true },
+    { to: '/quiz',      label: 'Тест'       },
     { to: '/apply',     label: 'Записаться' },
-    { to: '/quiz',      label: 'Тест' },
-    { to: '/news',      label: 'Новости' },
   ]
 
   return (
@@ -122,7 +122,11 @@ export default function Navbar() {
         <ul className="navbar-links">
           {links.map(l => (
             <li key={l.to}>
-              <Link to={l.to} className={location.pathname === l.to ? 'active' : ''}>{l.label}</Link>
+              <Link
+                to={l.to}
+                className={location.pathname === l.to ? 'active' : ''}
+                style={l.gold ? { color: '#c8962a' } : undefined}
+              >{l.label}</Link>
             </li>
           ))}
         </ul>
@@ -186,7 +190,13 @@ export default function Navbar() {
 
       {/* Мобильное меню */}
       <div className={`mobile-menu ${menuOpen ? 'open' : ''}`}>
-        {links.map(l => <Link key={l.to} to={l.to}>{l.label}</Link>)}
+        {links.map(l => (
+          <Link
+            key={l.to}
+            to={l.to}
+            style={l.gold ? { color: '#c8962a' } : undefined}
+          >{l.label}</Link>
+        ))}
         {token
           ? <Link to="/cabinet" className="mobile-menu-cabinet">Кабинет</Link>
           : <Link to="/login"   className="mobile-menu-cabinet">Войти</Link>

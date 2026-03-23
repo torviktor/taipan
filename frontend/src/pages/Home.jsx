@@ -227,7 +227,7 @@ export default function Home() {
                 </div>
               </div>
               <a
-                href="https://yandex.ru/maps/?text=Павловский+Посад,+ул.+Кирова,+95"
+                href="https://yandex.ru/maps/-/CPR1nQKu"
                 target="_blank"
                 rel="noreferrer"
                 className="btn-primary map-btn"
@@ -236,7 +236,7 @@ export default function Home() {
               </a>
             </div>
             <iframe
-              src="https://yandex.ru/map-widget/v1/?ll=38.6572%2C55.7697&z=16&pt=38.6572%2C55.7697%2Cpm2rdm"
+              src="https://yandex.ru/map-widget/v1/?ll=38.673440%2C55.781140&z=16&pt=38.673440%2C55.781140%2Cpm2rdm"
               width="100%"
               height="400"
               style={{ border: 'none' }}
