@@ -53,6 +53,25 @@ def _out(n: News) -> dict:
     }
 
 
+def _rank_label(gup: Optional[int], dan: Optional[int]) -> str:
+    """Читаемое обозначение гыпа/дана."""
+    if dan:
+        suffixes = {1:"1-й дан",2:"2-й дан",3:"3-й дан",4:"4-й дан",
+                    5:"5-й дан",6:"6-й дан",7:"7-й дан",8:"8-й дан",9:"9-й дан"}
+        return suffixes.get(dan, f"{dan}-й дан")
+    if gup == 0:
+        return "без пояса"
+    if gup:
+        return f"{gup}-й гып"
+    return "—"
+
+
+def _athlete_word(n: int) -> str:
+    if n % 10 == 1 and n % 100 != 11:  return "спортсмен"
+    if 2 <= n % 10 <= 4 and not (12 <= n % 100 <= 14): return "спортсмена"
+    return "спортсменов"
+
+
 @router.get("")
 def list_news(limit: int = 20, offset: int = 0, db: Session = Depends(get_db)):
     items = db.query(News).filter(News.is_published == True).order_by(News.published_at.desc()).offset(offset).limit(limit).all()
@@ -139,6 +158,8 @@ def delete_news(news_id: int, db: Session = Depends(get_db), _: User = Depends(r
     db.delete(n); db.commit()
 
 
+# ─── from-competition ────────────────────────────────────────────────────────
+
 @router.post("/from-competition/{comp_id}", status_code=201)
 def news_from_competition(comp_id: int, db: Session = Depends(get_db), user: User = Depends(require_manager)):
     from app.models.competition import Competition, CompetitionResult
@@ -178,7 +199,7 @@ def news_from_competition(comp_id: int, db: Session = Depends(get_db), user: Use
     body_parts.append("")
 
     if participants:
-        body_parts.append(f"В соревнованиях участвовали {len(participants)} спортсменов клуба «Тайпан»:")
+        body_parts.append(f"В соревнованиях участвовали {len(participants)} {_athlete_word(len(participants))} клуба «Тайпан»:")
         for p in participants: body_parts.append(f"• {p}")
         body_parts.append("")
 
@@ -206,6 +227,8 @@ def news_from_competition(comp_id: int, db: Session = Depends(get_db), user: Use
     return _out(n)
 
 
+# ─── from-certification ──────────────────────────────────────────────────────
+
 @router.post("/from-certification/{cert_id}", status_code=201)
 def news_from_certification(cert_id: int, db: Session = Depends(get_db), user: User = Depends(require_manager)):
     from app.models.certification import Certification, CertificationResult
@@ -217,36 +240,26 @@ def news_from_certification(cert_id: int, db: Session = Depends(get_db), user: U
     existing = db.query(News).filter(News.certification_id == cert_id, News.is_published == True).first()
     if existing: raise HTTPException(400, "Новость об этой аттестации уже опубликована")
 
-    all_results = db.query(CertificationResult).filter(CertificationResult.certification_id == cert_id).all()
+    all_results    = db.query(CertificationResult).filter(CertificationResult.certification_id == cert_id).all()
     passed_results = [r for r in all_results if r.passed is True]
 
     date_str = cert.date.strftime("%d.%m.%Y") if cert.date else ""
-    title = f"{cert.name} — {date_str}"
+    title    = f"{cert.name} — {date_str}"
 
-    def rank_label(gup, dan):
-        """Возвращает читаемое обозначение гыпа/дана."""
-        if dan:
-            suffix = {1: "1-й дан", 2: "2-й дан", 3: "3-й дан",
-                      4: "4-й дан", 5: "5-й дан", 6: "6-й дан",
-                      7: "7-й дан", 8: "8-й дан", 9: "9-й дан"}.get(dan, f"{dan}-й дан")
-            return suffix
-        if gup == 0:
-            return "без пояса"
-        if gup:
-            return f"{gup}-й гып"
-        return "—"
-
-    lines = []
+    # Собираем строки по сдавшим
+    passed_lines = []
     for r in passed_results:
         athlete = db.query(Athlete).filter(Athlete.id == r.athlete_id).first()
-        if not athlete:
-            continue
-        target = rank_label(r.target_gup, r.target_dan)
-        lines.append((athlete.full_name, target))
+        if not athlete: continue
+        rank = _rank_label(r.target_gup, r.target_dan)
+        passed_lines.append(f"{athlete.full_name} — {rank}")
 
+    total        = len(all_results)
+    passed_count = len(passed_lines)
     location_str = f" в {cert.location}" if cert.location else ""
+
     body_parts = [
-        f"{date_str} в клубе «Тайпан» прошла аттестация{location_str}.",
+        f"{date_str} в клубе «Тайпан»{location_str} прошла аттестация.",
         "",
         f"Аттестация: {cert.name}",
         f"Дата: {date_str}",
@@ -255,21 +268,13 @@ def news_from_certification(cert_id: int, db: Session = Depends(get_db), user: U
         body_parts.append(f"Место проведения: {cert.location}")
     body_parts.append("")
 
-    total = len(all_results)
-    passed_count = len(lines)
-
-    def athlete_word(n):
-        if n % 10 == 1 and n % 100 != 11: return "спортсмен"
-        if 2 <= n % 10 <= 4 and not (12 <= n % 100 <= 14): return "спортсмена"
-        return "спортсменов"
-
-    body_parts.append(f"К аттестации приступили {total} {athlete_word(total)}.")
+    body_parts.append(f"К аттестации приступили {total} {_athlete_word(total)}.")
     body_parts.append("")
 
-    if lines:
-        body_parts.append(f"Успешно сдали аттестацию {passed_count} {athlete_word(passed_count)}:")
-        for name, rank in lines:
-            body_parts.append(f"• {name} — {rank}")
+    if passed_lines:
+        body_parts.append(f"Успешно сдали {passed_count} {_athlete_word(passed_count)}:")
+        for line in passed_lines:
+            body_parts.append(f"• {line}")
         body_parts.append("")
         body_parts.append("Поздравляем с новыми поясами! Продолжаем расти и совершенствоваться.")
     else:
@@ -283,6 +288,8 @@ def news_from_certification(cert_id: int, db: Session = Depends(get_db), user: U
     db.add(n); db.commit(); db.refresh(n)
     return _out(n)
 
+
+# ─── from-camp ───────────────────────────────────────────────────────────────
 
 @router.post("/from-camp/{camp_id}", status_code=201)
 def news_from_camp(camp_id: int, db: Session = Depends(get_db), user: User = Depends(require_manager)):
@@ -312,13 +319,7 @@ def news_from_camp(camp_id: int, db: Session = Depends(get_db), user: User = Dep
         if athlete:
             names.append(athlete.full_name)
 
-    count = len(names)
-
-    def athlete_word(n):
-        if n % 10 == 1 and n % 100 != 11: return "спортсмен"
-        if 2 <= n % 10 <= 4 and not (12 <= n % 100 <= 14): return "спортсмена"
-        return "спортсменов"
-
+    count        = len(names)
     location_str = f" в {camp.location}" if camp.location else ""
 
     body_parts = [
@@ -332,7 +333,7 @@ def news_from_camp(camp_id: int, db: Session = Depends(get_db), user: User = Dep
     body_parts.append("")
 
     if count > 0:
-        body_parts.append(f"В сборах приняли участие {count} {athlete_word(count)} клуба «Тайпан»:")
+        body_parts.append(f"В сборах принял участие {count} {_athlete_word(count)} клуба «Тайпан»:")
         for name in names:
             body_parts.append(f"• {name}")
         body_parts.append("")

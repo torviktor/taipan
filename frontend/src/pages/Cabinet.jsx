@@ -3093,13 +3093,10 @@ function NewsTab({ token }) {
     setSaving(false)
   }
 
-  const publishFromCert = async (certId, certName, certDate) => {
+  const publishFromCert = async (certId) => {
     setSaving(true); setMsg('')
     try {
-      const dateStr = new Date(certDate).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
-      const title = `${certName} — ${dateStr}`
-      const body  = `${dateStr} в клубе «Тайпан» прошла аттестация: ${certName}.\n\nПоздравляем всех участников с получением новых поясов! Каждый пояс — это результат упорного труда, дисциплины и преданности тхэквондо ГТФ.\n\nПродолжаем расти и совершенствоваться!`
-      const r = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title, body, certification_id: certId }) })
+      const r = await fetch(`${API}/news/from-certification/${certId}`, { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
       if (r.ok) { setMsg('Новость об аттестации опубликована'); await loadNews() }
       else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
@@ -3107,39 +3104,26 @@ function NewsTab({ token }) {
   }
 
 
-  const generateCertWithGPT = async (certId, certName, certDate) => {
+  const generateCertWithGPT = async (certId) => {
     setSaving(true); setMsg('')
     try {
-      const dateStr = new Date(certDate).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
-      const prompt = `Напиши новость об аттестации по тхэквондо ГТФ для сайта клуба «Тайпан».\n\nДанные:\nНазвание аттестации: ${certName}\nДата: ${dateStr}\nКлуб: Тайпан, г. Павловский Посад\nФедерация: ГТФ (GTF)\n\nСтиль — торжественный, поддерживающий, гордый. Не используй эмодзи. Зал называется доянг. Пояса — гыпы (ученические) и даны (мастерские).\nОбъём 100-180 слов.\nВерни:\nЗАГОЛОВОК: [заголовок]\nТЕКСТ: [текст]`
-      const rGpt = await fetch(`${API}/ai/chat`, { method: 'POST', headers: hj, body: JSON.stringify({ message: prompt, history: [] }) })
-      if (!rGpt.ok) { setMsg('Ошибка YandexGPT'); setSaving(false); return }
-      const gptData = await rGpt.json()
-      const reply = gptData.reply || ''
-      let title = `${certName} — ${dateStr}`
-      let body  = reply
-      if (reply.includes('ЗАГОЛОВОК:') && reply.includes('ТЕКСТ:')) {
-        const parts = reply.split('ТЕКСТ:')
-        title = parts[0].replace('ЗАГОЛОВОК:', '').trim() || title
-        body  = parts[1].trim()
-      }
-      const rSave = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title: title.slice(0,255), body, certification_id: certId }) })
-      if (rSave.ok) { setMsg('Новость об аттестации сгенерирована YandexGPT'); await loadNews() }
-      else { const d = await rSave.json(); setMsg(d.detail || 'Ошибка') }
+      const r = await fetch(`${API}/news-admin/generate-cert-news`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify({ cert_id: certId }),
+      })
+      const d = await r.json()
+      if (r.ok && d.ok) { setMsg('Новость об аттестации сгенерирована YandexGPT'); await loadNews() }
+      else { setMsg(d.message || d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
     setSaving(false)
   }
 
 
-  const publishFromCamp = async (campId, campName, campDateStart, campDateEnd, campLocation) => {
+  const publishFromCamp = async (campId) => {
     setSaving(true); setMsg('')
     try {
-      const ds = new Date(campDateStart).toLocaleDateString('ru-RU', { day:'numeric', month:'long' })
-      const de = new Date(campDateEnd).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
-      const loc = campLocation ? ` в ${campLocation}` : ''
-      const title = `Учебно-тренировочные сборы «${campName}» — ${ds}–${de}`
-      const body  = `С ${ds} по ${de} наши спортсмены приняли участие в учебно-тренировочных сборах «${campName}»${loc}.\n\nСборы — важная часть подготовки каждого спортсмена. Интенсивные тренировки, работа над техникой хъёнгов и массоги, командный дух и взаимная поддержка — всё это делает наших бойцов сильнее.\n\nБлагодарим всех участников за старание и самоотдачу!`
-      const r = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title, body, camp_id: campId }) })
+      const r = await fetch(`${API}/news/from-camp/${campId}`, { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
       if (r.ok) { setMsg('Новость о сборах опубликована'); await loadNews() }
       else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
@@ -3147,27 +3131,17 @@ function NewsTab({ token }) {
   }
 
 
-  const generateCampWithGPT = async (campId, campName, campDateStart, campDateEnd, campLocation) => {
+  const generateCampWithGPT = async (campId) => {
     setSaving(true); setMsg('')
     try {
-      const ds = new Date(campDateStart).toLocaleDateString('ru-RU', { day:'numeric', month:'long' })
-      const de = new Date(campDateEnd).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
-      const loc = campLocation ? `, место: ${campLocation}` : ''
-      const prompt = `Напиши новость об учебно-тренировочных сборах по тхэквондо ГТФ для сайта клуба «Тайпан».\n\nДанные:\nНазвание: ${campName}\nДаты: ${ds}–${de}${loc}\nКлуб: Тайпан, г. Павловский Посад\nФедерация: ГТФ (GTF)\n\nСтиль — живой, мотивирующий, командный. Не используй эмодзи. Зал называется доянг, техника — хъёнги и массоги.\nОбъём 120-200 слов.\nВерни:\nЗАГОЛОВОК: [заголовок]\nТЕКСТ: [текст]`
-      const rGpt = await fetch(`${API}/ai/chat`, { method: 'POST', headers: hj, body: JSON.stringify({ message: prompt, history: [] }) })
-      if (!rGpt.ok) { setMsg('Ошибка YandexGPT'); setSaving(false); return }
-      const gptData = await rGpt.json()
-      const reply = gptData.reply || ''
-      let title = `Сборы «${campName}» — ${ds}–${de}`
-      let body  = reply
-      if (reply.includes('ЗАГОЛОВОК:') && reply.includes('ТЕКСТ:')) {
-        const parts = reply.split('ТЕКСТ:')
-        title = parts[0].replace('ЗАГОЛОВОК:', '').trim() || title
-        body  = parts[1].trim()
-      }
-      const rSave = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title: title.slice(0,255), body, camp_id: campId }) })
-      if (rSave.ok) { setMsg('Новость о сборах сгенерирована YandexGPT'); await loadNews() }
-      else { const d = await rSave.json(); setMsg(d.detail || 'Ошибка') }
+      const r = await fetch(`${API}/news-admin/generate-camp-news`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify({ camp_id: campId }),
+      })
+      const d = await r.json()
+      if (r.ok && d.ok) { setMsg('Новость о сборах сгенерирована YandexGPT'); await loadNews() }
+      else { setMsg(d.message || d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
     setSaving(false)
   }
@@ -3259,9 +3233,9 @@ function NewsTab({ token }) {
                 </span>
                 <div style={{ display:'flex', gap:8, flexShrink:0 }}>
                   <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap' }}
-                    onClick={() => publishFromCert(c.id, c.name, c.date)} disabled={saving}>Стандартная</button>
+                    onClick={() => publishFromCert(c.id)} disabled={saving}>Стандартная</button>
                   <button className="btn-primary" style={{ fontSize:'12px', padding:'6px 12px', whiteSpace:'nowrap' }}
-                    onClick={() => generateCertWithGPT(c.id, c.name, c.date)} disabled={saving}>YandexGPT</button>
+                    onClick={() => generateCertWithGPT(c.id)} disabled={saving}>YandexGPT</button>
                 </div>
               </div>
             ))}
@@ -3283,9 +3257,9 @@ function NewsTab({ token }) {
                 </span>
                 <div style={{ display:'flex', gap:8, flexShrink:0 }}>
                   <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap' }}
-                    onClick={() => publishFromCamp(c.id, c.name, c.date_start, c.date_end, c.location)} disabled={saving}>Стандартная</button>
+                    onClick={() => publishFromCamp(c.id)} disabled={saving}>Стандартная</button>
                   <button className="btn-primary" style={{ fontSize:'12px', padding:'6px 12px', whiteSpace:'nowrap' }}
-                    onClick={() => generateCampWithGPT(c.id, c.name, c.date_start, c.date_end, c.location)} disabled={saving}>YandexGPT</button>
+                    onClick={() => generateCampWithGPT(c.id)} disabled={saving}>YandexGPT</button>
                 </div>
               </div>
             ))}
