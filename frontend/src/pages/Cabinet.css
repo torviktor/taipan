@@ -225,6 +225,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 16px;
 }
 .modal-box {
   background: var(--dark);
@@ -233,6 +234,8 @@
   padding: 40px;
   max-width: 400px;
   width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 .modal-box h3 {
   font-family: 'Bebas Neue', sans-serif;
@@ -256,9 +259,19 @@
 }
 .modal-input:focus { outline: none; border-color: var(--red); }
 .modal-msg { font-size: 14px; color: #4caf50; margin-bottom: 12px; }
-.modal-btns-row { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.modal-btns-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
 .modal-btns-row .btn-primary,
-.modal-btns-row .btn-outline { flex: 0 0 auto; width: auto; padding: 12px 28px; }
+.modal-btns-row .btn-outline {
+  flex: 1 1 auto;
+  min-width: 120px;
+  padding: 12px 20px;
+  text-align: center;
+}
 .my-athletes { display: flex; flex-direction: column; gap: 12px; }
 .my-athlete-card {
   background: var(--dark);
@@ -284,11 +297,44 @@
 }
 .my-athlete-details span::after { content: '·'; margin-left: 20px; color: var(--gray-dim); }
 .my-athlete-details span:last-child::after { content: ''; margin: 0; }
+
+/* ── МОБИЛЬНАЯ ВЕРСИЯ ────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
+  .cabinet-page { padding: 80px 0 60px; }
   .cabinet-search input { width: 100%; }
-  .cabinet-header { flex-direction: column; align-items: flex-start; }
-  .cabinet-logout { align-self: flex-end; }
+
+  /* Шапка — имя слева, кнопка Выйти под именем справа */
+  .cabinet-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .cabinet-header > div:first-child { width: 100%; }
+  .cabinet-logout {
+    align-self: flex-start;
+    font-size: 13px;
+    padding: 8px 20px;
+  }
+
+  /* Вкладки — компактнее на мобиле */
+  .cabinet-tab {
+    padding: 10px 14px;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+
+  /* Группы вкладок — разделитель */
+  .cabinet-tabs-group {
+    border-bottom: 1px solid var(--gray-dim);
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+  }
+  .cabinet-tabs-group:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+  }
 }
+
 /* ── ЖУРНАЛ ПОСЕЩАЕМОСТИ ─────────────────────────────────────────────────── */
 .attendance-wrap { padding-top: 24px; }
 
@@ -305,6 +351,7 @@
 .attendance-view-tabs {
   display: flex;
   gap: 2px;
+  flex-wrap: wrap;
 }
 
 .att-group-btn,
@@ -362,7 +409,6 @@
 
 /* Форма */
 .att-form { display: flex; flex-direction: column; gap: 20px; }
-
 .att-form-top { display: flex; gap: 16px; flex-wrap: wrap; }
 
 .att-date-row {
@@ -411,6 +457,7 @@
   padding: 14px 20px;
   background: var(--dark);
   border-left: 3px solid var(--red);
+  flex-wrap: wrap;
 }
 .att-counter { color: var(--gray); font-size: 15px; flex: 1; }
 .att-counter strong { color: var(--white); }
@@ -481,4 +528,6 @@
   .attendance-header { flex-direction: column; align-items: flex-start; }
   .att-notes-input { width: 100%; }
   .att-form-top { flex-direction: column; }
+  .att-date-input { width: 100%; }
+  .att-session-date { min-width: unset; }
 }

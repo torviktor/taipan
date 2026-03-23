@@ -368,3 +368,20 @@
   opacity: 1;
   transform: translateY(0);
 }
+
+/* ── АДАПТИВНЫЕ ФОТО-СЕТКИ ───────────────────────────────────────────────── */
+.about-photo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+}
+
+@media (max-width: 600px) {
+  .about-photo-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .about-photo-grid img {
+    height: 280px !important;
+    width: 100% !important;
+  }
+}

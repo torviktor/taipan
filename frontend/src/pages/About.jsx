@@ -188,7 +188,7 @@ members: (
   <div className="about-body">
 
     {/* ── 3 фото вверху раздела ── */}
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:32 }}>
+    <div className="about-photo-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:32 }}>
       <img src="/photo4.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/photo5.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/photo6.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
@@ -214,7 +214,7 @@ members: (
     <p>Занятия в клубе подразумевают, что ты (или твои родители) принимаешь цели клуба и готов идти по пути тхэквондо вместе со всеми.</p>
 
     {/* ── 2 фото перед блоком родителей ── */}
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, margin:'32px 0' }}>
+    <div className="about-photo-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:32 }}>
       <img src="/photo8.jpg" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
       <img src="/photo9.jpg" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
     </div>
@@ -256,7 +256,7 @@ structure: (
   <div className="about-body">
 
     {/* ── 3 фото вверху раздела ── */}
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:32 }}>
+    <div className="about-photo-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:32 }}>
       <img src="/photo10.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/photo11.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/photo12.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
@@ -371,7 +371,7 @@ attestation: (
 camps: (
   <div className="about-body">
 
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:32 }}>
+    <div className="about-photo-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:32 }}>
       <img src="/photo14.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/photo15.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/photo16.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
@@ -411,7 +411,7 @@ camps: (
       <li>развитие самостоятельности, дисциплины и ответственности у детей</li>
     </ul>
 
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, margin:'32px 0' }}>
+    <div className="about-photo-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, margin:'32px 0' }}>
       <img src="/photo17.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/photo18.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/photo19.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
@@ -469,7 +469,7 @@ family: (
       <p>Тхэквондо — это путь, который ребёнок проходит не один. Поддержка семьи, внимание со стороны взрослых и правильное окружение — ключевые факторы успеха в тренировках и развитии.</p>
     </div>
 
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, margin:'32px 0' }}>
+    <div className="about-photo-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, margin:'32px 0' }}>
       <img src="/photo20.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/photo21.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/photo22.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
