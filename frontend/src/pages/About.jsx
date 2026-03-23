@@ -1,20 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import './About.css'
 
-function useImageFadeIn(ref) {
-  useEffect(() => {
-    if (!ref.current) return
-    const imgs = ref.current.querySelectorAll('img')
-    imgs.forEach(img => {
-      if (img.complete) {
-        img.classList.add('loaded')
-      } else {
-        img.onload = () => img.classList.add('loaded')
-      }
-    })
-  })
-}
-
 const SECTIONS = [
   { id: 'about',       title: 'О НАС' },
   { id: 'emblem',      title: 'ЭМБЛЕМА КЛУБА' },
@@ -534,8 +520,7 @@ family: (
 export default function About() {
   const [active, setActive] = useState('about')
   const contentRef = useRef(null)
-  useImageFadeIn(contentRef)
-
+  
   const switchSection = (id) => {
     setActive(id)
     // Скролл к верху контентной области
@@ -573,7 +558,7 @@ export default function About() {
           ))}
         </nav>
 
-        <div className="about-content" ref={contentRef}>
+        <div className="about-content" 
           <h2 className="about-section-title">{section.title}</h2>
           <div className="about-divider" />
 

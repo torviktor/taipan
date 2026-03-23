@@ -4130,6 +4130,8 @@ export default function Cabinet() {
   </div>
 </div>
 
+          </div>
+
         {view !== 'attendance' && view !== 'competitions' && view !== 'rating' && view !== 'certification' && view !== 'achievements' && view !== 'camps' && view !== 'archive' && (
           <div className="cabinet-toolbar">
             <div className="cabinet-search">
