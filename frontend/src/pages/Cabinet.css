@@ -303,17 +303,24 @@
   .cabinet-page { padding: 80px 0 60px; }
   .cabinet-search input { width: 100%; }
 
-  /* Шапка — имя слева, кнопка Выйти под именем справа */
+  /* Шапка — позиционирование для компактной кнопки «Выйти» */
   .cabinet-header {
+    position: relative;
     flex-direction: column;
     align-items: flex-start;
-    gap: 12px;
+    gap: 4px;
   }
-  .cabinet-header > div:first-child { width: 100%; }
+  .cabinet-header-main { width: 100%; padding-right: 80px; }
+
+  /* Кнопка «Выйти» — маленькая, в правом верхнем углу */
   .cabinet-logout {
-    align-self: flex-start;
-    font-size: 13px;
-    padding: 8px 20px;
+    position: absolute;
+    top: 0;
+    right: 0;
+    font-size: 11px !important;
+    padding: 5px 10px !important;
+    letter-spacing: 1px;
+    white-space: nowrap;
   }
 
   /* Вкладки — компактнее на мобиле */
@@ -323,15 +330,16 @@
     letter-spacing: 1px;
   }
 
-  /* Группы вкладок — разделитель */
+  /* Группы вкладок — горизонтальный разделитель между группами */
   .cabinet-tabs-group {
+    padding-bottom: 6px;
+    margin-bottom: 6px;
     border-bottom: 1px solid var(--gray-dim);
-    margin-bottom: 4px;
-    padding-bottom: 4px;
   }
   .cabinet-tabs-group:last-child {
-    border-bottom: none;
+    padding-bottom: 0;
     margin-bottom: 0;
+    border-bottom: none;
   }
 }
 
