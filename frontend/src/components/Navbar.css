@@ -214,11 +214,13 @@
 @media (max-width: 900px) {
   .navbar-links  { gap: 20px; }
 }
+
 @media (max-width: 768px) {
-  .navbar-links    { display: none; }
-  .navbar-actions  { display: none; }
-  .burger          { display: flex; }
-  .mobile-menu     { display: flex; }
+  .navbar-links        { display: none; }
+  .navbar-actions      { display: flex; }
+  .navbar-search       { display: none; }
+  .burger              { display: flex; }
+  .mobile-menu         { display: flex; }
 }
 
 /* ── МОБИЛЬНОЕ МЕНЮ — кнопка кабинет/войти ──────────────────────────── */
