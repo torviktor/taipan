@@ -385,3 +385,31 @@
     width: 100% !important;
   }
 }
+
+@media (max-width: 768px) {
+  .about-layout {
+    grid-template-columns: 1fr;
+    padding-top: 24px;
+    gap: 24px;
+  }
+  .about-nav {
+    position: static;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    margin-top: 16px;
+  }
+  .about-nav-item {
+    padding: 14px 10px;
+    min-height: 60px;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .about-nav-num { display: none; }
+  .about-nav-title {
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    line-height: 1.3;
+  }
+}
