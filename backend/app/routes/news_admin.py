@@ -1,6 +1,7 @@
 # backend/app/routes/news_admin.py
 
 import os, requests
+from datetime import date as date_type
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -25,23 +26,18 @@ def require_manager(u: User = Depends(get_current_user)) -> User:
 
 
 def _yandex_gpt(prompt: str) -> str:
-    """Отправляет промт в YandexGPT и возвращает текст ответа."""
     if not YANDEX_API_KEY or not YANDEX_FOLDER_ID:
         raise RuntimeError("Не заданы YANDEX_API_KEY / YANDEX_FOLDER_ID в переменных окружения")
 
     payload = {
         "modelUri": f"gpt://{YANDEX_FOLDER_ID}/yandexgpt-lite",
-        "completionOptions": {
-            "stream": False,
-            "temperature": 0.6,
-            "maxTokens": 1500,
-        },
+        "completionOptions": {"stream": False, "temperature": 0.6, "maxTokens": 1500},
         "messages": [
             {
                 "role": "system",
                 "text": (
                     "Ты — редактор сайта спортивного клуба тхэквондо «Тайпан». "
-                    "Пишешь короткие, живые новости в прошедшем времени. "
+                    "Пишешь короткие, живые новости. "
                     "Без эмодзи, без заголовков Markdown, только чистый текст. "
                     "Тон — позитивный, официально-дружелюбный."
                 ),
@@ -49,14 +45,10 @@ def _yandex_gpt(prompt: str) -> str:
             {"role": "user", "text": prompt},
         ],
     }
-    headers = {
-        "Authorization": f"Api-Key {YANDEX_API_KEY}",
-        "Content-Type":  "application/json",
-    }
+    headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
     resp = requests.post(YANDEX_GPT_URL, json=payload, headers=headers, timeout=30)
     resp.raise_for_status()
-    data = resp.json()
-    return data["result"]["alternatives"][0]["message"]["text"].strip()
+    return resp.json()["result"]["alternatives"][0]["message"]["text"].strip()
 
 
 def _rank_label(gup: Optional[int], dan: Optional[int]) -> str:
@@ -75,6 +67,21 @@ def _athlete_word(n: int) -> str:
     return "спортсменов"
 
 
+def _resolve_mode(mode: str, event_date: date_type) -> str:
+    if mode != "auto": return mode
+    today = date_type.today()
+    if event_date < today:  return "past"
+    if event_date > today:  return "preview"
+    return "past"
+
+
+def _mode_instruction(mode: str) -> str:
+    """Инструкция для YandexGPT в зависимости от режима."""
+    if mode == "preview":
+        return "Пиши как анонс предстоящего события: будущее время, призывай болеть/участвовать, создавай предвкушение."
+    return "Пиши как репортаж о прошедшем событии: прошедшее время, свершившийся факт, итоги и поздравления."
+
+
 def _out(n: News) -> dict:
     return {
         "id": n.id, "title": n.title, "body": n.body,
@@ -86,7 +93,7 @@ def _out(n: News) -> dict:
     }
 
 
-# ─── существующие роуты ───────────────────────────────────────────────────────
+# ─── Существующие роуты ───────────────────────────────────────────────────────
 
 @router.post("/fetch-dss")
 def fetch_dss(user: User = Depends(require_manager)):
@@ -116,10 +123,8 @@ def generate_comp_news(data: CompNewsRequest, user: User = Depends(require_manag
     try:
         from app.tasks.yandex_gpt import run_competition_news
         ok = run_competition_news(data.comp_id)
-        if ok:
-            return {"ok": True, "message": "Новость сгенерирована и опубликована"}
-        else:
-            return {"ok": False, "message": "Новость уже существует или нет данных"}
+        if ok: return {"ok": True, "message": "Новость сгенерирована и опубликована"}
+        else:  return {"ok": False, "message": "Новость уже существует или нет данных"}
     except Exception as e:
         raise HTTPException(500, f"Ошибка генерации: {str(e)}")
 
@@ -129,10 +134,8 @@ def generate_announcement(user: User = Depends(require_manager)):
     try:
         from app.tasks.yandex_gpt import run_weekly_announcement
         ok = run_weekly_announcement()
-        if ok:
-            return {"ok": True, "message": "Анонс сгенерирован и опубликован"}
-        else:
-            return {"ok": False, "message": "Нет предстоящих соревнований"}
+        if ok: return {"ok": True, "message": "Анонс сгенерирован и опубликован"}
+        else:  return {"ok": False, "message": "Нет предстоящих соревнований"}
     except Exception as e:
         raise HTTPException(500, f"Ошибка генерации: {str(e)}")
 
@@ -141,6 +144,7 @@ def generate_announcement(user: User = Depends(require_manager)):
 
 class CertNewsRequest(BaseModel):
     cert_id: int
+    mode:    str = "auto"
 
 @router.post("/generate-cert-news")
 def generate_cert_news(
@@ -152,63 +156,65 @@ def generate_cert_news(
     from app.models.user import Athlete
 
     cert = db.query(Certification).filter(Certification.id == data.cert_id).first()
-    if not cert:
-        raise HTTPException(404, "Аттестация не найдена")
+    if not cert: raise HTTPException(404, "Аттестация не найдена")
 
-    existing = db.query(News).filter(
-        News.certification_id == data.cert_id,
-        News.is_published == True
-    ).first()
-    if existing:
-        return {"ok": False, "message": "Новость об этой аттестации уже опубликована"}
+    existing = db.query(News).filter(News.certification_id == data.cert_id, News.is_published == True).first()
+    if existing: return {"ok": False, "message": "Новость об этой аттестации уже опубликована"}
 
-    all_results    = db.query(CertificationResult).filter(
-        CertificationResult.certification_id == data.cert_id
-    ).all()
-    passed_results = [r for r in all_results if r.passed is True]
-
+    mode     = _resolve_mode(data.mode, cert.date)
     date_str = cert.date.strftime("%d.%m.%Y") if cert.date else ""
+
+    all_results    = db.query(CertificationResult).filter(CertificationResult.certification_id == data.cert_id).all()
+    passed_results = [r for r in all_results if r.passed is True]
 
     passed_lines = []
     for r in passed_results:
         athlete = db.query(Athlete).filter(Athlete.id == r.athlete_id).first()
         if not athlete: continue
-        rank = _rank_label(r.target_gup, r.target_dan)
-        passed_lines.append(f"{athlete.full_name} — {rank}")
+        passed_lines.append(f"{athlete.full_name} — {_rank_label(r.target_gup, r.target_dan)}")
+
+    all_lines = []
+    for r in all_results:
+        athlete = db.query(Athlete).filter(Athlete.id == r.athlete_id).first()
+        if not athlete: continue
+        all_lines.append(f"{athlete.full_name} (цель: {_rank_label(r.target_gup, r.target_dan)})")
 
     total        = len(all_results)
     passed_count = len(passed_lines)
-    location_str = f" в {cert.location}" if cert.location else ""
 
     prompt_parts = [
         f"Напиши новость для сайта спортивного клуба тхэквондо «Тайпан» об аттестации.",
+        f"",
+        _mode_instruction(mode),
         f"",
         f"Данные аттестации:",
         f"Название: {cert.name}",
         f"Дата: {date_str}",
     ]
-    if cert.location:
-        prompt_parts.append(f"Место проведения: {cert.location}")
-    prompt_parts += [
-        f"",
-        f"Всего участвовали: {total} {_athlete_word(total)}.",
-        f"Успешно сдали: {passed_count} {_athlete_word(passed_count)}.",
-    ]
-    if passed_lines:
-        prompt_parts.append("Кто и на какой пояс сдал:")
-        for line in passed_lines:
-            prompt_parts.append(f"- {line}")
-    if cert.notes:
-        prompt_parts += ["", f"Дополнительно: {cert.notes}"]
+    if cert.location: prompt_parts.append(f"Место проведения: {cert.location}")
+    prompt_parts.append("")
+
+    if mode == "preview":
+        prompt_parts.append(f"Готовятся к аттестации: {total} {_athlete_word(total)}.")
+        if all_lines:
+            prompt_parts.append("Участники и цели:")
+            for line in all_lines: prompt_parts.append(f"- {line}")
+    else:
+        prompt_parts.append(f"Всего участвовали: {total} {_athlete_word(total)}.")
+        prompt_parts.append(f"Успешно сдали: {passed_count} {_athlete_word(passed_count)}.")
+        if passed_lines:
+            prompt_parts.append("Сдавшие и полученные пояса:")
+            for line in passed_lines: prompt_parts.append(f"- {line}")
+
+    if cert.notes: prompt_parts += ["", f"Дополнительно: {cert.notes}"]
 
     prompt_parts += [
         "",
         "Требования к тексту:",
-        "— прошедшее время, свершившийся факт",
         "— не более 200 слов",
         "— без Markdown, без эмодзи",
         "— первый абзац — краткое резюме события",
-        "— перечисли всех сдавших по имени с поясом",
+        "— перечисли всех участников с поясами",
         "— завершить мотивирующей фразой",
     ]
 
@@ -227,6 +233,7 @@ def generate_cert_news(
 
 class CampNewsRequest(BaseModel):
     camp_id: int
+    mode:    str = "auto"
 
 @router.post("/generate-camp-news")
 def generate_camp_news(
@@ -238,59 +245,53 @@ def generate_camp_news(
     from app.models.user import Athlete
 
     camp = db.query(Camp).filter(Camp.id == data.camp_id).first()
-    if not camp:
-        raise HTTPException(404, "Сборы не найдены")
+    if not camp: raise HTTPException(404, "Сборы не найдены")
 
-    existing = db.query(News).filter(
-        News.camp_id == data.camp_id,
-        News.is_published == True
-    ).first()
-    if existing:
-        return {"ok": False, "message": "Новость об этих сборах уже опубликована"}
+    existing = db.query(News).filter(News.camp_id == data.camp_id, News.is_published == True).first()
+    if existing: return {"ok": False, "message": "Новость об этих сборах уже опубликована"}
 
-    participants = db.query(CampParticipant).filter(
-        CampParticipant.camp_id == data.camp_id,
-        CampParticipant.status.in_(["confirmed", "paid"])
-    ).all()
+    today = date_type.today()
+    if data.mode == "auto":
+        if camp.date_end < today:     mode = "past"
+        elif camp.date_start > today: mode = "preview"
+        else: mode = "past"
+    else:
+        mode = data.mode
 
     date_start_str = camp.date_start.strftime("%d.%m.%Y") if camp.date_start else ""
     date_end_str   = camp.date_end.strftime("%d.%m.%Y")   if camp.date_end   else ""
     date_range     = f"{date_start_str} – {date_end_str}" if date_start_str and date_end_str else date_start_str or date_end_str
 
+    participants = db.query(CampParticipant).filter(
+        CampParticipant.camp_id == data.camp_id,
+        CampParticipant.status.in_(["confirmed", "paid"])
+    ).all()
     names = []
     for p in participants:
         athlete = db.query(Athlete).filter(Athlete.id == p.athlete_id).first()
-        if athlete:
-            names.append(athlete.full_name)
-
+        if athlete: names.append(athlete.full_name)
     count = len(names)
 
     prompt_parts = [
         f"Напиши новость для сайта спортивного клуба тхэквондо «Тайпан» об учебно-тренировочных сборах.",
         f"",
+        _mode_instruction(mode),
+        f"",
         f"Данные сборов:",
         f"Название: {camp.name}",
         f"Даты: {date_range}",
     ]
-    if camp.location:
-        prompt_parts.append(f"Место проведения: {camp.location}")
-    if camp.price:
-        prompt_parts.append(f"Стоимость участия: {camp.price} руб.")
-    prompt_parts += [
-        f"",
-        f"Участвовали: {count} {_athlete_word(count)} клуба.",
-    ]
+    if camp.location: prompt_parts.append(f"Место проведения: {camp.location}")
+    if camp.price:    prompt_parts.append(f"Стоимость участия: {camp.price} руб.")
+    prompt_parts += ["", f"Участников (статус confirmed/paid): {count} {_athlete_word(count)}."]
     if names:
         prompt_parts.append("Список участников:")
-        for name in names:
-            prompt_parts.append(f"- {name}")
-    if camp.notes:
-        prompt_parts += ["", f"Дополнительно: {camp.notes}"]
+        for name in names: prompt_parts.append(f"- {name}")
+    if camp.notes: prompt_parts += ["", f"Дополнительно: {camp.notes}"]
 
     prompt_parts += [
         "",
         "Требования к тексту:",
-        "— прошедшее время, свершившийся факт",
         "— не более 200 слов",
         "— без Markdown, без эмодзи",
         "— первый абзац — краткое резюме события",

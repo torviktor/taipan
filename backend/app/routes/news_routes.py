@@ -1,6 +1,7 @@
 # backend/app/routes/news_routes.py
 
 import os, uuid
+from datetime import date as date_type
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -39,6 +40,10 @@ class NewsUpdate(BaseModel):
     body:  Optional[str] = None
 
 
+class ModeBody(BaseModel):
+    mode: str = "auto"   # "auto" | "past" | "preview"
+
+
 def _out(n: News) -> dict:
     return {
         "id":               n.id,
@@ -54,15 +59,12 @@ def _out(n: News) -> dict:
 
 
 def _rank_label(gup: Optional[int], dan: Optional[int]) -> str:
-    """Читаемое обозначение гыпа/дана."""
     if dan:
         suffixes = {1:"1-й дан",2:"2-й дан",3:"3-й дан",4:"4-й дан",
                     5:"5-й дан",6:"6-й дан",7:"7-й дан",8:"8-й дан",9:"9-й дан"}
         return suffixes.get(dan, f"{dan}-й дан")
-    if gup == 0:
-        return "без пояса"
-    if gup:
-        return f"{gup}-й гып"
+    if gup == 0: return "без пояса"
+    if gup:      return f"{gup}-й гып"
     return "—"
 
 
@@ -71,6 +73,24 @@ def _athlete_word(n: int) -> str:
     if 2 <= n % 10 <= 4 and not (12 <= n % 100 <= 14): return "спортсмена"
     return "спортсменов"
 
+
+def _resolve_mode(mode: str, event_date: date_type) -> str:
+    """
+    'auto'    → определяем по дате события
+    'past'    → свершившийся факт
+    'preview' → анонс предстоящего
+    Если mode='auto' и дата == сегодня, возвращаем 'past' как fallback
+    (фронт должен передать явный режим при date == today).
+    """
+    if mode != "auto":
+        return mode
+    today = date_type.today()
+    if event_date < today:  return "past"
+    if event_date > today:  return "preview"
+    return "past"  # today fallback
+
+
+# ─── CRUD роуты ──────────────────────────────────────────────────────────────
 
 @router.get("")
 def list_news(limit: int = 20, offset: int = 0, db: Session = Depends(get_db)):
@@ -161,7 +181,12 @@ def delete_news(news_id: int, db: Session = Depends(get_db), _: User = Depends(r
 # ─── from-competition ────────────────────────────────────────────────────────
 
 @router.post("/from-competition/{comp_id}", status_code=201)
-def news_from_competition(comp_id: int, db: Session = Depends(get_db), user: User = Depends(require_manager)):
+def news_from_competition(
+    comp_id: int,
+    data:    ModeBody = ModeBody(),
+    db:      Session  = Depends(get_db),
+    user:    User     = Depends(require_manager),
+):
     from app.models.competition import Competition, CompetitionResult
     from app.models.user import Athlete
 
@@ -171,56 +196,85 @@ def news_from_competition(comp_id: int, db: Session = Depends(get_db), user: Use
     existing = db.query(News).filter(News.competition_id == comp_id, News.is_published == True).first()
     if existing: raise HTTPException(400, "Новость об этом соревновании уже опубликована")
 
-    results = db.query(CompetitionResult).filter(CompetitionResult.competition_id == comp_id).all()
-
+    mode     = _resolve_mode(data.mode, comp.date)
     date_str = comp.date.strftime("%d.%m.%Y") if comp.date else ""
-    gold = silver = bronze = 0
-    medals = []
-    participants = []
-
-    for r in results:
-        athlete = db.query(Athlete).filter(Athlete.id == r.athlete_id).first()
-        if not athlete: continue
-        participants.append(athlete.full_name)
-        places = []
-        for disc, place in [("спарринг", r.sparring_place), ("стоп-балл", r.stopball_place), ("тег-тим", r.tegtim_place), ("туль", r.tuli_place)]:
-            if place == 1:   gold += 1;   places.append(f"1 место ({disc})")
-            elif place == 2: silver += 1; places.append(f"2 место ({disc})")
-            elif place == 3: bronze += 1; places.append(f"3 место ({disc})")
-        if places:
-            medals.append(f"{athlete.full_name} — {', '.join(places)}")
+    results  = db.query(CompetitionResult).filter(CompetitionResult.competition_id == comp_id).all()
 
     location_str = f" в {comp.location}" if comp.location else ""
     level_str    = f"{comp.level} {comp.comp_type}".lower()
     title        = f"{comp.name} — {date_str}"
 
-    body_parts = [f"{date_str} наши спортсмены приняли участие в {level_str}{location_str}.", "", f"Соревнование: {comp.name}", f"Дата: {date_str}"]
-    if comp.location: body_parts.append(f"Место проведения: {comp.location}")
-    body_parts.append("")
+    if mode == "preview":
+        participants = []
+        for r in results:
+            athlete = db.query(Athlete).filter(Athlete.id == r.athlete_id).first()
+            if athlete: participants.append(athlete.full_name)
 
-    if participants:
-        body_parts.append(f"В соревнованиях участвовали {len(participants)} {_athlete_word(len(participants))} клуба «Тайпан»:")
-        for p in participants: body_parts.append(f"• {p}")
+        body_parts = [
+            f"{date_str} состоится {level_str}{location_str}.",
+            "",
+            f"Соревнование: {comp.name}",
+            f"Дата: {date_str}",
+        ]
+        if comp.location: body_parts.append(f"Место проведения: {comp.location}")
         body_parts.append("")
 
-    total_medals = gold + silver + bronze
-    if total_medals > 0:
-        def medal_word(n):
-            if n == 1: return "медаль"
-            if n < 5:  return "медали"
-            return "медалей"
-        parts = []
-        if gold:   parts.append(f"{gold} золот{'ая' if gold==1 else 'ых'}")
-        if silver: parts.append(f"{silver} серебрян{'ая' if silver==1 else 'ых'}")
-        if bronze: parts.append(f"{bronze} бронзов{'ая' if bronze==1 else 'ых'}")
-        body_parts.append(f"Наши спортсмены завоевали {total_medals} {medal_word(total_medals)}: {', '.join(parts)}.")
+        if participants:
+            body_parts.append(f"Запланировано участие {len(participants)} {_athlete_word(len(participants))} клуба «Тайпан»:")
+            for p in participants: body_parts.append(f"• {p}")
+            body_parts.append("")
+
+        body_parts.append("Желаем нашим спортсменам успехов и достойных выступлений! Следите за результатами.")
+
+    else:  # past
+        gold = silver = bronze = 0
+        medals = []
+        participants = []
+
+        for r in results:
+            athlete = db.query(Athlete).filter(Athlete.id == r.athlete_id).first()
+            if not athlete: continue
+            participants.append(athlete.full_name)
+            places = []
+            for disc, place in [("спарринг", r.sparring_place), ("стоп-балл", r.stopball_place), ("тег-тим", r.tegtim_place), ("туль", r.tuli_place)]:
+                if place == 1:   gold += 1;   places.append(f"1 место ({disc})")
+                elif place == 2: silver += 1; places.append(f"2 место ({disc})")
+                elif place == 3: bronze += 1; places.append(f"3 место ({disc})")
+            if places:
+                medals.append(f"{athlete.full_name} — {', '.join(places)}")
+
+        body_parts = [
+            f"{date_str} наши спортсмены приняли участие в {level_str}{location_str}.",
+            "",
+            f"Соревнование: {comp.name}",
+            f"Дата: {date_str}",
+        ]
+        if comp.location: body_parts.append(f"Место проведения: {comp.location}")
         body_parts.append("")
-        body_parts.append("Призовые места:")
-        for m in medals: body_parts.append(f"• {m}")
-        body_parts.append("")
-        body_parts.append("Поздравляем наших спортсменов с заслуженными наградами! Продолжаем работать и идти вперёд.")
-    else:
-        body_parts.append("Наши спортсмены достойно выступили и набрали опыт участия в соревнованиях. Продолжаем работать!")
+
+        if participants:
+            body_parts.append(f"В соревнованиях участвовали {len(participants)} {_athlete_word(len(participants))} клуба «Тайпан»:")
+            for p in participants: body_parts.append(f"• {p}")
+            body_parts.append("")
+
+        total_medals = gold + silver + bronze
+        if total_medals > 0:
+            def medal_word(n):
+                if n == 1: return "медаль"
+                if n < 5:  return "медали"
+                return "медалей"
+            parts = []
+            if gold:   parts.append(f"{gold} золот{'ая' if gold==1 else 'ых'}")
+            if silver: parts.append(f"{silver} серебрян{'ая' if silver==1 else 'ых'}")
+            if bronze: parts.append(f"{bronze} бронзов{'ая' if bronze==1 else 'ых'}")
+            body_parts.append(f"Наши спортсмены завоевали {total_medals} {medal_word(total_medals)}: {', '.join(parts)}.")
+            body_parts.append("")
+            body_parts.append("Призовые места:")
+            for m in medals: body_parts.append(f"• {m}")
+            body_parts.append("")
+            body_parts.append("Поздравляем наших спортсменов с заслуженными наградами! Продолжаем работать и идти вперёд.")
+        else:
+            body_parts.append("Наши спортсмены достойно выступили и набрали опыт участия в соревнованиях. Продолжаем работать!")
 
     n = News(title=title, body="\n".join(body_parts), competition_id=comp_id, created_by=user.id)
     db.add(n); db.commit(); db.refresh(n)
@@ -230,7 +284,12 @@ def news_from_competition(comp_id: int, db: Session = Depends(get_db), user: Use
 # ─── from-certification ──────────────────────────────────────────────────────
 
 @router.post("/from-certification/{cert_id}", status_code=201)
-def news_from_certification(cert_id: int, db: Session = Depends(get_db), user: User = Depends(require_manager)):
+def news_from_certification(
+    cert_id: int,
+    data:    ModeBody = ModeBody(),
+    db:      Session  = Depends(get_db),
+    user:    User     = Depends(require_manager),
+):
     from app.models.certification import Certification, CertificationResult
     from app.models.user import Athlete
 
@@ -240,45 +299,67 @@ def news_from_certification(cert_id: int, db: Session = Depends(get_db), user: U
     existing = db.query(News).filter(News.certification_id == cert_id, News.is_published == True).first()
     if existing: raise HTTPException(400, "Новость об этой аттестации уже опубликована")
 
+    mode         = _resolve_mode(data.mode, cert.date)
+    date_str     = cert.date.strftime("%d.%m.%Y") if cert.date else ""
+    title        = f"{cert.name} — {date_str}"
+    location_str = f" в {cert.location}" if cert.location else ""
+
     all_results    = db.query(CertificationResult).filter(CertificationResult.certification_id == cert_id).all()
     passed_results = [r for r in all_results if r.passed is True]
 
-    date_str = cert.date.strftime("%d.%m.%Y") if cert.date else ""
-    title    = f"{cert.name} — {date_str}"
+    if mode == "preview":
+        participants = []
+        for r in all_results:
+            athlete = db.query(Athlete).filter(Athlete.id == r.athlete_id).first()
+            if not athlete: continue
+            rank = _rank_label(r.target_gup, r.target_dan)
+            participants.append(f"{athlete.full_name} (цель: {rank})")
 
-    # Собираем строки по сдавшим
-    passed_lines = []
-    for r in passed_results:
-        athlete = db.query(Athlete).filter(Athlete.id == r.athlete_id).first()
-        if not athlete: continue
-        rank = _rank_label(r.target_gup, r.target_dan)
-        passed_lines.append(f"{athlete.full_name} — {rank}")
-
-    total        = len(all_results)
-    passed_count = len(passed_lines)
-    location_str = f" в {cert.location}" if cert.location else ""
-
-    body_parts = [
-        f"{date_str} в клубе «Тайпан»{location_str} прошла аттестация.",
-        "",
-        f"Аттестация: {cert.name}",
-        f"Дата: {date_str}",
-    ]
-    if cert.location:
-        body_parts.append(f"Место проведения: {cert.location}")
-    body_parts.append("")
-
-    body_parts.append(f"К аттестации приступили {total} {_athlete_word(total)}.")
-    body_parts.append("")
-
-    if passed_lines:
-        body_parts.append(f"Успешно сдали {passed_count} {_athlete_word(passed_count)}:")
-        for line in passed_lines:
-            body_parts.append(f"• {line}")
+        body_parts = [
+            f"{date_str} в клубе «Тайпан»{location_str} состоится аттестация.",
+            "",
+            f"Аттестация: {cert.name}",
+            f"Дата: {date_str}",
+        ]
+        if cert.location: body_parts.append(f"Место проведения: {cert.location}")
         body_parts.append("")
-        body_parts.append("Поздравляем с новыми поясами! Продолжаем расти и совершенствоваться.")
-    else:
-        body_parts.append("В этот раз никто из участников не подтвердил допуск к следующему поясу. Продолжаем тренироваться!")
+
+        if participants:
+            body_parts.append(f"К аттестации готовятся {len(participants)} {_athlete_word(len(participants))}:")
+            for p in participants: body_parts.append(f"• {p}")
+            body_parts.append("")
+
+        body_parts.append("Желаем всем участникам уверенности и чистого исполнения! Боевой дух и усердие — ключ к новому поясу.")
+
+    else:  # past
+        passed_lines = []
+        for r in passed_results:
+            athlete = db.query(Athlete).filter(Athlete.id == r.athlete_id).first()
+            if not athlete: continue
+            rank = _rank_label(r.target_gup, r.target_dan)
+            passed_lines.append(f"{athlete.full_name} — {rank}")
+
+        total        = len(all_results)
+        passed_count = len(passed_lines)
+
+        body_parts = [
+            f"{date_str} в клубе «Тайпан»{location_str} прошла аттестация.",
+            "",
+            f"Аттестация: {cert.name}",
+            f"Дата: {date_str}",
+        ]
+        if cert.location: body_parts.append(f"Место проведения: {cert.location}")
+        body_parts.append("")
+        body_parts.append(f"К аттестации приступили {total} {_athlete_word(total)}.")
+        body_parts.append("")
+
+        if passed_lines:
+            body_parts.append(f"Успешно сдали {passed_count} {_athlete_word(passed_count)}:")
+            for line in passed_lines: body_parts.append(f"• {line}")
+            body_parts.append("")
+            body_parts.append("Поздравляем с новыми поясами! Продолжаем расти и совершенствоваться.")
+        else:
+            body_parts.append("В этот раз никто из участников не подтвердил допуск к следующему поясу. Продолжаем тренироваться!")
 
     if cert.notes:
         body_parts.append("")
@@ -292,7 +373,12 @@ def news_from_certification(cert_id: int, db: Session = Depends(get_db), user: U
 # ─── from-camp ───────────────────────────────────────────────────────────────
 
 @router.post("/from-camp/{camp_id}", status_code=201)
-def news_from_camp(camp_id: int, db: Session = Depends(get_db), user: User = Depends(require_manager)):
+def news_from_camp(
+    camp_id: int,
+    data:    ModeBody = ModeBody(),
+    db:      Session  = Depends(get_db),
+    user:    User     = Depends(require_manager),
+):
     from app.models.camp import Camp, CampParticipant
     from app.models.user import Athlete
 
@@ -302,44 +388,66 @@ def news_from_camp(camp_id: int, db: Session = Depends(get_db), user: User = Dep
     existing = db.query(News).filter(News.camp_id == camp_id, News.is_published == True).first()
     if existing: raise HTTPException(400, "Новость об этих сборах уже опубликована")
 
-    participants = db.query(CampParticipant).filter(
-        CampParticipant.camp_id == camp_id,
-        CampParticipant.status.in_(["confirmed", "paid"])
-    ).all()
+    # Для сборов auto-логика по date_start / date_end
+    today = date_type.today()
+    if data.mode == "auto":
+        if camp.date_end < today:     mode = "past"
+        elif camp.date_start > today: mode = "preview"
+        else: mode = "past"   # сборы идут сейчас, fallback
+    else:
+        mode = data.mode
 
     date_start_str = camp.date_start.strftime("%d.%m.%Y") if camp.date_start else ""
     date_end_str   = camp.date_end.strftime("%d.%m.%Y")   if camp.date_end   else ""
     date_range     = f"{date_start_str} – {date_end_str}" if date_start_str and date_end_str else date_start_str or date_end_str
+    title          = f"{camp.name} — {date_range}"
+    location_str   = f" в {camp.location}" if camp.location else ""
 
-    title = f"{camp.name} — {date_range}"
-
+    participants = db.query(CampParticipant).filter(
+        CampParticipant.camp_id == camp_id,
+        CampParticipant.status.in_(["confirmed", "paid"])
+    ).all()
     names = []
     for p in participants:
         athlete = db.query(Athlete).filter(Athlete.id == p.athlete_id).first()
-        if athlete:
-            names.append(athlete.full_name)
+        if athlete: names.append(athlete.full_name)
+    count = len(names)
 
-    count        = len(names)
-    location_str = f" в {camp.location}" if camp.location else ""
-
-    body_parts = [
-        f"С {date_range} прошли учебно-тренировочные сборы{location_str}.",
-        "",
-        f"Сборы: {camp.name}",
-        f"Даты: {date_range}",
-    ]
-    if camp.location:
-        body_parts.append(f"Место проведения: {camp.location}")
-    body_parts.append("")
-
-    if count > 0:
-        body_parts.append(f"В сборах принял участие {count} {_athlete_word(count)} клуба «Тайпан»:")
-        for name in names:
-            body_parts.append(f"• {name}")
+    if mode == "preview":
+        body_parts = [
+            f"С {date_range} состоятся учебно-тренировочные сборы{location_str}.",
+            "",
+            f"Сборы: {camp.name}",
+            f"Даты: {date_range}",
+        ]
+        if camp.location: body_parts.append(f"Место проведения: {camp.location}")
+        if camp.price:    body_parts.append(f"Стоимость участия: {camp.price} руб.")
         body_parts.append("")
-        body_parts.append("Интенсивные тренировки прошли продуктивно. Спасибо всем участникам за труд и самоотдачу!")
-    else:
-        body_parts.append("Информация об участниках уточняется.")
+
+        if count > 0:
+            body_parts.append(f"Уже подтвердили участие {count} {_athlete_word(count)}:")
+            for name in names: body_parts.append(f"• {name}")
+            body_parts.append("")
+
+        body_parts.append("Сборы — отличная возможность для интенсивной работы над техникой и командного роста. Ждём всех!")
+
+    else:  # past
+        body_parts = [
+            f"С {date_range} прошли учебно-тренировочные сборы{location_str}.",
+            "",
+            f"Сборы: {camp.name}",
+            f"Даты: {date_range}",
+        ]
+        if camp.location: body_parts.append(f"Место проведения: {camp.location}")
+        body_parts.append("")
+
+        if count > 0:
+            body_parts.append(f"В сборах принял участие {count} {_athlete_word(count)} клуба «Тайпан»:")
+            for name in names: body_parts.append(f"• {name}")
+            body_parts.append("")
+            body_parts.append("Интенсивные тренировки прошли продуктивно. Спасибо всем участникам за труд и самоотдачу!")
+        else:
+            body_parts.append("Информация об участниках уточняется.")
 
     if camp.notes:
         body_parts.append("")

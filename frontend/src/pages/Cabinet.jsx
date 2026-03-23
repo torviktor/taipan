@@ -3070,11 +3070,18 @@ function NewsTab({ token }) {
     } catch {}
   }
 
-  const generateWithGPT = async (compId) => {
+  const generateWithGPT = async (compId, compDate) => {
     setSaving(true); setMsg('')
     try {
+      const today = new Date().toISOString().split('T')[0]
+      const eventDate = compDate ? compDate.split('T')[0] : ''
+      let mode = 'auto'
+      if (eventDate === today) {
+        const finished = window.confirm('Соревнование запланировано на сегодня. Оно уже завершилось?')
+        mode = finished ? 'past' : 'preview'
+      }
       const r = await fetch(`${API}/news-admin/generate-comp-news`, {
-        method: 'POST', headers: hj, body: JSON.stringify({ comp_id: compId })
+        method: 'POST', headers: hj, body: JSON.stringify({ comp_id: compId, mode })
       })
       const d = await r.json()
       setMsg(d.message || (r.ok ? 'Готово' : 'Ошибка'))
@@ -3083,20 +3090,38 @@ function NewsTab({ token }) {
     setSaving(false)
   }
 
-  const publishFromComp = async (compId) => {
+  const publishFromComp = async (compId, compDate) => {
     setSaving(true); setMsg('')
     try {
-      const r = await fetch(`${API}/news/from-competition/${compId}`, { method: 'POST', headers: h })
+      const today = new Date().toISOString().split('T')[0]
+      const eventDate = compDate ? compDate.split('T')[0] : ''
+      let mode = 'auto'
+      if (eventDate === today) {
+        const finished = window.confirm('Соревнование запланировано на сегодня. Оно уже завершилось?')
+        mode = finished ? 'past' : 'preview'
+      }
+      const r = await fetch(`${API}/news/from-competition/${compId}`, {
+        method: 'POST', headers: hj, body: JSON.stringify({ mode })
+      })
       if (r.ok) { setMsg('Новость опубликована'); await loadNews() }
       else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
     setSaving(false)
   }
 
-  const publishFromCert = async (certId) => {
+  const publishFromCert = async (certId, certDate) => {
     setSaving(true); setMsg('')
     try {
-      const r = await fetch(`${API}/news/from-certification/${certId}`, { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+      const today = new Date().toISOString().split('T')[0]
+      const eventDate = certDate ? certDate.split('T')[0] : ''
+      let mode = 'auto'
+      if (eventDate === today) {
+        const finished = window.confirm('Аттестация запланирована на сегодня. Она уже завершилась?')
+        mode = finished ? 'past' : 'preview'
+      }
+      const r = await fetch(`${API}/news/from-certification/${certId}`, {
+        method: 'POST', headers: hj, body: JSON.stringify({ mode })
+      })
       if (r.ok) { setMsg('Новость об аттестации опубликована'); await loadNews() }
       else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
@@ -3104,13 +3129,20 @@ function NewsTab({ token }) {
   }
 
 
-  const generateCertWithGPT = async (certId) => {
+  const generateCertWithGPT = async (certId, certDate) => {
     setSaving(true); setMsg('')
     try {
+      const today = new Date().toISOString().split('T')[0]
+      const eventDate = certDate ? certDate.split('T')[0] : ''
+      let mode = 'auto'
+      if (eventDate === today) {
+        const finished = window.confirm('Аттестация запланирована на сегодня. Она уже завершилась?')
+        mode = finished ? 'past' : 'preview'
+      }
       const r = await fetch(`${API}/news-admin/generate-cert-news`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify({ cert_id: certId }),
+        headers: hj,
+        body: JSON.stringify({ cert_id: certId, mode }),
       })
       const d = await r.json()
       if (r.ok && d.ok) { setMsg('Новость об аттестации сгенерирована YandexGPT'); await loadNews() }
@@ -3120,10 +3152,21 @@ function NewsTab({ token }) {
   }
 
 
-  const publishFromCamp = async (campId) => {
+  const publishFromCamp = async (campId, campDateStart, campDateEnd) => {
     setSaving(true); setMsg('')
     try {
-      const r = await fetch(`${API}/news/from-camp/${campId}`, { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+      const today = new Date().toISOString().split('T')[0]
+      const start = campDateStart ? campDateStart.split('T')[0] : ''
+      const end   = campDateEnd   ? campDateEnd.split('T')[0]   : ''
+      let mode = 'auto'
+      // Сборы «сегодня» — либо начинаются, либо заканчиваются
+      if (start === today || end === today || (start < today && end > today)) {
+        const finished = window.confirm('Сборы проходят сегодня или заканчиваются сегодня. Они уже завершились?')
+        mode = finished ? 'past' : 'preview'
+      }
+      const r = await fetch(`${API}/news/from-camp/${campId}`, {
+        method: 'POST', headers: hj, body: JSON.stringify({ mode })
+      })
       if (r.ok) { setMsg('Новость о сборах опубликована'); await loadNews() }
       else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
@@ -3131,13 +3174,21 @@ function NewsTab({ token }) {
   }
 
 
-  const generateCampWithGPT = async (campId) => {
+  const generateCampWithGPT = async (campId, campDateStart, campDateEnd) => {
     setSaving(true); setMsg('')
     try {
+      const today = new Date().toISOString().split('T')[0]
+      const start = campDateStart ? campDateStart.split('T')[0] : ''
+      const end   = campDateEnd   ? campDateEnd.split('T')[0]   : ''
+      let mode = 'auto'
+      if (start === today || end === today || (start < today && end > today)) {
+        const finished = window.confirm('Сборы проходят сегодня или заканчиваются сегодня. Они уже завершились?')
+        mode = finished ? 'past' : 'preview'
+      }
       const r = await fetch(`${API}/news-admin/generate-camp-news`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify({ camp_id: campId }),
+        headers: hj,
+        body: JSON.stringify({ camp_id: campId, mode }),
       })
       const d = await r.json()
       if (r.ok && d.ok) { setMsg('Новость о сборах сгенерирована YandexGPT'); await loadNews() }
@@ -3209,9 +3260,9 @@ function NewsTab({ token }) {
                 </span>
                 <div style={{ display:'flex', gap:8, flexShrink:0 }}>
                   <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap' }}
-                    onClick={() => publishFromComp(c.id)} disabled={saving}>Стандартная</button>
+                    onClick={() => publishFromComp(c.id, c.date)} disabled={saving}>Стандартная</button>
                   <button className="btn-primary" style={{ fontSize:'12px', padding:'6px 12px', whiteSpace:'nowrap' }}
-                    onClick={() => generateWithGPT(c.id)} disabled={saving}>YandexGPT</button>
+                    onClick={() => generateWithGPT(c.id, c.date)} disabled={saving}>YandexGPT</button>
                 </div>
               </div>
             ))}
@@ -3233,9 +3284,9 @@ function NewsTab({ token }) {
                 </span>
                 <div style={{ display:'flex', gap:8, flexShrink:0 }}>
                   <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap' }}
-                    onClick={() => publishFromCert(c.id)} disabled={saving}>Стандартная</button>
+                    onClick={() => publishFromCert(c.id, c.date)} disabled={saving}>Стандартная</button>
                   <button className="btn-primary" style={{ fontSize:'12px', padding:'6px 12px', whiteSpace:'nowrap' }}
-                    onClick={() => generateCertWithGPT(c.id)} disabled={saving}>YandexGPT</button>
+                    onClick={() => generateCertWithGPT(c.id, c.date)} disabled={saving}>YandexGPT</button>
                 </div>
               </div>
             ))}
@@ -3257,9 +3308,9 @@ function NewsTab({ token }) {
                 </span>
                 <div style={{ display:'flex', gap:8, flexShrink:0 }}>
                   <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap' }}
-                    onClick={() => publishFromCamp(c.id)} disabled={saving}>Стандартная</button>
+                    onClick={() => publishFromCamp(c.id, c.date_start, c.date_end)} disabled={saving}>Стандартная</button>
                   <button className="btn-primary" style={{ fontSize:'12px', padding:'6px 12px', whiteSpace:'nowrap' }}
-                    onClick={() => generateCampWithGPT(c.id)} disabled={saving}>YandexGPT</button>
+                    onClick={() => generateCampWithGPT(c.id, c.date_start, c.date_end)} disabled={saving}>YandexGPT</button>
                 </div>
               </div>
             ))}
