@@ -8,7 +8,7 @@ from typing import Optional
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User, Athlete
-from app.models.analytics import AnalyticsRequest, AnalyticsReport
+from app.models.analytics_model import AnalyticsRequest, AnalyticsReport
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
