@@ -11,8 +11,9 @@ from app.routes.certifications import router as certifications_router, notif_rou
 from app.routes.achievements import router as achievements_router
 from app.routes.camps import router as camps_router
 from app.routes.hall_of_fame_routes import router as hof_router
+from app.routes.analytics import router as analytics_router          
 from app.models import user, event, attendance, competition, certification, achievement, camp
-from app.models import hall_of_fame
+from app.models import hall_of_fame, analytics                       
 from app.models import news
 from app.routes.news_routes import router as news_router
 from app.routes.news_admin import router as news_admin_router
