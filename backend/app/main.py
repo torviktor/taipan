@@ -56,6 +56,7 @@ app.include_router(notifications_router,     prefix="/api",              tags=["
 app.include_router(achievements_router,      prefix="/api",              tags=["Ачивки"])
 app.include_router(camps_router,             prefix="/api",              tags=["Сборы"])
 app.include_router(hof_router,               prefix="/api",              tags=["Зал Славы"])
+app.include_router(analytics_router,         prefix="/api",              tags=["Аналитика"])
 app.include_router(news_router,              prefix="/api",              tags=["Новости"])
 app.include_router(news_admin_router,        prefix="/api",              tags=["Новости-Админ"])
 app.include_router(competition_files_router, prefix="/api")
