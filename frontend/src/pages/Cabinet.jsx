@@ -3920,7 +3920,6 @@ function ParentAnalyticsTab({ token, athletes: myAthletes }) {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:40, paddingTop:24 }}>
-      <AnalyticsInfoBlock />
 
       {/* Мои аналитики */}
       <div>
@@ -3941,7 +3940,7 @@ function ParentAnalyticsTab({ token, athletes: myAthletes }) {
                     </div>
                     <div style={{ display:'flex', alignItems:'center', gap:12 }}>
                       <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.8rem', letterSpacing:'1px', textTransform:'uppercase', color:st.color }}>{st.text}</span>
-                      {rep.status === 'ready' && (
+                      {(rep.status === 'ready') && (
                         <button className="btn-outline" style={{ padding:'6px 16px', fontSize:'13px' }} onClick={() => setOpenReportId(isOpen ? null : rep.id)}>
                           {isOpen ? 'Свернуть' : 'Открыть'}
                         </button>
@@ -3949,8 +3948,15 @@ function ParentAnalyticsTab({ token, athletes: myAthletes }) {
                     </div>
                   </div>
                   {isOpen && (
-                    <div style={{ padding:'0 20px 20px', borderTop:'1px solid var(--gray-dim)', paddingTop:16 }}>
-                      <pre style={{ fontFamily:'Barlow, sans-serif', fontSize:'0.93rem', color:'var(--gray)', lineHeight:1.7, whiteSpace:'pre-wrap', margin:0 }}>{rep.content}</pre>
+                    <div style={{ padding:'16px 20px 20px', borderTop:'1px solid var(--gray-dim)' }}>
+                      {rep.content && (
+                        <pre style={{ fontFamily:'Barlow, sans-serif', fontSize:'0.93rem', color:'var(--gray)', lineHeight:1.7, whiteSpace:'pre-wrap', margin:'0 0 16px' }}>{rep.content}</pre>
+                      )}
+                      {rep.file_url && (
+                        <a href={rep.file_url} target="_blank" rel="noreferrer" className="btn-outline" style={{ display:'inline-block', padding:'8px 20px', fontSize:'13px', textDecoration:'none' }}>
+                          Скачать файл аналитики
+                        </a>
+                      )}
                     </div>
                   )}
                 </div>
@@ -3963,6 +3969,32 @@ function ParentAnalyticsTab({ token, athletes: myAthletes }) {
       {/* Заявка на аналитику */}
       <div>
         <div style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.08em', color:'var(--white)', marginBottom:16, borderBottom:'1px solid var(--gray-dim)', paddingBottom:8 }}>Заявка на аналитику</div>
+
+        {/* Статус активных заявок */}
+        {requests.length > 0 && (
+          <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:20 }}>
+            {requests.map(req => {
+              const st = statusLabel[req.status] || { text: req.status, color:'var(--gray)' }
+              return (
+                <div key={req.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px', background:'var(--dark)', border:'1px solid var(--gray-dim)', flexWrap:'wrap', gap:8 }}>
+                  <div>
+                    <span style={{ color:'var(--white)', fontSize:'0.9rem', fontWeight:600 }}>{req.athlete_name}</span>
+                    <span style={{ color:'var(--gray)', fontSize:'0.85rem', marginLeft:10 }}>{fmtDate(req.created_at)}</span>
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:16 }}>
+                    {req.paid ? (
+                      <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.78rem', letterSpacing:'1px', textTransform:'uppercase', color:'#4caf50' }}>Оплачено</span>
+                    ) : (
+                      <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.78rem', letterSpacing:'1px', textTransform:'uppercase', color:'#c8962a' }}>Не оплачено</span>
+                    )}
+                    <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.78rem', letterSpacing:'1px', textTransform:'uppercase', color:st.color }}>{st.text}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         {submitted ? (
           <div className="att-msg" style={{ maxWidth:480 }}>Заявка принята. Мы свяжемся с вами.</div>
         ) : (
@@ -3995,6 +4027,9 @@ function ParentAnalyticsTab({ token, athletes: myAthletes }) {
           </div>
         )}
       </div>
+
+      {/* Информационный блок — в конце */}
+      <AnalyticsInfoBlock />
     </div>
   )
 }
@@ -4011,6 +4046,8 @@ function AnalyticsAdminTab({ token, athletes }) {
   const [form,       setForm]       = useState({ athlete_id:'', title:'', content:'', status:'in_progress' })
   const [formMsg,    setFormMsg]    = useState('')
   const [saving,     setSaving]     = useState(false)
+  const [fileInput,  setFileInput]  = useState(null)
+  const [uploading,  setUploading]  = useState(false)
 
   const h  = { Authorization: `Bearer ${token}` }
   const hj = { ...h, 'Content-Type': 'application/json' }
@@ -4035,17 +4072,32 @@ function AnalyticsAdminTab({ token, athletes }) {
     if (r.ok) load()
   }
 
+  async function togglePaid(id, paid) {
+    await fetch(`${API}/analytics/requests/${id}/status`, { method:'PATCH', headers:hj, body:JSON.stringify({ paid }) })
+    load()
+  }
+
   async function saveReport() {
     if (!form.athlete_id) { setFormMsg('Выберите спортсмена'); return }
     if (!form.title.trim()) { setFormMsg('Введите название'); return }
-    if (!form.content.trim()) { setFormMsg('Введите текст аналитики'); return }
     setSaving(true); setFormMsg('')
     try {
       const method = editingRep ? 'PATCH' : 'POST'
       const url    = editingRep ? `${API}/analytics/reports/${editingRep.id}/` : `${API}/analytics/reports/`
       const r = await fetch(url, { method, headers:hj, body:JSON.stringify({ athlete_id:Number(form.athlete_id), title:form.title.trim(), content:form.content.trim(), status:form.status }) })
-      if (r.ok) { setShowForm(false); setEditingRep(null); load() }
-      else { const d = await r.json(); setFormMsg(d.detail || 'Ошибка') }
+      if (r.ok) {
+        const saved = await r.json()
+        // Загружаем файл если выбран
+        if (fileInput) {
+          setUploading(true)
+          const fd = new FormData()
+          fd.append('file', fileInput)
+          await fetch(`${API}/analytics/reports/${saved.id}/file`, { method:'POST', headers:h, body:fd })
+          setUploading(false)
+          setFileInput(null)
+        }
+        setShowForm(false); setEditingRep(null); load()
+      } else { const d = await r.json(); setFormMsg(d.detail || 'Ошибка') }
     } catch { setFormMsg('Ошибка сети') }
     setSaving(false)
   }
@@ -4093,7 +4145,7 @@ function AnalyticsAdminTab({ token, athletes }) {
           <div className="athletes-table-wrap">
             <table className="athletes-table">
               <thead><tr>
-                <th>Спортсмен</th><th>Родитель</th><th>Дата</th><th>Комментарий</th><th>Статус</th><th>Действия</th>
+                <th>Спортсмен</th><th>Родитель</th><th>Дата</th><th>Комментарий</th><th>Оплата</th><th>Статус</th><th>Действия</th>
               </tr></thead>
               <tbody>
                 {filteredReqs.map(r => (
@@ -4101,7 +4153,16 @@ function AnalyticsAdminTab({ token, athletes }) {
                     <td className="td-name">{r.athlete_name}</td>
                     <td style={{ fontSize:'0.88rem', color:'var(--gray)' }}>{r.parent_name}</td>
                     <td style={{ whiteSpace:'nowrap', fontSize:'0.88rem' }}>{fmtDate(r.created_at)}</td>
-                    <td style={{ maxWidth:260, fontSize:'0.88rem', color:'var(--gray)' }}>{r.comment||'—'}</td>
+                    <td style={{ maxWidth:200, fontSize:'0.88rem', color:'var(--gray)' }}>{r.comment||'—'}</td>
+                    <td>
+                      <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer' }}>
+                        <input type="checkbox" checked={!!r.paid} onChange={e => togglePaid(r.id, e.target.checked)}
+                          style={{ width:15, height:15, accentColor:'#4caf50', cursor:'pointer' }}/>
+                        <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.78rem', letterSpacing:'1px', textTransform:'uppercase', color: r.paid ? '#4caf50' : 'var(--gray)' }}>
+                          {r.paid ? 'Оплачено' : 'Не оплачено'}
+                        </span>
+                      </label>
+                    </td>
                     <td><span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.8rem', letterSpacing:'1px', textTransform:'uppercase', color:(reqSt[r.status]||{}).color||'var(--gray)' }}>{(reqSt[r.status]||{}).text||r.status}</span></td>
                     <td className="td-actions">
                       {r.status==='new'         && <button className="td-btn td-btn-edit" onClick={()=>updateReqStatus(r.id,'in_progress')}>В работу</button>}
@@ -4172,10 +4233,25 @@ function AnalyticsAdminTab({ token, athletes }) {
                 <option value="ready">Готова (видна родителю)</option>
               </select>
             </div>
+            <div style={{ marginBottom:20 }}>
+              <label style={{ color:'var(--gray)', fontSize:'0.78rem', letterSpacing:'0.08em', textTransform:'uppercase', display:'block', marginBottom:6 }}>Файл аналитики (PDF, DOCX, XLSX)</label>
+              <input type="file" accept=".pdf,.doc,.docx,.xlsx,.xls"
+                onChange={e => setFileInput(e.target.files[0] || null)}
+                style={{ color:'var(--gray)', fontSize:'0.9rem', width:'100%' }}/>
+              {editingRep?.file_url && !fileInput && (
+                <div style={{ marginTop:8 }}>
+                  <a href={editingRep.file_url} target="_blank" rel="noreferrer" style={{ color:'var(--red)', fontSize:'0.88rem' }}>Текущий файл (скачать)</a>
+                  <span style={{ color:'var(--gray)', fontSize:'0.85rem' }}> — загрузите новый чтобы заменить</span>
+                </div>
+              )}
+              {fileInput && (
+                <div style={{ marginTop:6, color:'#4caf50', fontSize:'0.85rem' }}>Выбран: {fileInput.name}</div>
+              )}
+            </div>
             {formMsg && <div style={{ color:'var(--red)', fontSize:'0.88rem', marginBottom:12 }}>{formMsg}</div>}
             <div className="modal-btns-row">
-              <button className="btn-primary" onClick={saveReport} disabled={saving}>{saving?'Сохранение...':'Сохранить'}</button>
-              <button className="btn-outline" onClick={()=>{setShowForm(false);setEditingRep(null)}}>Отмена</button>
+              <button className="btn-primary" onClick={saveReport} disabled={saving||uploading}>{saving?'Сохранение...':uploading?'Загрузка файла...':'Сохранить'}</button>
+              <button className="btn-outline" onClick={()=>{setShowForm(false);setEditingRep(null);setFileInput(null)}}>Отмена</button>
             </div>
           </div>
         </div>
@@ -4448,7 +4524,6 @@ export default function Cabinet() {
           {parentView === 'achievements'  && !loading && <AchievementsTab token={token} athletes={myAthletes}/>}
           {parentView === 'rating'        && !loading && <RatingTab token={token} myAthleteIds={myAthletes.map(a=>a.id)}/>}
           {parentView === 'notifications' && <NotificationsTab token={token}/>}
-          {parentView === 'analytics'     && <ParentAnalyticsTab token={token} athletes={myAthletes}/>}
           {parentView === 'info'          && <InfoTab isAdmin={false}/>}
           {parentView === 'analytics'     && !loading && <ParentAnalyticsTab token={token} athletes={myAthletes}/>}
         </div>
