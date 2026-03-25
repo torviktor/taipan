@@ -69,3 +69,16 @@ def update_status(
     db.commit()
     db.refresh(application)
     return application
+
+# ─── Удалить заявку — менеджер ───────────────────────────────────────────────
+@router.delete("/{app_id}", status_code=204, summary="Удалить заявку")
+def delete_application(
+    app_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_manager)
+):
+    application = db.query(Application).filter(Application.id == app_id).first()
+    if not application:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+    db.delete(application)
+    db.commit()

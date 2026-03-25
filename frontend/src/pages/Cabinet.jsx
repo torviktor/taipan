@@ -3813,48 +3813,78 @@ function BeltDisplay({ gup, dan }) {
   )
 }
 
-// ── АНАЛИТИКА — ИНФОРМАЦИОННЫЙ БЛОК ──────────────────────────────────────────
-function AnalyticsInfoBlock() {
-  const H3 = ({ children }) => (
-    <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'1.05rem',
-      letterSpacing:'0.06em', color:'var(--red)', marginTop:20, marginBottom:8, textTransform:'uppercase' }}>
-      {children}
-    </div>
-  )
-  const P = ({ children }) => (
-    <p style={{ color:'var(--gray)', fontSize:'0.95rem', lineHeight:1.7, marginBottom:12 }}>{children}</p>
-  )
-  const Hl = ({ children }) => (
-    <span style={{ color:'var(--white)', fontWeight:600 }}>{children}</span>
-  )
-  const Li = ({ children }) => (
-    <div style={{ display:'flex', gap:10, marginBottom:6 }}>
-      <span style={{ color:'var(--red)', flexShrink:0, marginTop:2 }}>—</span>
-      <span style={{ color:'var(--gray)', fontSize:'0.95rem', lineHeight:1.6 }}>{children}</span>
-    </div>
-  )
+// ── МОДАЛ СОЗДАНИЯ АНАЛИТИКИ ──────────────────────────────────────────────────
+
+function AnalyticsModal({ token, athletes, preselectedAthleteId, preselectedAthleteName, applicationId, onClose, onSuccess }) {
+  const [athleteId, setAthleteId] = useState(preselectedAthleteId || '')
+  const [title, setTitle]         = useState('')
+  const [comment, setComment]     = useState('')
+  const [file, setFile]           = useState(null)
+  const [saving, setSaving]       = useState(false)
+  const [msg, setMsg]             = useState('')
+
+  const submit = async () => {
+    if (!athleteId) { setMsg('Выберите спортсмена'); return }
+    if (!title.trim()) { setMsg('Введите название'); return }
+    setSaving(true)
+    try {
+      const fd = new FormData()
+      fd.append('athlete_id', athleteId)
+      fd.append('title', title.trim())
+      if (comment.trim()) fd.append('comment', comment.trim())
+      if (applicationId) fd.append('application_id', applicationId)
+      if (file) fd.append('file', file)
+
+      const r = await fetch(`${API}/analytics`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      })
+      if (r.ok) {
+        onSuccess()
+      } else {
+        const d = await r.json()
+        setMsg(d.detail || 'Ошибка')
+      }
+    } catch { setMsg('Ошибка отправки') }
+    setSaving(false)
+  }
+
   return (
-    <div>
-      <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderRadius:10, padding:'18px 22px', marginBottom:24 }}>
-        <P>Платформа накапливает данные по каждому спортсмену: посещаемость тренировок, результаты соревнований, прогресс по аттестациям, участие в сборах. Это не просто архив — это основа для осмысленных выводов о развитии бойца. Мы знаем, как превратить эти данные в пользу.</P>
-      </div>
-      <H3>Что входит в аналитику</H3>
-      <div style={{ marginBottom:18 }}>
-        <Li><Hl>Посещаемость</Hl> — динамика активности по сезонам, пропуски, тренды</Li>
-        <Li><Hl>Соревнования</Hl> — частота участия, результативность, динамика мест, сравнение по возрастной категории</Li>
-        <Li><Hl>Сборы</Hl> — участие, периодичность, связь с результатами соревнований</Li>
-        <Li><Hl>Аттестации</Hl> — темп продвижения по поясам, интервалы между аттестациями</Li>
-        <Li><Hl>Связи и зависимости</Hl> — как посещаемость влияет на результат, как сборы связаны с ростом уровня</Li>
-        <Li><Hl>Антропометрия и весовая категория</Hl> — соответствие возрасту и росту, рекомендации для соревнований</Li>
-        <Li><Hl>Индивидуальные рекомендации</Hl> — конкретные выводы под возраст, уровень и цели спортсмена</Li>
-      </div>
-      <H3>Как часто проводить аналитику</H3>
-      <P>Аналитика — не еженедельный отчёт. Смысл появляется, когда данных достаточно. Рекомендация: <Hl>раз в год — всем</Hl> активным спортсменам. <Hl>Раз в полгода</Hl> — тем, кто регулярно участвует в соревнованиях и сборах. Делать её чаще — значит анализировать одно и то же.</P>
-      <H3>Почему это платно</H3>
-      <P>Каждая аналитика — это ручная работа, а не автоматический отчёт. Аналитик — сертифицированный специалист (Яндекс Практикум), при этом глубоко интегрированный в тхэквондо: знает специфику тренировочного процесса, структуру соревнований, систему поясов и возрастных категорий. Это не сторонний взгляд — это взгляд изнутри, переведённый в цифры.</P>
-      <P>Бесплатно — значит «когда успею». Платный формат — это гарантия срока, структуры и реальной пользы.</P>
-      <div style={{ margin:'24px 0 4px', padding:'18px 22px', borderLeft:'3px solid var(--red)', background:'var(--dark2)', borderRadius:'0 6px 6px 0' }}>
-        <P>Ваши данные уже накоплены. Осталось их прочитать.</P>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{maxWidth:520, width:'90vw', boxSizing:'border-box'}}>
+        <h3 style={{marginBottom:20}}>Новая аналитика</h3>
+        <div className="comp-form-grid">
+          <div className="comp-field comp-field-full">
+            <label>Спортсмен *</label>
+            {preselectedAthleteId ? (
+              <input type="text" className="modal-input" value={preselectedAthleteName || ''} disabled style={{opacity:0.7, cursor:'not-allowed'}}/>
+            ) : (
+              <select className="modal-input" value={athleteId} onChange={e => setAthleteId(e.target.value)}>
+                <option value="">-- Выберите спортсмена --</option>
+                {athletes.filter(a=>!a.is_archived).map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
+              </select>
+            )}
+          </div>
+          <div className="comp-field comp-field-full">
+            <label>Название *</label>
+            <input type="text" className="modal-input" placeholder="Аналитика за март 2026" value={title} onChange={e => setTitle(e.target.value)} />
+          </div>
+          <div className="comp-field comp-field-full">
+            <label>Комментарий</label>
+            <textarea className="modal-input" rows={3} placeholder="Краткий комментарий..." value={comment} onChange={e => setComment(e.target.value)} style={{resize:'vertical', minHeight:60}} />
+          </div>
+          <div className="comp-field comp-field-full">
+            <label>Файл (PDF, Excel, изображение и т.д.)</label>
+            <input type="file" onChange={e => setFile(e.target.files[0] || null)} style={{color:'var(--gray)', fontSize:'13px'}} />
+            {file && <div style={{fontSize:'12px', color:'var(--gray)', marginTop:4}}>Выбран: {file.name}</div>}
+          </div>
+        </div>
+        {msg && <div className="att-msg" style={{marginTop:8}}>{msg}</div>}
+        <div className="modal-btns-row" style={{marginTop:16}}>
+          <button className="btn-primary" onClick={submit} disabled={saving}>{saving ? 'Отправка...' : 'Отправить'}</button>
+          <button className="btn-outline" onClick={onClose}>Отмена</button>
+        </div>
       </div>
     </div>
   )
@@ -3862,398 +3892,141 @@ function AnalyticsInfoBlock() {
 
 // ── АНАЛИТИКА — КАБИНЕТ РОДИТЕЛЯ/СПОРТСМЕНА ──────────────────────────────────
 function ParentAnalyticsTab({ token, athletes: myAthletes }) {
-  const [reports,      setReports]      = useState([])
-  const [requests,     setRequests]     = useState([])
-  const [loading,      setLoading]      = useState(true)
-  const [selectedId,   setSelectedId]   = useState(myAthletes.length === 1 ? myAthletes[0].id : '')
-  const [comment,      setComment]      = useState('')
-  const [submitting,   setSubmitting]   = useState(false)
-  const [submitted,    setSubmitted]    = useState(false)
-  const [submitErr,    setSubmitErr]    = useState('')
-  const [openReportId, setOpenReportId] = useState(null)
-
-  const h  = { Authorization: `Bearer ${token}` }
-  const hj = { ...h, 'Content-Type': 'application/json' }
-
-  useEffect(() => { loadAll() }, [])
-
-  async function loadAll() {
-    setLoading(true)
-    try {
-      const [rRep, rReq] = await Promise.all([
-        fetch(`${API}/analytics/reports/my/`, { headers: h }),
-        fetch(`${API}/analytics/requests/my/`, { headers: h }),
-      ])
-      if (rRep.ok) setReports(await rRep.json())
-      if (rReq.ok) setRequests(await rReq.json())
-    } catch {}
-    setLoading(false)
-  }
-
-  async function submitRequest() {
-    if (!selectedId) { setSubmitErr('Выберите спортсмена'); return }
-    setSubmitErr('')
-    setSubmitting(true)
-    try {
-      const r = await fetch(`${API}/analytics/requests/`, {
-        method: 'POST', headers: hj,
-        body: JSON.stringify({ athlete_id: Number(selectedId), comment: comment || null }),
-      })
-      const d = await r.json()
-      if (r.ok) { setSubmitted(true); setComment(''); loadAll() }
-      else { setSubmitErr(d.detail || 'Ошибка при отправке') }
-    } catch { setSubmitErr('Ошибка сети') }
-    setSubmitting(false)
-  }
-
-  const activeRequest = selectedId
-    ? requests.find(r => r.athlete_id === Number(selectedId) && ['new', 'in_progress'].includes(r.status))
-    : null
-
-  const statusLabel = {
-    new:         { text: 'Новая',    color: 'var(--red)' },
-    in_progress: { text: 'В работе', color: '#c8962a'    },
-    done:        { text: 'Готова',   color: '#4caf50'    },
-    ready:       { text: 'Готова',   color: '#4caf50'    },
-  }
-  const fmtDate = s => s ? new Date(s).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' }) : '—'
-
-  return (
-    <div style={{ display:'flex', flexDirection:'column', gap:40, paddingTop:24 }}>
-
-      {/* Мои аналитики */}
-      <div>
-        <div style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.08em', color:'var(--white)', marginBottom:16, borderBottom:'1px solid var(--gray-dim)', paddingBottom:8 }}>Мои аналитики</div>
-        {loading && <div className="cabinet-loading">Загрузка...</div>}
-        {!loading && reports.length === 0 && <div className="cabinet-coming">Аналитика пока не проводилась.</div>}
-        {!loading && reports.length > 0 && (
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            {reports.map(rep => {
-              const st = statusLabel[rep.status] || { text: rep.status, color:'var(--gray)' }
-              const isOpen = openReportId === rep.id
-              return (
-                <div key={rep.id} style={{ background:'var(--dark)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)' }}>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', flexWrap:'wrap', gap:12 }}>
-                    <div>
-                      <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'1rem', letterSpacing:'1px', color:'var(--white)', textTransform:'uppercase' }}>{rep.athlete_name}</div>
-                      <div style={{ color:'var(--gray)', fontSize:'0.88rem', marginTop:3 }}>{rep.title} · {fmtDate(rep.created_at)}</div>
-                    </div>
-                    <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                      <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.8rem', letterSpacing:'1px', textTransform:'uppercase', color:st.color }}>{st.text}</span>
-                      {(rep.status === 'ready') && (
-                        <button className="btn-outline" style={{ padding:'6px 16px', fontSize:'13px' }} onClick={() => setOpenReportId(isOpen ? null : rep.id)}>
-                          {isOpen ? 'Свернуть' : 'Открыть'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {isOpen && (
-                    <div style={{ padding:'16px 20px 20px', borderTop:'1px solid var(--gray-dim)' }}>
-                      {rep.content && (
-                        <pre style={{ fontFamily:'Barlow, sans-serif', fontSize:'0.93rem', color:'var(--gray)', lineHeight:1.7, whiteSpace:'pre-wrap', margin:'0 0 16px' }}>{rep.content}</pre>
-                      )}
-                      {rep.file_url && (
-                        <a href={rep.file_url} target="_blank" rel="noreferrer" className="btn-outline" style={{ display:'inline-block', padding:'8px 20px', fontSize:'13px', textDecoration:'none' }}>
-                          Скачать файл аналитики
-                        </a>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Заявка на аналитику */}
-      <div>
-        <div style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.08em', color:'var(--white)', marginBottom:16, borderBottom:'1px solid var(--gray-dim)', paddingBottom:8 }}>Заявка на аналитику</div>
-
-        {/* Статус активных заявок */}
-        {requests.length > 0 && (
-          <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:20 }}>
-            {requests.map(req => {
-              const st = statusLabel[req.status] || { text: req.status, color:'var(--gray)' }
-              return (
-                <div key={req.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px', background:'var(--dark)', border:'1px solid var(--gray-dim)', flexWrap:'wrap', gap:8 }}>
-                  <div>
-                    <span style={{ color:'var(--white)', fontSize:'0.9rem', fontWeight:600 }}>{req.athlete_name}</span>
-                    <span style={{ color:'var(--gray)', fontSize:'0.85rem', marginLeft:10 }}>{fmtDate(req.created_at)}</span>
-                  </div>
-                  <div style={{ display:'flex', alignItems:'center', gap:16 }}>
-                    {req.paid ? (
-                      <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.78rem', letterSpacing:'1px', textTransform:'uppercase', color:'#4caf50' }}>Оплачено</span>
-                    ) : (
-                      <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.78rem', letterSpacing:'1px', textTransform:'uppercase', color:'#c8962a' }}>Не оплачено</span>
-                    )}
-                    <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.78rem', letterSpacing:'1px', textTransform:'uppercase', color:st.color }}>{st.text}</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {submitted ? (
-          <div className="att-msg" style={{ maxWidth:480 }}>Заявка принята. Мы свяжемся с вами.</div>
-        ) : (
-          <div style={{ display:'flex', flexDirection:'column', gap:14, maxWidth:480 }}>
-            {myAthletes.length > 1 && (
-              <div>
-                <label style={{ color:'var(--gray)', fontSize:'0.78rem', letterSpacing:'0.08em', textTransform:'uppercase', display:'block', marginBottom:6 }}>Спортсмен</label>
-                <select value={selectedId} onChange={e => { setSelectedId(e.target.value); setSubmitted(false) }} className="att-date-input" style={{ width:'100%' }}>
-                  <option value="">Выберите спортсмена</option>
-                  {myAthletes.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
-                </select>
-              </div>
-            )}
-            {myAthletes.length === 1 && (
-              <div style={{ color:'var(--gray)', fontSize:'0.9rem' }}>Спортсмен: <span style={{ color:'var(--white)', fontWeight:600 }}>{myAthletes[0].full_name}</span></div>
-            )}
-            <div>
-              <label style={{ color:'var(--gray)', fontSize:'0.78rem', letterSpacing:'0.08em', textTransform:'uppercase', display:'block', marginBottom:6 }}>Комментарий / пожелания</label>
-              <textarea value={comment} onChange={e => setComment(e.target.value)} rows={4} placeholder="Что вас интересует? Какой период? Есть ли конкретные вопросы по спортсмену?" className="att-notes-input" style={{ width:'100%', resize:'vertical' }} />
-            </div>
-            {activeRequest && (
-              <div style={{ padding:'10px 14px', background:'rgba(200,150,42,0.1)', border:'1px solid #c8962a', color:'#c8962a', fontSize:'0.88rem' }}>
-                По этому спортсмену уже есть активная заявка (статус: {statusLabel[activeRequest.status]?.text || activeRequest.status}).
-              </div>
-            )}
-            {submitErr && <div style={{ color:'var(--red)', fontSize:'0.88rem' }}>{submitErr}</div>}
-            <button className="btn-primary" style={{ alignSelf:'flex-start', padding:'12px 28px' }} onClick={submitRequest} disabled={submitting || !!activeRequest}>
-              {submitting ? 'Отправка...' : 'Отправить заявку'}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Информационный блок — в конце */}
-      <AnalyticsInfoBlock />
-    </div>
-  )
-}
-
-// ── АНАЛИТИКА — КАБИНЕТ ТРЕНЕРА/АДМИНИСТРАТОРА ───────────────────────────────
-function AnalyticsAdminTab({ token, athletes }) {
-  const [requests,   setRequests]   = useState([])
-  const [reports,    setReports]    = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [reqFilter,  setReqFilter]  = useState('')
-  const [reqSearch,  setReqSearch]  = useState('')
-  const [showForm,   setShowForm]   = useState(false)
-  const [editingRep, setEditingRep] = useState(null)
-  const [form,       setForm]       = useState({ athlete_id:'', title:'', content:'', status:'in_progress' })
-  const [formMsg,    setFormMsg]    = useState('')
-  const [saving,     setSaving]     = useState(false)
-  const [fileInput,  setFileInput]  = useState(null)
-  const [uploading,  setUploading]  = useState(false)
-
-  const h  = { Authorization: `Bearer ${token}` }
-  const hj = { ...h, 'Content-Type': 'application/json' }
+  const [records, setRecords] = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => { load() }, [])
 
   async function load() {
     setLoading(true)
     try {
-      const [rReq, rRep] = await Promise.all([
-        fetch(`${API}/analytics/requests/`,  { headers: h }),
-        fetch(`${API}/analytics/reports/`,   { headers: h }),
-      ])
-      if (rReq.ok) setRequests(await rReq.json())
-      if (rRep.ok) setReports(await rRep.json())
+      const r = await fetch(`${API}/analytics`, { headers: { Authorization: `Bearer ${token}` } })
+      if (r.ok) setRecords(await r.json())
     } catch {}
     setLoading(false)
   }
 
-  async function updateReqStatus(id, status) {
-    const r = await fetch(`${API}/analytics/requests/${id}/status`, { method:'PATCH', headers:hj, body:JSON.stringify({ status }) })
-    if (r.ok) load()
-  }
+  if (loading) return <div className="cabinet-loading">Загрузка...</div>
+  if (records.length === 0) return <div className="cabinet-empty">Аналитических отчётов пока нет.</div>
 
-  async function togglePaid(id, paid) {
-    await fetch(`${API}/analytics/requests/${id}/status`, { method:'PATCH', headers:hj, body:JSON.stringify({ paid }) })
-    load()
-  }
+  return (
+    <div>
+      <p className="section-label" style={{marginBottom:16}}>Аналитика</p>
+      {records.map(r => (
+        <div key={r.id} className="my-athlete-card" style={{marginBottom:12}}>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap'}}>
+            <div>
+              <div className="my-athlete-name">{r.title}</div>
+              <div className="my-athlete-details" style={{marginTop:4}}>
+                <span>{r.athlete_name}</span>
+                <span>{new Date(r.created_at).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}</span>
+              </div>
+              {r.comment && <div style={{color:'var(--gray)', fontSize:'0.85rem', marginTop:6, lineHeight:1.5}}>{r.comment}</div>}
+            </div>
+            {r.file_path && (
+              <a href={r.file_path} target="_blank" rel="noreferrer"
+                className="btn-outline" style={{padding:'6px 14px', fontSize:'12px', whiteSpace:'nowrap'}}>
+                Скачать файл
+              </a>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
-  async function saveReport() {
-    if (!form.athlete_id) { setFormMsg('Выберите спортсмена'); return }
-    if (!form.title.trim()) { setFormMsg('Введите название'); return }
-    setSaving(true); setFormMsg('')
+// ── АНАЛИТИКА — КАБИНЕТ ТРЕНЕРА/АДМИНИСТРАТОРА ───────────────────────────────
+function AnalyticsAdminTab({ token, athletes }) {
+  const [records, setRecords]     = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [showModal, setShowModal] = useState(false)
+  const [confirm, setConfirm]     = useState(null)
+
+  const h = { Authorization: `Bearer ${token}` }
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    setLoading(true)
     try {
-      const method = editingRep ? 'PATCH' : 'POST'
-      const url    = editingRep ? `${API}/analytics/reports/${editingRep.id}/` : `${API}/analytics/reports/`
-      const r = await fetch(url, { method, headers:hj, body:JSON.stringify({ athlete_id:Number(form.athlete_id), title:form.title.trim(), content:form.content.trim(), status:form.status }) })
-      if (r.ok) {
-        const saved = await r.json()
-        // Загружаем файл если выбран
-        if (fileInput) {
-          setUploading(true)
-          const fd = new FormData()
-          fd.append('file', fileInput)
-          await fetch(`${API}/analytics/reports/${saved.id}/file`, { method:'POST', headers:h, body:fd })
-          setUploading(false)
-          setFileInput(null)
-        }
-        setShowForm(false); setEditingRep(null); load()
-      } else { const d = await r.json(); setFormMsg(d.detail || 'Ошибка') }
-    } catch { setFormMsg('Ошибка сети') }
-    setSaving(false)
+      const r = await fetch(`${API}/analytics`, { headers: h })
+      if (r.ok) setRecords(await r.json())
+    } catch {}
+    setLoading(false)
   }
 
-  async function deleteReport(id) {
-    if (!window.confirm('Удалить аналитику?')) return
-    await fetch(`${API}/analytics/reports/${id}/`, { method:'DELETE', headers:h })
-    load()
+  function remove(item) {
+    setConfirm({
+      message: `Удалить аналитику "${item.title}"?`,
+      confirmText: 'Удалить',
+      danger: true,
+      onConfirm: async () => {
+        setConfirm(null)
+        await fetch(`${API}/analytics/${item.id}`, { method: 'DELETE', headers: h })
+        await load()
+      }
+    })
   }
-
-  function openNew() { setEditingRep(null); setForm({ athlete_id:'', title:'', content:'', status:'in_progress' }); setFormMsg(''); setShowForm(true) }
-  function openEdit(rep) { setEditingRep(rep); setForm({ athlete_id:rep.athlete_id, title:rep.title, content:rep.content, status:rep.status }); setFormMsg(''); setShowForm(true) }
-
-  const filteredReqs = requests.filter(r => {
-    if (reqFilter && r.status !== reqFilter) return false
-    if (reqSearch && !(r.athlete_name||'').toLowerCase().includes(reqSearch.toLowerCase())) return false
-    return true
-  })
-
-  const reqSt = { new:{text:'Новая',color:'var(--red)'}, in_progress:{text:'В работе',color:'#c8962a'}, done:{text:'Готова',color:'#4caf50'} }
-  const repSt = { in_progress:{text:'В работе',color:'#c8962a'}, ready:{text:'Готова',color:'#4caf50'} }
-  const fmtDate = s => s ? new Date(s).toLocaleDateString('ru-RU') : '—'
 
   if (loading) return <div className="cabinet-loading">Загрузка...</div>
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:40, paddingTop:16 }}>
+    <div>
+      {confirm && <ConfirmModal message={confirm.message} confirmText={confirm.confirmText} danger={confirm.danger} onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)}/>}
 
-      {/* Блок 1 — Заявки */}
-      <div>
-        <div style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.08em', color:'var(--white)', marginBottom:16, borderBottom:'1px solid var(--gray-dim)', paddingBottom:8 }}>
-          Заявки на аналитику
-          {requests.filter(r=>r.status==='new').length > 0 && <span className="tab-badge" style={{ marginLeft:10 }}>{requests.filter(r=>r.status==='new').length}</span>}
+      {showModal && <AnalyticsModal
+        token={token}
+        athletes={athletes}
+        preselectedAthleteId={null}
+        preselectedAthleteName={null}
+        applicationId={null}
+        onClose={() => setShowModal(false)}
+        onSuccess={() => { setShowModal(false); load() }}
+      />}
+
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16}}>
+        <div style={{color:'var(--gray)', fontSize:'0.85rem'}}>
+          Аналитические отчёты для спортсменов. Родители получают уведомление и могут скачать файл.
         </div>
-        <div className="cabinet-toolbar" style={{ marginBottom:16 }}>
-          <input type="text" placeholder="Поиск по спортсмену..." value={reqSearch} onChange={e=>setReqSearch(e.target.value)} className="att-date-input" style={{ width:220 }} />
-          <select value={reqFilter} onChange={e=>setReqFilter(e.target.value)} className="att-date-input" style={{ width:'auto' }}>
-            <option value="">Все статусы</option>
-            <option value="new">Новые</option>
-            <option value="in_progress">В работе</option>
-            <option value="done">Готово</option>
-          </select>
-        </div>
-        {filteredReqs.length === 0 ? <div className="cabinet-empty">Заявок нет.</div> : (
-          <div className="athletes-table-wrap">
-            <table className="athletes-table">
-              <thead><tr>
-                <th>Спортсмен</th><th>Родитель</th><th>Дата</th><th>Комментарий</th><th>Оплата</th><th>Статус</th><th>Действия</th>
-              </tr></thead>
-              <tbody>
-                {filteredReqs.map(r => (
-                  <tr key={r.id} style={{ background:r.status==='new' ? 'rgba(204,0,0,0.04)' : undefined }}>
-                    <td className="td-name">{r.athlete_name}</td>
-                    <td style={{ fontSize:'0.88rem', color:'var(--gray)' }}>{r.parent_name}</td>
-                    <td style={{ whiteSpace:'nowrap', fontSize:'0.88rem' }}>{fmtDate(r.created_at)}</td>
-                    <td style={{ maxWidth:200, fontSize:'0.88rem', color:'var(--gray)' }}>{r.comment||'—'}</td>
-                    <td>
-                      <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer' }}>
-                        <input type="checkbox" checked={!!r.paid} onChange={e => togglePaid(r.id, e.target.checked)}
-                          style={{ width:15, height:15, accentColor:'#4caf50', cursor:'pointer' }}/>
-                        <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.78rem', letterSpacing:'1px', textTransform:'uppercase', color: r.paid ? '#4caf50' : 'var(--gray)' }}>
-                          {r.paid ? 'Оплачено' : 'Не оплачено'}
-                        </span>
-                      </label>
-                    </td>
-                    <td><span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.8rem', letterSpacing:'1px', textTransform:'uppercase', color:(reqSt[r.status]||{}).color||'var(--gray)' }}>{(reqSt[r.status]||{}).text||r.status}</span></td>
-                    <td className="td-actions">
-                      {r.status==='new'         && <button className="td-btn td-btn-edit" onClick={()=>updateReqStatus(r.id,'in_progress')}>В работу</button>}
-                      {r.status==='in_progress' && <button className="td-btn td-btn-save" onClick={()=>updateReqStatus(r.id,'done')}>Готово</button>}
-                      {r.status==='done'        && <span style={{ color:'var(--gray)', fontSize:'0.8rem' }}>Закрыта</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <button className="btn-primary" style={{padding:'8px 18px', fontSize:'14px', whiteSpace:'nowrap'}}
+          onClick={() => setShowModal(true)}>+ Аналитика</button>
       </div>
 
-      {/* Блок 2 — Готовые аналитики */}
-      <div>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, borderBottom:'1px solid var(--gray-dim)', paddingBottom:8 }}>
-          <div style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.08em', color:'var(--white)' }}>Аналитики</div>
-          <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'13px' }} onClick={openNew}>+ Добавить аналитику</button>
-        </div>
-        {reports.length === 0 ? <div className="cabinet-empty">Аналитик пока нет.</div> : (
-          <div className="athletes-table-wrap">
-            <table className="athletes-table">
-              <thead><tr><th>Спортсмен</th><th>Название</th><th>Дата</th><th>Статус</th><th>Действия</th></tr></thead>
-              <tbody>
-                {reports.map(rep => (
-                  <tr key={rep.id}>
-                    <td className="td-name">{rep.athlete_name}</td>
-                    <td style={{ fontSize:'0.88rem' }}>{rep.title}</td>
-                    <td style={{ whiteSpace:'nowrap', fontSize:'0.88rem' }}>{fmtDate(rep.created_at)}</td>
-                    <td><span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.8rem', letterSpacing:'1px', textTransform:'uppercase', color:(repSt[rep.status]||{}).color||'var(--gray)' }}>{(repSt[rep.status]||{}).text||rep.status}</span></td>
-                    <td className="td-actions">
-                      <button className="td-btn td-btn-edit" onClick={()=>openEdit(rep)}>Ред.</button>
-                      <button className="td-btn td-btn-del"  onClick={()=>deleteReport(rep.id)}>Удал.</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {records.length === 0 && <div className="cabinet-empty">Аналитических отчётов пока нет.</div>}
 
-      {/* Модалка */}
-      {showForm && (
-        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setShowForm(false)}>
-          <div className="modal-box" style={{ maxWidth:560 }} onClick={e=>e.stopPropagation()}>
-            <h3 style={{ marginBottom:20 }}>{editingRep ? 'Редактировать аналитику' : 'Новая аналитика'}</h3>
-            <div style={{ marginBottom:14 }}>
-              <label style={{ color:'var(--gray)', fontSize:'0.78rem', letterSpacing:'0.08em', textTransform:'uppercase', display:'block', marginBottom:6 }}>Спортсмен</label>
-              <select value={form.athlete_id} onChange={e=>setForm(f=>({...f,athlete_id:e.target.value}))} className="modal-input" disabled={!!editingRep}>
-                <option value="">Выберите спортсмена</option>
-                {athletes.filter(a=>!a.is_archived).map(a=><option key={a.id} value={a.id}>{a.full_name}</option>)}
-              </select>
-            </div>
-            <div style={{ marginBottom:14 }}>
-              <label style={{ color:'var(--gray)', fontSize:'0.78rem', letterSpacing:'0.08em', textTransform:'uppercase', display:'block', marginBottom:6 }}>Название / тип</label>
-              <input type="text" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="Например: Годовая аналитика 2025/2026" className="modal-input" />
-            </div>
-            <div style={{ marginBottom:14 }}>
-              <label style={{ color:'var(--gray)', fontSize:'0.78rem', letterSpacing:'0.08em', textTransform:'uppercase', display:'block', marginBottom:6 }}>Текст аналитики</label>
-              <textarea value={form.content} onChange={e=>setForm(f=>({...f,content:e.target.value}))} rows={10} placeholder="Подробный текст аналитики..." className="modal-input" style={{ resize:'vertical' }} />
-            </div>
-            <div style={{ marginBottom:20 }}>
-              <label style={{ color:'var(--gray)', fontSize:'0.78rem', letterSpacing:'0.08em', textTransform:'uppercase', display:'block', marginBottom:6 }}>Статус</label>
-              <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))} className="modal-input">
-                <option value="in_progress">В работе</option>
-                <option value="ready">Готова (видна родителю)</option>
-              </select>
-            </div>
-            <div style={{ marginBottom:20 }}>
-              <label style={{ color:'var(--gray)', fontSize:'0.78rem', letterSpacing:'0.08em', textTransform:'uppercase', display:'block', marginBottom:6 }}>Файл аналитики (PDF, DOCX, XLSX)</label>
-              <input type="file" accept=".pdf,.doc,.docx,.xlsx,.xls"
-                onChange={e => setFileInput(e.target.files[0] || null)}
-                style={{ color:'var(--gray)', fontSize:'0.9rem', width:'100%' }}/>
-              {editingRep?.file_url && !fileInput && (
-                <div style={{ marginTop:8 }}>
-                  <a href={editingRep.file_url} target="_blank" rel="noreferrer" style={{ color:'var(--red)', fontSize:'0.88rem' }}>Текущий файл (скачать)</a>
-                  <span style={{ color:'var(--gray)', fontSize:'0.85rem' }}> — загрузите новый чтобы заменить</span>
-                </div>
-              )}
-              {fileInput && (
-                <div style={{ marginTop:6, color:'#4caf50', fontSize:'0.85rem' }}>Выбран: {fileInput.name}</div>
-              )}
-            </div>
-            {formMsg && <div style={{ color:'var(--red)', fontSize:'0.88rem', marginBottom:12 }}>{formMsg}</div>}
-            <div className="modal-btns-row">
-              <button className="btn-primary" onClick={saveReport} disabled={saving||uploading}>{saving?'Сохранение...':uploading?'Загрузка файла...':'Сохранить'}</button>
-              <button className="btn-outline" onClick={()=>{setShowForm(false);setEditingRep(null);setFileInput(null)}}>Отмена</button>
-            </div>
-          </div>
+      {records.length > 0 && (
+        <div className="athletes-table-wrap">
+          <table className="athletes-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th style={{textAlign:'left'}}>Спортсмен</th>
+                <th style={{textAlign:'left'}}>Название</th>
+                <th style={{textAlign:'left'}}>Комментарий</th>
+                <th>Файл</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map(r => (
+                <tr key={r.id}>
+                  <td style={{whiteSpace:'nowrap'}}>{new Date(r.created_at).toLocaleDateString('ru')}</td>
+                  <td className="td-name">{r.athlete_name || '--'}</td>
+                  <td>{r.title}</td>
+                  <td style={{fontSize:'13px', color:'var(--gray)', maxWidth:'200px'}}>{r.comment || '--'}</td>
+                  <td style={{textAlign:'center'}}>
+                    {r.file_path
+                      ? <a href={r.file_path} target="_blank" rel="noreferrer" style={{color:'var(--red)', fontSize:'13px', fontWeight:700}}>Скачать</a>
+                      : <span style={{color:'var(--gray-dim)'}}>--</span>}
+                  </td>
+                  <td>
+                    <button className="td-btn td-btn-del" onClick={() => remove(r)}>Удал.</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
@@ -4278,6 +4051,8 @@ export default function Cabinet() {
   const [view,         setView]         = useState('athletes')
   const [resetUser,    setResetUser]    = useState(null)
   const [parentView,   setParentView]   = useState('athletes') // для кабинета родителя
+  const [analyticsModal, setAnalyticsModal] = useState(null) // { athlete_id, athlete_name, application_id }
+  const [deleteAppConfirm, setDeleteAppConfirm] = useState(null) // { id, full_name }
   const [cf, setCfState] = useState({ gender:'', group:'', gup_dan:'', parent_name:'' })
   const setCf = (k, v) => setCfState(f => ({ ...f, [k]: v }))
   const resetFilters = () => { setSearch(''); setCfState({ gender:'', group:'', gup_dan:'', parent_name:'' }) }
@@ -4407,6 +4182,28 @@ export default function Cabinet() {
       body: JSON.stringify({ status }),
     })
     loadApplications()
+  }
+
+  const deleteApplication = async (id) => {
+    await fetch(`${API}/applications/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    setDeleteAppConfirm(null)
+    loadApplications()
+  }
+
+  const openAnalyticsFromApp = (app) => {
+    // Ищем спортсмена по имени из заявки
+    const matched = athletes.find(a =>
+      a.full_name.toLowerCase() === app.full_name.toLowerCase() ||
+      a.parent_name?.toLowerCase() === app.full_name.toLowerCase()
+    )
+    setAnalyticsModal({
+      athlete_id: matched ? matched.id : null,
+      athlete_name: matched ? matched.full_name : app.full_name,
+      application_id: app.id,
+    })
   }
 
   const uniqueGroups  = useMemo(() => GROUPS, [])  // п.7 — фиксированный справочник
@@ -4806,7 +4603,31 @@ export default function Cabinet() {
 
         {/* ── Заявки ── */}
         {view === 'applications' && (
-          <div className="athletes-table-wrap">
+          <div>
+            {deleteAppConfirm && (
+              <div className="modal-overlay" onClick={() => setDeleteAppConfirm(null)}>
+                <div className="modal-box" onClick={e => e.stopPropagation()} style={{maxWidth:400}}>
+                  <h3 style={{marginBottom:12}}>Удалить заявку?</h3>
+                  <p style={{color:'var(--gray)', fontSize:'0.9rem', marginBottom:16}}>
+                    Заявка от <span style={{color:'var(--white)'}}>{deleteAppConfirm.full_name}</span> будет удалена безвозвратно.
+                  </p>
+                  <div style={{display:'flex', gap:8}}>
+                    <button className="btn-primary" style={{padding:'8px 16px', fontSize:'13px'}} onClick={() => deleteApplication(deleteAppConfirm.id)}>Удалить</button>
+                    <button className="btn-outline" style={{padding:'8px 16px', fontSize:'13px'}} onClick={() => setDeleteAppConfirm(null)}>Отмена</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {analyticsModal && <AnalyticsModal
+              token={token}
+              athletes={athletes.filter(a=>!a.is_archived)}
+              preselectedAthleteId={analyticsModal.athlete_id}
+              preselectedAthleteName={analyticsModal.athlete_name}
+              applicationId={analyticsModal.application_id}
+              onClose={() => setAnalyticsModal(null)}
+              onSuccess={() => { setAnalyticsModal(null); loadApplications() }}
+            />}
+            <div className="athletes-table-wrap">
             <table className="athletes-table">
               <thead>
                 <tr>
@@ -4814,34 +4635,26 @@ export default function Cabinet() {
                   <Th colKey="full_name"  sort={sortAp} toggle={toggleAp}>ФИО</Th>
                   <Th colKey="phone"      sort={sortAp} toggle={toggleAp}>Телефон</Th>
                   <th>Комментарий</th>
-                  <Th colKey="status"     sort={sortAp} toggle={toggleAp}>Статус</Th>
-                  <th>Изменить статус</th>
+                  <th>Действия</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedApps.map(a => {
-                  const st = STATUS_LABELS[a.status] || { label: a.status, color: 'var(--gray)' }
-                  return (
-                    <tr key={a.id}>
-                      <td style={{ whiteSpace:'nowrap' }}>{new Date(a.created_at).toLocaleDateString('ru')}</td>
-                      <td className="td-name">{a.full_name}</td>
-                      <td>{a.phone}</td>
-                      <td style={{ fontSize:'13px', color:'var(--gray)', maxWidth:'200px' }}>{a.comment || '—'}</td>
-                      <td><span style={{ color:st.color, fontWeight:700, fontSize:'13px' }}>{st.label}</span></td>
-                      <td>
-                        <select className="td-status-select" value={a.status} onChange={e => updateAppStatus(a.id, e.target.value)}>
-                          <option value="new">Новая</option>
-                          <option value="processing">В обработке</option>
-                          <option value="confirmed">Подтверждена</option>
-                          <option value="rejected">Отклонена</option>
-                        </select>
-                      </td>
-                    </tr>
-                  )
-                })}
+                {sortedApps.map(a => (
+                  <tr key={a.id}>
+                    <td style={{ whiteSpace:'nowrap' }}>{new Date(a.created_at).toLocaleDateString('ru')}</td>
+                    <td className="td-name">{a.full_name}</td>
+                    <td>{a.phone}</td>
+                    <td style={{ fontSize:'13px', color:'var(--gray)', maxWidth:'200px' }}>{a.comment || '—'}</td>
+                    <td className="td-actions">
+                      <button className="td-btn td-btn-edit" onClick={() => openAnalyticsFromApp(a)}>Исполнить</button>
+                      <button className="td-btn td-btn-del" onClick={() => setDeleteAppConfirm({ id: a.id, full_name: a.full_name })}>Удалить</button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
             {sortedApps.length === 0 && !loading && <div className="cabinet-empty">Заявок нет</div>}
+            </div>
           </div>
         )}
       </div>
