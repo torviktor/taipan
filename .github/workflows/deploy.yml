@@ -21,32 +21,17 @@ jobs:
             # ── 1. Удалить старый скрипт если есть
             rm -f /opt/taipan/deploy-club-info.sh
 
-            # ── 2. Получить свежий код
-            sudo git pull origin main
+            # ── 2. Получить свежий код (сбросить локальные изменения)
+            sudo git fetch origin main
+            sudo git reset --hard origin/main
 
-            # ── 3. Патч моделей напрямую на хосте
-            sudo python3 /opt/taipan/backend/migrations/patch_models.py
+            # ── 3. Миграция БД
+            sleep 3
+            sudo docker compose exec -T backend python /app/migrations/add_insurance_strategy_fields.py || true
 
-            # ── 4. Патч main.py напрямую на хосте
-            sudo python3 /opt/taipan/backend/migrations/patch_main.py
-
-            # ── 5. Патч Cabinet.jsx напрямую на хосте
-            sudo python3 /opt/taipan/frontend/src/pages/_patch_cabinet.py
-
-            # ── 6. Патч App.jsx напрямую на хосте
-            sudo python3 /opt/taipan/frontend/src/pages/_patch_app.py
-
-            # ── 7. Удалить патч-скрипты jsx
-            rm -f /opt/taipan/frontend/src/pages/_patch_cabinet.py
-            rm -f /opt/taipan/frontend/src/pages/_patch_app.py
-
-            # ── 8. Пересборка и запуск
+            # ── 4. Пересборка и запуск
             sudo docker compose build --no-cache backend frontend
             sudo docker compose up -d
             sudo docker image prune -f
-
-            # ── 9. Миграция БД
-            sleep 8
-            sudo docker compose exec -T backend python /app/migrations/add_insurance_strategy_fields.py
 
             echo "Деплой завершён"
