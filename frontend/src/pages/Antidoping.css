@@ -1,0 +1,91 @@
+.antidoping-page {
+  min-height: 100vh;
+  background: var(--dark);
+  padding: 120px 0 80px;
+}
+
+.antidoping-container {
+  max-width: 800px;
+}
+
+.antidoping-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 48px;
+  letter-spacing: 6px;
+  color: var(--white);
+  margin-bottom: 8px;
+}
+
+.antidoping-section {
+  padding: 24px 0;
+}
+
+.antidoping-h2 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-bottom: 12px;
+}
+
+.antidoping-text {
+  color: var(--gray);
+  font-size: 15px;
+  line-height: 1.8;
+  margin-bottom: 12px;
+}
+
+.antidoping-text:last-child {
+  margin-bottom: 0;
+}
+
+.antidoping-divider {
+  height: 1px;
+  background: var(--gray-dim);
+}
+
+.antidoping-accent {
+  border-left: 3px solid var(--red);
+  padding: 12px 16px;
+  margin-top: 16px;
+  background: rgba(200, 30, 30, 0.06);
+  border-radius: 0 6px 6px 0;
+}
+
+.antidoping-accent p {
+  color: var(--white);
+  font-size: 14px;
+  line-height: 1.7;
+  font-weight: 600;
+  margin: 0;
+}
+
+.antidoping-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.antidoping-buttons .btn-outline {
+  font-size: 13px;
+  padding: 10px 20px;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .antidoping-title {
+    font-size: 32px;
+    letter-spacing: 3px;
+  }
+
+  .antidoping-buttons {
+    flex-direction: column;
+  }
+
+  .antidoping-buttons .btn-outline {
+    text-align: center;
+  }
+}

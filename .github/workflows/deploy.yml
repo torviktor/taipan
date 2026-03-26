@@ -15,9 +15,192 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key:      ${{ secrets.SERVER_SSH_KEY }}
           script: |
+            set -e
             cd /opt/taipan
-            git pull origin main
-            docker compose pull
-            docker compose up -d --build
-            docker image prune -f
+
+            # ── 1. Удалить старый скрипт если есть ──────────────────────
+            rm -f /opt/taipan/deploy-club-info.sh
+
+            # ── 2. Получить свежий код ───────────────────────────────────
+            sudo git pull origin main
+
+            # ── 3. Патч user.py — добавить поля если их нет ─────────────
+            sudo docker compose run --rm --no-deps backend python3 - << 'PYEOF'
+            import re
+
+            path = '/app/app/models/user.py'
+            with open(path, 'r') as f:
+                content = f.read()
+
+            changed = False
+
+            if 'insurance_expiry' not in content:
+                old = 'is_archived = Column(Boolean, default=False)'
+                new = 'is_archived = Column(Boolean, default=False)\n    insurance_expiry = Column(Date, nullable=True)'
+                if old in content:
+                    content = content.replace(old, new)
+                    changed = True
+                    print('insurance_expiry добавлено')
+
+            if 'strategy_items' not in content:
+                old = 'is_active = Column(Boolean, default=True)'
+                new = "is_active = Column(Boolean, default=True)\n    strategy_items = Column(Text, default='[]')"
+                if old in content:
+                    content = content.replace(old, new)
+                    changed = True
+                    print('strategy_items добавлено')
+
+            if 'from sqlalchemy import' in content and ', Date' not in content and 'Date,' not in content:
+                content = re.sub(r'from sqlalchemy import (.*)', r'from sqlalchemy import Date, \1', content, count=1)
+                changed = True
+                print('Date импорт добавлен')
+
+            if changed:
+                with open(path, 'w') as f:
+                    f.write(content)
+                print('user.py обновлён')
+            else:
+                print('user.py без изменений')
+            PYEOF
+
+            # ── 4. Патч main.py — подключить новые роуты ────────────────
+            sudo docker compose run --rm --no-deps backend python3 - << 'PYEOF'
+            path = '/app/app/main.py'
+            with open(path, 'r') as f:
+                content = f.read()
+
+            changed = False
+
+            if 'insurance_strategy' not in content:
+                old = 'from app.routes.hall_of_fame_routes import router as hof_router'
+                new = (old
+                    + '\nfrom app.routes.insurance_strategy import router as insurance_strategy_router'
+                    + '\nfrom app.routes.analytics import router as analytics_router')
+                content = content.replace(old, new)
+
+                old2 = 'app.include_router(hof_router'
+                new2 = ('app.include_router(insurance_strategy_router, prefix="/api", tags=["Страховка и стратегия"])\n'
+                        'app.include_router(analytics_router,          prefix="/api", tags=["Аналитика"])\n'
+                        + old2)
+                content = content.replace(old2, new2)
+                changed = True
+                print('main.py обновлён')
+            else:
+                print('main.py без изменений')
+
+            if changed:
+                with open(path, 'w') as f:
+                    f.write(content)
+            PYEOF
+
+            # ── 5. Патч Cabinet.jsx ──────────────────────────────────────
+            sudo docker compose run --rm --no-deps frontend node - << 'JSEOF'
+            const fs = require('fs');
+            const path = '/app/src/pages/Cabinet.jsx';
+            let c = fs.readFileSync(path, 'utf8');
+            let changed = false;
+
+            // Импорты
+            if (!c.includes('InsuranceTab')) {
+              const anchor = "import CompetitionsTab from './CompetitionsTab'";
+              c = c.replace(anchor,
+                anchor
+                + "\nimport InsuranceTab from './InsuranceTab'"
+                + "\nimport StrategyTab  from './StrategyTab'"
+                + "\nimport EquipmentTab from './EquipmentTab'"
+              );
+              changed = true;
+              console.log('Импорты добавлены');
+            }
+
+            // Сигнатура InfoTab
+            if (c.includes('function InfoTab({ isAdmin })')) {
+              c = c.replace('function InfoTab({ isAdmin })', 'function InfoTab({ isAdmin, token })');
+              changed = true;
+              console.log('InfoTab: token prop добавлен');
+            }
+
+            // Кнопки в InfoTab
+            if (!c.includes('id="insurance"') && !c.includes("id='insurance'")) {
+              c = c.replace(
+                '{isAdmin && <SectionBtn id="admin" label="Памятка тренера"/>}',
+                '{isAdmin && <SectionBtn id="insurance"  label="Страхование"/>}\n'
+                + '        {isAdmin && <SectionBtn id="strategy"   label="Стратегия"/>}\n'
+                + '        {isAdmin && <SectionBtn id="equipment"  label="Экипировка"/>}\n'
+                + '        {isAdmin && <SectionBtn id="admin"      label="Памятка тренера"/>}'
+              );
+              changed = true;
+              console.log('Кнопки секций добавлены');
+            }
+
+            // Рендер новых секций
+            if (!c.includes("section === 'insurance'")) {
+              c = c.replace(
+                "{/* ── ПАМЯТКА ТРЕНЕРА ── */}",
+                "{section === 'insurance' && isAdmin && (<InsuranceTab token={token} />)}\n\n"
+                + "      {section === 'strategy' && isAdmin && (<StrategyTab token={token} />)}\n\n"
+                + "      {section === 'equipment' && isAdmin && (<EquipmentTab />)}\n\n"
+                + "      {/* ── ПАМЯТКА ТРЕНЕРА ── */}"
+              );
+              changed = true;
+              console.log('Рендер новых секций добавлен');
+            }
+
+            // token в InfoTab (admin)
+            if (c.includes('<InfoTab isAdmin={true} />')) {
+              c = c.replace('<InfoTab isAdmin={true} />', '<InfoTab isAdmin={true} token={token} />');
+              changed = true;
+            }
+
+            // token в InfoTab (parent)
+            if (c.includes('<InfoTab isAdmin={false}/>')) {
+              c = c.replace('<InfoTab isAdmin={false}/>', '<InfoTab isAdmin={false} token={token}/>');
+              changed = true;
+            }
+
+            if (changed) {
+              fs.writeFileSync(path, c, 'utf8');
+              console.log('Cabinet.jsx сохранён');
+            } else {
+              console.log('Cabinet.jsx без изменений');
+            }
+
+            // Проверка баланса скобок
+            let d = 0;
+            for (const ch of c) { if (ch==='{') d++; if (ch==='}') d--; }
+            console.log('Баланс скобок:', d, d === 0 ? 'OK' : 'ОШИБКА!');
+            if (d !== 0) process.exit(1);
+            JSEOF
+
+            # ── 6. Патч App.jsx — роут антидопинга ──────────────────────
+            sudo docker compose run --rm --no-deps frontend node - << 'JSEOF'
+            const fs = require('fs');
+            const path = '/app/src/App.jsx';
+            let c = fs.readFileSync(path, 'utf8');
+
+            if (!c.includes('Antidoping')) {
+              c = c.replace(
+                "import Privacy from './pages/Privacy'",
+                "import Privacy from './pages/Privacy'\nimport Antidoping from './pages/Antidoping'"
+              );
+              c = c.replace(
+                '<Route path="/privacy"             element={<Privacy />} />',
+                '<Route path="/privacy"             element={<Privacy />} />\n        <Route path="/antidoping"         element={<Antidoping />} />'
+              );
+              fs.writeFileSync(path, c, 'utf8');
+              console.log('App.jsx: роут /antidoping добавлен');
+            } else {
+              console.log('App.jsx без изменений');
+            }
+            JSEOF
+
+            # ── 7. Пересборка и запуск ───────────────────────────────────
+            sudo docker compose build --no-cache backend frontend
+            sudo docker compose up -d
+            sudo docker image prune -f
+
+            # ── 8. Миграция БД ───────────────────────────────────────────
+            sleep 8
+            sudo docker compose exec -T backend python /app/migrations/add_insurance_strategy_fields.py
+
             echo "✅ Деплой завершён"
