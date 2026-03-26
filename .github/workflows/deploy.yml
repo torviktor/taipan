@@ -24,19 +24,19 @@ jobs:
             # ── 2. Получить свежий код
             sudo git pull origin main
 
-            # ── 3. Патч user.py
-            sudo docker compose run --rm --no-deps backend python3 /app/migrations/patch_models.py
+            # ── 3. Патч моделей напрямую на хосте
+            sudo python3 /opt/taipan/backend/migrations/patch_models.py
 
-            # ── 4. Патч main.py
-            sudo docker compose run --rm --no-deps backend python3 /app/migrations/patch_main.py
+            # ── 4. Патч main.py напрямую на хосте
+            sudo python3 /opt/taipan/backend/migrations/patch_main.py
 
-            # ── 5. Патч Cabinet.jsx напрямую (python3 на хосте)
+            # ── 5. Патч Cabinet.jsx напрямую на хосте
             sudo python3 /opt/taipan/frontend/src/pages/_patch_cabinet.py
 
-            # ── 6. Патч App.jsx напрямую
+            # ── 6. Патч App.jsx напрямую на хосте
             sudo python3 /opt/taipan/frontend/src/pages/_patch_app.py
 
-            # ── 7. Удалить патч-скрипты
+            # ── 7. Удалить патч-скрипты jsx
             rm -f /opt/taipan/frontend/src/pages/_patch_cabinet.py
             rm -f /opt/taipan/frontend/src/pages/_patch_app.py
 

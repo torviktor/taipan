@@ -1,7 +1,7 @@
 # backend/migrations/patch_models.py
 import re
 
-path = '/app/app/models/user.py'
+path = '/opt/taipan/backend/app/models/user.py'
 with open(path, 'r') as f:
     content = f.read()
 
@@ -14,6 +14,8 @@ if 'insurance_expiry' not in content:
         content = content.replace(old, new)
         changed = True
         print('insurance_expiry добавлено')
+    else:
+        print('WARN: is_archived не найдено в user.py')
 
 if 'strategy_items' not in content:
     old = 'is_active = Column(Boolean, default=True)'
@@ -22,8 +24,10 @@ if 'strategy_items' not in content:
         content = content.replace(old, new)
         changed = True
         print('strategy_items добавлено')
+    else:
+        print('WARN: is_active не найдено в user.py')
 
-if 'from sqlalchemy import' in content and 'Date' not in content:
+if 'Date' not in content and 'from sqlalchemy import' in content:
     content = re.sub(r'from sqlalchemy import (.*)', r'from sqlalchemy import Date, \1', content, count=1)
     changed = True
     print('Date импорт добавлен')
