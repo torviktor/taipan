@@ -176,7 +176,7 @@ export default function StrategyTab({ token }) {
                 )}
               </button>
               <span style={{
-                flex: 1, color: 'var(--white)', fontSize: '0.9rem',
+                flex: 1, fontSize: '0.9rem',
                 textDecoration: item.done ? 'line-through' : 'none',
                 color: item.done ? 'var(--gray)' : 'var(--white)'
               }}>

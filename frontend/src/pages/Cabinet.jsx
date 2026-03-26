@@ -4,6 +4,8 @@ import * as XLSX from 'xlsx'
 import './Cabinet.css'
 import './Competitions.css'
 import CompApplicationMatrix from './CompApplicationMatrix'
+import InsuranceTab from './InsuranceTab'
+import StrategyTab  from './StrategyTab'
 
 const API = '/api'
 
@@ -2697,9 +2699,8 @@ function NotificationsTab({ token }) {
             borderRadius: 8, padding: '14px 16px', marginBottom: 10,
             transition: 'background 0.15s'
           }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12 }}
-            onClick={() => !n.is_read && !n.link_type && markRead(n.id)}
-            style={{ cursor: !n.is_read && !n.link_type ? 'pointer' : 'default' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, cursor: !n.is_read && !n.link_type ? 'pointer' : 'default' }}
+            onClick={() => !n.is_read && !n.link_type && markRead(n.id)}>
             <div style={{ display:'flex', gap:10, alignItems:'flex-start', flex:1 }}>
               {(() => { const lbl = typeLabel(n.type); return (
                 <span style={{ fontFamily:'Barlow Condensed, sans-serif', fontWeight:700, fontSize:'0.7rem', letterSpacing:'0.08em', padding:'3px 7px', borderRadius:3, background:lbl.bg, color:lbl.color, flexShrink:0, marginTop:2, whiteSpace:'nowrap' }}>{lbl.text}</span>
@@ -3389,9 +3390,296 @@ function NewsTab({ token }) {
 
 
 
+// ── СТРАХОВАНИЕ (ТРЕНЕР) ─────────────────────────────────────────────────────
+function InsuranceAdminTab({ token, athletes }) {
+  const [data, setData]     = useState([])
+  const [loading, setLoad]  = useState(false)
+  const [saving, setSaving] = useState(null)
+  const [msg, setMsg]       = useState('')
+  const [search, setSearch] = useState('')
+  const h  = { Authorization: `Bearer ${token}` }
+  const hj = { ...h, 'Content-Type': 'application/json' }
+  const today = new Date().toISOString().slice(0,10)
+
+  useEffect(() => { load() }, [])
+
+  const load = async () => {
+    setLoad(true)
+    try {
+      const r = await fetch(`${API}/insurance-strategy/insurance`, { headers: h })
+      if (r.ok) setData(await r.json())
+      else {
+        // Если эндпоинт ещё не готов — используем список спортсменов
+        setData(athletes.map(a => ({ athlete_id: a.id, full_name: a.full_name, insurance_expiry: null })))
+      }
+    } catch {
+      setData(athletes.map(a => ({ athlete_id: a.id, full_name: a.full_name, insurance_expiry: null })))
+    }
+    setLoad(false)
+  }
+
+  const save = async (athleteId, expiry) => {
+    setSaving(athleteId)
+    try {
+      const r = await fetch(`${API}/insurance-strategy/insurance`, {
+        method: 'PATCH', headers: hj,
+        body: JSON.stringify({ athlete_id: athleteId, insurance_expiry: expiry || null })
+      })
+      if (r.ok) {
+        setData(prev => prev.map(x => x.athlete_id === athleteId ? { ...x, insurance_expiry: expiry || null } : x))
+        setMsg('Сохранено'); setTimeout(() => setMsg(''), 2000)
+      }
+    } catch {}
+    setSaving(null)
+  }
+
+  const getStatus = (expiry) => {
+    if (!expiry) return { label: 'Не указана', color: 'var(--gray)' }
+    if (expiry < today) return { label: 'Истекла', color: 'var(--red)' }
+    const diff = Math.floor((new Date(expiry) - new Date(today)) / 86400000)
+    if (diff <= 30) return { label: `Истекает через ${diff} дн.`, color: '#c8962a' }
+    return { label: 'Действует', color: '#6cba6c' }
+  }
+
+  const filtered = data.filter(a => a.full_name.toLowerCase().includes(search.toLowerCase()))
+
+  return (
+    <div style={{ padding:'0 0 40px' }}>
+      <div style={{ marginBottom:20 }}>
+        <div style={{ fontFamily:'Bebas Neue', fontSize:'1.8rem', letterSpacing:'0.06em', color:'var(--white)', marginBottom:4 }}>Сроки страховок</div>
+        <div style={{ color:'var(--gray)', fontSize:'0.88rem' }}>Отслеживание дат окончания страховых полисов спортсменов.</div>
+      </div>
+      <div style={{ display:'flex', gap:12, alignItems:'center', marginBottom:16, flexWrap:'wrap' }}>
+        <input type="text" placeholder="Поиск по имени..." value={search} onChange={e => setSearch(e.target.value)}
+          style={{ background:'var(--dark)', border:'1px solid var(--gray-dim)', color:'var(--white)', padding:'7px 14px', fontSize:'0.88rem', fontFamily:'Barlow', outline:'none', minWidth:220 }} />
+        {msg && <span style={{ color:'#6cba6c', fontSize:'0.85rem', fontFamily:'Barlow Condensed', fontWeight:700 }}>{msg}</span>}
+      </div>
+      {loading ? <div style={{ color:'var(--gray)' }}>Загрузка...</div> : (
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'0.9rem' }}>
+            <thead>
+              <tr style={{ borderBottom:'1px solid var(--gray-dim)' }}>
+                {['Спортсмен','Дата окончания полиса','Статус',''].map(h => (
+                  <th key={h} style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.72rem', letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--gray)', padding:'8px 12px', textAlign:'left' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(a => {
+                const status = getStatus(a.insurance_expiry)
+                return (
+                  <tr key={a.athlete_id} style={{ borderBottom:'1px solid var(--gray-dim)' }}>
+                    <td style={{ padding:'10px 12px', color:'var(--white)', fontWeight:600 }}>{a.full_name}</td>
+                    <td style={{ padding:'10px 12px' }}>
+                      <span style={{ color: a.insurance_expiry ? 'var(--white)' : 'var(--gray)', fontSize:'0.9rem' }}>{a.insurance_expiry || '—'}</span>
+                    </td>
+                    <td style={{ padding:'10px 12px' }}>
+                      {a.insurance_expiry && <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.85rem', color:status.color }}>{status.label}</span>}
+                    </td>
+                    <td style={{ padding:'10px 12px' }}>
+                      {saving === a.athlete_id && <span style={{ color:'var(--gray)', fontSize:'0.8rem' }}>Сохранение...</span>}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div style={{ display:'flex', gap:20, marginTop:16, flexWrap:'wrap' }}>
+        {[['#6cba6c','Действует'],['#c8962a','Истекает в течение 30 дней'],['var(--red)','Истекла'],['var(--gray)','Не указана']].map(([color, label]) => (
+          <div key={label} style={{ display:'flex', alignItems:'center', gap:8, fontSize:'0.82rem' }}>
+            <div style={{ width:10, height:10, borderRadius:'50%', background:color, flexShrink:0 }} />
+            <span style={{ color:'var(--gray)' }}>{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── СТРАХОВАНИЕ (РОДИТЕЛЬ/СПОРТСМЕН) ─────────────────────────────────────────
+function InsuranceStatus({ athleteId, token }) {
+  const [expiry, setExpiry] = useState(null)
+  const today = new Date().toISOString().slice(0,10)
+
+  useEffect(() => {
+    fetch(`${API}/insurance-strategy/insurance`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        const found = data.find(x => x.athlete_id === athleteId)
+        if (found) setExpiry(found.insurance_expiry)
+      })
+      .catch(() => {})
+  }, [athleteId])
+
+  if (expiry === null) return null
+  const diff = Math.floor((new Date(expiry) - new Date(today)) / 86400000)
+  const expired = expiry < today
+  const soon = (expired === false) && diff <= 30
+  const color = expired ? 'var(--red)' : soon ? '#c8962a' : '#6cba6c'
+  const label = expired ? 'Страховка истекла' : soon ? `Страховка истекает через ${diff} дн.` : 'Страховка действует'
+
+  return (
+    <div style={{ marginTop:8, display:'flex', alignItems:'center', gap:8 }}>
+      <div style={{ width:8, height:8, borderRadius:'50%', background:color, flexShrink:0 }} />
+      <span style={{ color, fontSize:'0.82rem', fontFamily:'Barlow Condensed', fontWeight:700 }}>{label}</span>
+      <span style={{ color:'var(--gray)', fontSize:'0.78rem' }}>{expiry}</span>
+    </div>
+  )
+}
+
+function ParentInsuranceDates({ token, athletes }) {
+  const [data, setData]     = useState([])
+  const [saving, setSaving] = useState(null)
+  const [msg, setMsg]       = useState('')
+  const h  = { Authorization: `Bearer ${token}` }
+  const hj = { ...h, 'Content-Type': 'application/json' }
+  const today = new Date().toISOString().slice(0,10)
+
+  useEffect(() => { load() }, [])
+
+  const load = async () => {
+    try {
+      const r = await fetch(`${API}/insurance-strategy/insurance`, { headers: h })
+      if (r.ok) {
+        const server = await r.json()
+        const merged = athletes.map(a => {
+          const found = server.find(x => x.athlete_id === a.id)
+          return { athlete_id: a.id, full_name: a.full_name, insurance_expiry: found ? found.insurance_expiry : null }
+        })
+        setData(merged)
+      } else {
+        setData(athletes.map(a => ({ athlete_id: a.id, full_name: a.full_name, insurance_expiry: null })))
+      }
+    } catch {
+      setData(athletes.map(a => ({ athlete_id: a.id, full_name: a.full_name, insurance_expiry: null })))
+    }
+  }
+
+  const save = async (athleteId, expiry) => {
+    setSaving(athleteId)
+    try {
+      const r = await fetch(`${API}/insurance-strategy/insurance`, {
+        method: 'PATCH', headers: hj,
+        body: JSON.stringify({ athlete_id: athleteId, insurance_expiry: expiry || null })
+      })
+      if (r.ok) {
+        setData(prev => prev.map(x => x.athlete_id === athleteId ? { ...x, insurance_expiry: expiry || null } : x))
+        setMsg('Сохранено'); setTimeout(() => setMsg(''), 2000)
+      }
+    } catch {}
+    setSaving(null)
+  }
+
+  const getStatus = (expiry) => {
+    if (expiry < today) return { label: 'Истекла', color: 'var(--red)' }
+    const diff = Math.floor((new Date(expiry) - new Date(today)) / 86400000)
+    if (diff <= 30) return { label: `Истекает через ${diff} дн.`, color: '#c8962a' }
+    return { label: 'Действует', color: '#6cba6c' }
+  }
+
+  return (
+    <div style={{ marginBottom:24 }}>
+      <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.88rem', letterSpacing:'0.06em', textTransform:'uppercase', color:'var(--white)', marginBottom:12 }}>Сроки страховок</div>
+      {msg && <div style={{ color:'#6cba6c', fontSize:'0.85rem', marginBottom:8 }}>{msg}</div>}
+      <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+        {data.map(a => {
+          const status = getStatus(a.insurance_expiry)
+          return (
+            <div key={a.athlete_id} style={{ background:'var(--dark)', padding:'14px 16px', display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
+              <span style={{ color:'var(--white)', fontWeight:600, minWidth:160 }}>{a.full_name}</span>
+              <div style={{ display:'flex', alignItems:'center', gap:10, flex:1, flexWrap:'wrap' }}>
+                <input type="date" className="att-date-input" style={{ width:160 }}
+                  value={a.insurance_expiry || ''}
+                  onChange={e => setData(prev => prev.map(x => x.athlete_id === a.athlete_id ? { ...x, insurance_expiry: e.target.value } : x))}
+                  onBlur={e => save(a.athlete_id, e.target.value)} />
+                {a.insurance_expiry && <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.85rem', color:status.color }}>{status.label}</span>}
+                {saving === a.athlete_id && <span style={{ color:'var(--gray)', fontSize:'0.8rem' }}>Сохранение...</span>}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function ParentInsuranceTab({ token, athletes }) {
+  return (
+    <div style={{ padding:'0 0 40px' }}>
+      <div style={{ fontFamily:'Bebas Neue', fontSize:'1.8rem', letterSpacing:'0.06em', color:'var(--white)', marginBottom:4 }}>Страхование</div>
+      <div style={{ color:'var(--gray)', fontSize:'0.88rem', lineHeight:1.6, marginBottom:24 }}>
+        Спортивное страхование от несчастных случаев — обязательное условие допуска к соревнованиям ГТФ России.
+      </div>
+
+      {/* Даты страховок спортсменов */}
+      {athletes && athletes.length > 0 && <ParentInsuranceDates token={token} athletes={athletes} />}
+
+      {/* Что такое страховка и зачем */}
+      <div style={{ background:'var(--dark)', borderLeft:'3px solid var(--red)', padding:'18px 22px', marginBottom:16 }}>
+        <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.78rem', letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--red)', marginBottom:10 }}>Что такое спортивная страховка</div>
+        <div style={{ color:'var(--gray)', fontSize:'0.92rem', lineHeight:1.8 }}>
+          Спортивная страховка — это полис страхования от несчастных случаев, который защищает спортсмена во время тренировок и соревнований. В случае травмы страховая компания компенсирует расходы на лечение. Для участия в официальных соревнованиях <span style={{ color:'var(--white)', fontWeight:600 }}>ФТР ГТФ России</span> наличие действующего полиса обязательно — без него организаторы не допустят ребёнка к участию.
+        </div>
+      </div>
+
+      {/* Как оформить */}
+      <div style={{ background:'var(--dark)', borderLeft:'3px solid var(--red)', padding:'18px 22px', marginBottom:16 }}>
+        <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.78rem', letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--red)', marginBottom:10 }}>Как оформить</div>
+        <div style={{ color:'var(--gray)', fontSize:'0.92rem', lineHeight:1.8 }}>
+          {[
+            'Перейдите на сайт официального страхового партнёра федерации по кнопке ниже',
+            'Заполните данные спортсмена: ФИО, дата рождения',
+            'Выберите период страхования — он должен покрывать даты всех соревнований сезона',
+            'Оплатите полис онлайн и получите документ на e-mail',
+            'Распечатайте или сохраните полис на телефоне — он потребуется при регистрации на соревнование',
+          ].map((item, i) => (
+            <div key={i} style={{ display:'flex', gap:12, marginBottom:8 }}>
+              <span style={{ color:'var(--red)', fontFamily:'Bebas Neue', fontSize:'1.1rem', lineHeight:1, flexShrink:0, minWidth:20 }}>{i+1}</span>
+              <span>{item}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop:16 }}>
+          <a href="https://спортстрахование.рф/federation007822-105" target="_blank" rel="noopener noreferrer"
+            style={{ display:'inline-block', background:'var(--red)', color:'var(--white)', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.9rem', letterSpacing:'0.08em', textTransform:'uppercase', padding:'11px 24px', textDecoration:'none' }}>
+            Оформить страховку онлайн
+          </a>
+        </div>
+      </div>
+
+      {/* Требования */}
+      <div style={{ background:'var(--dark)', borderLeft:'3px solid var(--red)', padding:'18px 22px', marginBottom:16 }}>
+        <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.78rem', letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--red)', marginBottom:10 }}>Требования ФТР ГТФ</div>
+        <div style={{ color:'var(--gray)', fontSize:'0.92rem', lineHeight:1.8 }}>
+          {[
+            'Полис оформляется на каждого спортсмена индивидуально',
+            'Период страхования должен покрывать дату проведения каждого соревнования',
+            'Полис предъявляется при регистрации — в бумажном виде или на экране телефона',
+            'Без действующего полиса допуск к соревнованиям невозможен',
+            'Рекомендуем оформлять полис на весь соревновательный сезон (сентябрь–август)',
+          ].map((item, i) => (
+            <div key={i} style={{ display:'flex', gap:10, marginBottom:6 }}>
+              <span style={{ color:'var(--red)', flexShrink:0 }}>—</span>
+              <span>{item}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Вопросы */}
+      <div style={{ background:'var(--dark)', borderLeft:'3px solid #c8962a', padding:'16px 20px', fontSize:'0.9rem', color:'var(--gray)', lineHeight:1.7 }}>
+        <span style={{ color:'#c8962a', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.75rem', letterSpacing:'0.12em', textTransform:'uppercase', display:'block', marginBottom:6 }}>Есть вопросы?</span>
+        Обратитесь к тренеру — он поможет разобраться с оформлением и подскажет оптимальный срок страхования для вашего ребёнка.
+      </div>
+    </div>
+  )
+}
+
 // ── ВКЛАДКА ИНФОРМАЦИЯ ────────────────────────────────────────────────────────
 
-function InfoTab({ isAdmin }) {
+function InfoTab({ isAdmin, token }) {
   const [section, setSection] = useState('rating')
 
   const SectionBtn = ({ id, label }) => (
@@ -3433,7 +3721,10 @@ function InfoTab({ isAdmin }) {
         <SectionBtn id="achievements" label="Ачивки"/>
         <SectionBtn id="attendance"   label="Посещаемость"/>
         <SectionBtn id="seasons"      label="Сезоны"/>
-        {isAdmin && <SectionBtn id="admin" label="Памятка тренера"/>}
+        <SectionBtn id="equipment"    label="Экипировка"/>
+        <SectionBtn id="antidoping"   label="Антидопинг"/>
+        {isAdmin && <SectionBtn id="strategy"   label="Стратегия"/>}
+        {isAdmin && <SectionBtn id="admin"      label="Памятка тренера"/>}
       </div>
 
       {/* ── РЕЙТИНГ ── */}
@@ -3649,6 +3940,168 @@ function InfoTab({ isAdmin }) {
             <p style={{ fontStyle:'italic', color:'var(--gray)', fontSize:'0.95rem', lineHeight:1.7, margin:0 }}>
               Новый сезон — новые цели и новые возможности.
             </p>
+          </div>
+        </div>
+      )}
+
+            {section === 'insurance' && isAdmin && (<InsuranceTab token={token} />)}
+
+      {section === 'strategy' && isAdmin && (<StrategyTab token={token} />)}
+
+
+      {/* ── СТРАХОВАНИЕ ── */}
+      {section === 'insurance' && (
+        <div>
+          <div style={{ fontFamily:'Bebas Neue', fontSize:'1.7rem', letterSpacing:'0.08em', color:'var(--white)', marginTop:0, marginBottom:12, borderBottom:'1px solid var(--gray-dim)', paddingBottom:8 }}>Страхование спортсменов</div>
+          <P>Спортивное страхование от несчастных случаев — обязательное условие допуска к соревнованиям <Hl>ГТФ России</Hl>. Страховой полис оформляется на каждого спортсмена индивидуально и должен покрывать период проведения соревнования.</P>
+          <div style={{ background:'var(--dark)', borderLeft:'3px solid var(--red)', padding:'16px 20px', marginBottom:16 }}>
+            <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.78rem', letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--red)', marginBottom:8 }}>Требования ФТР ГТФ</div>
+            <div style={{ color:'var(--gray)', fontSize:'0.9rem', lineHeight:1.7 }}>
+              {[
+                'Полис оформляется на каждого спортсмена индивидуально',
+                'Период страхования должен покрывать дату соревнования',
+                'Полис предъявляется при регистрации на соревнование или сбор',
+                'Допуск без действующего полиса не осуществляется',
+              ].map((item, i) => (
+                <div key={i} style={{ display:'flex', gap:10, marginBottom:6 }}>
+                  <span style={{ color:'var(--red)', flexShrink:0 }}>—</span>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginBottom:20 }}>
+            <a href="https://спортстрахование.рф/federation007822-105" target="_blank" rel="noopener noreferrer"
+              style={{ display:'inline-block', background:'var(--red)', color:'var(--white)', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.9rem', letterSpacing:'0.08em', textTransform:'uppercase', padding:'10px 22px', textDecoration:'none' }}>
+              Оформить страховку онлайн
+            </a>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(260px, 1fr))', gap:2, marginBottom:16 }}>
+            {[
+              { title:'Федерация ТКД ГТФ России', desc:'Официальный сайт, документы, правила', url:'https://rusgtf.ru' },
+              { title:'Памятка для родителей', desc:'PDF — подготовка к соревнованиям и сборам', url:'https://rusgtf.ru/wp-content/uploads/2025/12/Памятка-для-родителей-по-подготовке-к-соревнованиям-и-сборам.pdf' },
+            ].map(link => (
+              <a key={link.title} href={link.url} target="_blank" rel="noopener noreferrer"
+                style={{ display:'block', background:'var(--dark)', padding:'14px 18px', textDecoration:'none', borderBottom:'2px solid transparent', transition:'border-color 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.borderBottomColor='var(--red)'}
+                onMouseLeave={e => e.currentTarget.style.borderBottomColor='transparent'}>
+                <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.92rem', letterSpacing:'0.04em', textTransform:'uppercase', color:'var(--white)', marginBottom:3 }}>{link.title}</div>
+                <div style={{ color:'var(--gray)', fontSize:'0.82rem' }}>{link.desc}</div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── ЭКИПИРОВКА ── */}
+      {section === 'equipment' && (
+        <div>
+          <div style={{ fontFamily:'Bebas Neue', fontSize:'1.7rem', letterSpacing:'0.08em', color:'var(--white)', marginTop:0, marginBottom:12, borderBottom:'1px solid var(--gray-dim)', paddingBottom:8 }}>Экипировка тхэквондо ГТФ</div>
+
+          {/* Добок */}
+          <div style={{ background:'var(--dark)', borderLeft:'3px solid var(--red)', padding:'18px 22px', marginBottom:14 }}>
+            <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.9rem', letterSpacing:'0.06em', textTransform:'uppercase', color:'var(--white)', marginBottom:8 }}>Добок — форма тхэквондо ГТФ</div>
+            <P>Добок — это не просто спортивная форма, это символ чистоты намерений и равенства всех практикующих. Белый цвет добока в традиции боевых искусств означает чистоту духа, открытость к обучению и отсутствие предрассудков. Одевая добок, спортсмен мысленно оставляет за порогом зала всё лишнее и сосредотачивается на пути совершенствования.</P>
+            <P>Добок для тхэквондо ГТФ производится в России компанией <Hl>ООО «ФОРТЭК»</Hl> и соответствует стандартам, утверждённым ОСОО «Российская Ассоциация тхэквондо (ГТФ)». Покрой соответствует корейским традициям: куртка на завязках, штаны на резинке со шнурком — лёгкость и прочность одновременно. <Hl>Пояс в комплект не входит</Hl> и заказывается отдельно.</P>
+          </div>
+
+          {/* Почему только Фортек */}
+          <div style={{ background:'var(--dark)', borderLeft:'3px solid #c8962a', padding:'18px 22px', marginBottom:14 }}>
+            <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.9rem', letterSpacing:'0.06em', textTransform:'uppercase', color:'#c8962a', marginBottom:8 }}>Почему в федерации только Fortek Sport</div>
+            <P>ФТР ГТФ России официально утвердила <Hl>Fortek Sport</Hl> как единственного поставщика сертифицированной экипировки для соревнований федерации. Это гарантирует соответствие добоков и защитного снаряжения единым стандартам, принятым в GTF — как по качеству пошива, так и по цветовым требованиям к перчаткам и футам (красный/синий). На официальных соревнованиях допускается только сертифицированная экипировка.</P>
+            <a href="https://fortek-sport.ru/" target="_blank" rel="noopener noreferrer"
+              style={{ display:'inline-block', background:'var(--red)', color:'var(--white)', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.88rem', letterSpacing:'0.1em', textTransform:'uppercase', padding:'10px 22px', textDecoration:'none', marginTop:8 }}>
+              Перейти в магазин Fortek Sport
+            </a>
+          </div>
+
+          {/* Защитная экипировка */}
+          <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.88rem', letterSpacing:'0.06em', textTransform:'uppercase', color:'var(--white)', marginBottom:10, marginTop:4 }}>Комплект защитной экипировки GTF</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:2, marginBottom:14 }}>
+            {[
+              ['Капа', 'Рекомендуются термопластичные одинарные капы — фиксируются на верхнем ряду зубов, не затрудняют дыхание и речь. Двойные капы обеспечивают максимальную защиту, но сложнее в использовании.'],
+              ['Шлем', 'Закрывает теменную и лобную часть, фиксируется ремешком на подбородке. Должен сидеть плотно, но не давить. Обязателен для всех возрастных категорий.'],
+              ['Перчатки', 'В GTF — красного или синего цвета с закрытыми пальцами. Вес до 10 унций в зависимости от весовой категории спортсмена.'],
+              ['Футы', 'Накладки из пенного материала красного или синего цвета, закрывают подъём стопы и пятку. Обязательны на спаррингах.'],
+              ['Щитки для ног', 'Дополнительная защита голени при необходимости — по требованию организаторов соревнований.'],
+              ['Бандаж (защита паха)', 'Эластичный бандаж, защищающий область паха от случайных ударов. Есть мужской и женский варианты.'],
+              ['Защита грудной клетки', 'Обязательна для девочек на соревнованиях.'],
+            ].map(([name, desc]) => (
+              <div key={name} style={{ background:'var(--dark)', padding:'12px 16px', borderBottom:'1px solid var(--gray-dim)' }}>
+                <span style={{ color:'var(--white)', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.9rem', textTransform:'uppercase', display:'block', marginBottom:3 }}>{name}</span>
+                <span style={{ color:'var(--gray)', fontSize:'0.86rem', lineHeight:1.6 }}>{desc}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ padding:'14px 18px', borderLeft:'3px solid #c8962a', background:'var(--dark)', fontSize:'0.88rem', color:'var(--gray)', lineHeight:1.7 }}>
+            <span style={{ color:'#c8962a', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.75rem', letterSpacing:'0.12em', textTransform:'uppercase', display:'block', marginBottom:4 }}>Важно</span>
+            Перед покупкой уточните у тренера — требования к экипировке могут отличаться в зависимости от возраста ребёнка и предстоящих соревнований.
+          </div>
+        </div>
+      )}
+
+      {/* ── АНТИДОПИНГ ── */}
+      {section === 'antidoping' && (
+        <div>
+          <div style={{ fontFamily:'Bebas Neue', fontSize:'1.7rem', letterSpacing:'0.08em', color:'var(--white)', marginTop:0, marginBottom:12, borderBottom:'1px solid var(--gray-dim)', paddingBottom:8 }}>Антидопинг</div>
+
+          <P>Чистый спорт — основа честной конкуренции. <Hl>Федерация тхэквондо ГТФ России</Hl> ведёт системную антидопинговую работу со спортсменами, тренерами и родителями. Знание антидопинговых правил защищает вашего ребёнка от случайных нарушений.</P>
+
+          {/* Зачем это знать родителям */}
+          <div style={{ background:'var(--dark)', borderLeft:'3px solid var(--red)', padding:'18px 22px', marginBottom:14 }}>
+            <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.78rem', letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--red)', marginBottom:10 }}>Зачем это знать родителям</div>
+            <P style={{ marginBottom:8 }}>Многие привычные лекарства — от насморка, кашля, аллергии — могут содержать запрещённые вещества. Именно родители обычно дают ребёнку препараты, не подозревая, что это может стать нарушением антидопинговых правил. <Hl>Незнание правил не освобождает от ответственности</Hl> — ответственность за здоровье и «чистоту» спортсмена несут и он сам, и его тренер, и родители.</P>
+            <P style={{ margin:0 }}>Перед любым соревнованием проверяйте все принимаемые препараты на сайте РУСАДА. Это занимает 2 минуты и может уберечь от серьёзных последствий.</P>
+          </div>
+
+          {/* С какого возраста */}
+          <div style={{ background:'var(--dark)', borderLeft:'3px solid var(--red)', padding:'18px 22px', marginBottom:14 }}>
+            <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.78rem', letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--red)', marginBottom:10 }}>С какого возраста актуально</div>
+            <P style={{ marginBottom:8 }}><Hl>С любого возраста участия в соревнованиях.</Hl> Формально допинг-контроль проводится с юношеского уровня (обычно с 14–16 лет), однако антидопинговое образование рекомендуется начинать значительно раньше. РУСАДА рекомендует вводить антидопинговое просвещение с <Hl>12 лет</Hl> — именно тогда дети начинают активнее участвовать в соревнованиях.</P>
+            <P style={{ margin:0 }}>До 12 лет ответственность полностью лежит на родителях — они должны контролировать все препараты, которые получает ребёнок в период соревнований.</P>
+          </div>
+
+          {/* Горячая линия */}
+          <div style={{ background:'var(--dark)', borderLeft:'3px solid var(--red)', padding:'14px 18px', marginBottom:16 }}>
+            <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.78rem', letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--red)', marginBottom:6 }}>Горячая линия РУСАДА</div>
+            <div style={{ color:'var(--gray)', fontSize:'0.9rem' }}>По всем вопросам антидопинга: <a href="tel:+74992717761" style={{ color:'var(--white)', textDecoration:'none' }}>+7 (499) 271-77-61</a></div>
+          </div>
+
+          {/* Ссылки */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:2, marginBottom:20 }}>
+            {[
+              { title:'Проверка препаратов', desc:'list.rusada.ru', url:'http://list.rusada.ru/', bg:'var(--red)' },
+              { title:'Онлайн-обучение РУСАДА', desc:'Курсы и тесты для спортсменов', url:'https://www.rusada.ru/education/online-training/', bg:'var(--dark)' },
+              { title:'Антидопинг ФТР ГТФ', desc:'Официальная страница федерации', url:'https://rusgtf.ru/antidoping/', bg:'var(--dark)' },
+            ].map(link => (
+              <a key={link.title} href={link.url} target="_blank" rel="noopener noreferrer"
+                style={{ background:link.bg, color:'var(--white)', padding:'16px 20px', textDecoration:'none', display:'block', border: link.bg !== 'var(--red)' ? '1px solid var(--gray-dim)' : 'none' }}>
+                <div style={{ fontFamily:'Bebas Neue', fontSize:'1rem', letterSpacing:'0.06em', marginBottom:4 }}>{link.title}</div>
+                <div style={{ fontSize:'0.8rem', color: link.bg === 'var(--red)' ? 'rgba(255,255,255,0.85)' : 'var(--gray)' }}>{link.desc}</div>
+              </a>
+            ))}
+          </div>
+
+          {/* Документы */}
+          <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.88rem', letterSpacing:'0.06em', textTransform:'uppercase', color:'var(--white)', marginBottom:10 }}>Документы ФТР ГТФ</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+            {[
+              ['Запрещённый список 2026','https://rusgtf.ru/wp-content/uploads/2025/12/Запрещенный-список-2026.pdf'],
+              ['Разрешённый список 2026 (ФМБА)','https://rusgtf.ru/wp-content/uploads/2026/02/Разрешенный-список-ФМБА-2026.pdf'],
+              ['Памятка для родителей','https://rusgtf.ru/wp-content/uploads/2025/12/Памятка-для-родителей.pdf'],
+              ['Памятка для спортсменов (права)','https://rusgtf.ru/wp-content/uploads/2025/12/Памятка-по-правам-спортсменов.pdf'],
+              ['Важные вопросы о допинге','https://rusgtf.ru/wp-content/uploads/2025/12/Важные-вопросы-о-допинге.pdf'],
+              ['Процедура допинг-контроля','https://rusgtf.ru/wp-content/uploads/2025/12/Процедура-допинг-контроля.pdf'],
+            ].map(([title, url]) => (
+              <a key={title} href={url} target="_blank" rel="noopener noreferrer"
+                style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'11px 14px', background:'var(--dark)', borderBottom:'1px solid var(--gray-dim)', textDecoration:'none', transition:'background 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.background='var(--dark2)'}
+                onMouseLeave={e => e.currentTarget.style.background='var(--dark)'}>
+                <span style={{ color:'var(--white)', fontSize:'0.88rem' }}>{title}</span>
+                <span style={{ color:'var(--red)', fontSize:'0.78rem', fontFamily:'Barlow Condensed', fontWeight:700 }}>PDF</span>
+              </a>
+            ))}
           </div>
         </div>
       )}
@@ -3962,9 +4415,14 @@ function ParentAnalyticsTab({ token, athletes: myAthletes }) {
                     {rep.comment && <div style={{ color:'var(--gray)', fontSize:'0.85rem', marginTop:4 }}>{rep.comment}</div>}
                   </div>
                   {rep.file_path && (
-                    <a href={rep.file_path} target="_blank" rel="noreferrer" className="btn-outline" style={{ padding:'6px 16px', fontSize:'13px', textDecoration:'none' }}>
+                    <button className="btn-outline" style={{ padding:'6px 16px', fontSize:'13px', cursor:'pointer' }}
+                      onClick={async () => {
+                        const filename = rep.file_path.split('/').pop()
+                        const r = await fetch(`/api/analytics/download/${filename}`, { headers: { Authorization: `Bearer ${token}` } })
+                        if (r.ok) { const blob = await r.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url) }
+                      }}>
                       Скачать файл
-                    </a>
+                    </button>
                   )}
                 </div>
               </div>
@@ -4131,7 +4589,12 @@ function AnalyticsAdminTab({ token, athletes }) {
                   <td style={{fontSize:'13px', color:'var(--gray)', maxWidth:'200px'}}>{r.comment || '--'}</td>
                   <td style={{textAlign:'center'}}>
                     {r.file_path
-                      ? <a href={r.file_path} target="_blank" rel="noreferrer" style={{color:'var(--red)', fontSize:'13px', fontWeight:700}}>Скачать</a>
+                      ? <button style={{color:'var(--red)', fontSize:'13px', fontWeight:700, background:'none', border:'none', cursor:'pointer', padding:0}}
+                    onClick={async () => {
+                      const filename = r.file_path.split('/').pop()
+                      const res = await fetch(`/api/analytics/download/${filename}`, { headers: { Authorization: `Bearer ${token}` } })
+                      if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url) }
+                    }}>Скачать</button>
                       : <span style={{color:'var(--gray-dim)'}}>--</span>}
                   </td>
                   <td>
@@ -4416,6 +4879,7 @@ export default function Cabinet() {
               <UnreadBadge token={token}/>
             </button>
             <button className={`cabinet-tab ${parentView==='analytics'?'active':''}`} onClick={() => setParentView('analytics')}>Аналитика</button>
+            <button className={`cabinet-tab ${parentView==='insurance'?'active':''}`} onClick={() => setParentView('insurance')}>Страхование</button>
             <button className={`cabinet-tab ${parentView==='info'?'active':''}`} style={{color: parentView==='info' ? undefined : 'var(--gray)'}} onClick={() => setParentView('info')}>Информация</button>
           </div>
 
@@ -4436,6 +4900,7 @@ export default function Cabinet() {
                         <span>{a.group || a.auto_group}</span>
                       </div>
                       <BeltDisplay gup={a.gup} dan={a.dan}/>
+                      <InsuranceStatus athleteId={a.id} token={token} />
                     </div>
                   ))}
                 </div>
@@ -4453,7 +4918,8 @@ export default function Cabinet() {
           {parentView === 'achievements'  && !loading && <AchievementsTab token={token} athletes={myAthletes}/>}
           {parentView === 'rating'        && !loading && <RatingTab token={token} myAthleteIds={myAthletes.map(a=>a.id)}/>}
           {parentView === 'notifications' && <NotificationsTab token={token}/>}
-          {parentView === 'info'          && <InfoTab isAdmin={false}/>}
+          {parentView === 'insurance'     && <ParentInsuranceTab token={token} athletes={myAthletes}/>}
+          {parentView === 'info'          && <InfoTab isAdmin={false} token={token}/>}
           {parentView === 'analytics'     && !loading && <ParentAnalyticsTab token={token} athletes={myAthletes}/>}
         </div>
       </main>
@@ -4486,6 +4952,7 @@ export default function Cabinet() {
     <div style={{ display:'flex', flexWrap:'wrap', gap:2, paddingLeft:8 }}>
       <button className={`cabinet-tab ${view==='athletes'?'active':''}`} onClick={() => setView('athletes')}>Спортсмены ({athletes.filter(a=>!a.is_archived).length})</button>
       <button className={`cabinet-tab ${view==='parents'?'active':''}`} onClick={() => setView('parents')}>Родители ({parents.length})</button>
+      <button className={`cabinet-tab ${view==='insurance_admin'?'active':''}`} onClick={() => setView('insurance_admin')}>Страхование</button>
       <button className={`cabinet-tab ${view==='archive'?'active':''}`} style={{ color: view==='archive' ? undefined : 'var(--gray)' }} onClick={() => setView('archive')}>Архив ({athletes.filter(a=>a.is_archived).length})</button>
       <button className={`cabinet-tab ${view==='applications'?'active':''}`} onClick={() => setView('applications')}>Заявки{applications.filter(a => a.status==='new').length > 0 && <span className="tab-badge">{applications.filter(a => a.status==='new').length}</span>}</button>
       <button className={`cabinet-tab ${view==='hof'?'active':''}`} style={{ color: view==='hof' ? undefined : '#c8962a' }} onClick={() => setView('hof')}>Зал Славы</button>
@@ -4520,7 +4987,7 @@ export default function Cabinet() {
 
           </div>
 
-        {view !== 'attendance' && view !== 'competitions' && view !== 'rating' && view !== 'certification' && view !== 'achievements' && view !== 'camps' && view !== 'archive' && view !== 'analytics' && (
+        {view !== 'attendance' && view !== 'competitions' && view !== 'rating' && view !== 'certification' && view !== 'achievements' && view !== 'camps' && view !== 'archive' && view !== 'analytics' && view !== 'insurance_admin' && (
           <div className="cabinet-toolbar">
             <div className="cabinet-search">
               <input type="text" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} />
@@ -4541,8 +5008,9 @@ export default function Cabinet() {
         {view === 'achievements'  && <AchievementsLeaderboard token={token} />}
         {view === 'camps'         && <CampsTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'news'          && <NewsTab token={token} />}
-        {view === 'info'          && <InfoTab isAdmin={true} />}
+        {view === 'info'          && <InfoTab isAdmin={true} token={token} />}
         {view === 'analytics'     && <AnalyticsAdminTab token={token} athletes={athletes} />}
+        {view === 'insurance_admin' && <InsuranceAdminTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'hof'           && <HallOfFameAdmin token={token} />}
         {view === 'archive'       && (
           <div>

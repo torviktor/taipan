@@ -28,6 +28,7 @@ class User(Base):
     role         = Column(Enum(UserRole), default=UserRole.parent)
     created_at   = Column(DateTime, default=datetime.utcnow)
     is_active    = Column(Boolean, default=True)
+    strategy_items = Column(Text, default='[]')
 
     athletes     = relationship("Athlete", back_populates="user", cascade="all, delete-orphan")
     applications = relationship("Application", back_populates="user")
@@ -49,6 +50,7 @@ class Athlete(Base):
     weight       = Column(Numeric(5, 2), nullable=True)
     group        = Column(String(100), nullable=True)
     is_archived  = Column(Boolean, default=False, nullable=False)
+    insurance_expiry = Column(Date, nullable=True)
     archived_at  = Column(DateTime, nullable=True)
 
     created_at   = Column(DateTime, default=datetime.utcnow)

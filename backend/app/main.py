@@ -11,6 +11,7 @@ from app.routes.certifications import router as certifications_router, notif_rou
 from app.routes.achievements import router as achievements_router
 from app.routes.camps import router as camps_router
 from app.routes.hall_of_fame_routes import router as hof_router
+from app.routes.insurance_strategy import router as insurance_strategy_router
 from app.routes.analytics import router as analytics_router
 from app.models import user, event, attendance, competition, certification, achievement, camp
 from app.models import hall_of_fame, analytics
@@ -50,8 +51,9 @@ app.include_router(certifications_router,    prefix="/api",              tags=["
 app.include_router(notifications_router,     prefix="/api",              tags=["Уведомления"])
 app.include_router(achievements_router,      prefix="/api",              tags=["Ачивки"])
 app.include_router(camps_router,             prefix="/api",              tags=["Сборы"])
+app.include_router(insurance_strategy_router, prefix="/api", tags=["Страховка и стратегия"])
+app.include_router(analytics_router,          prefix="/api", tags=["Аналитика"])
 app.include_router(hof_router,               prefix="/api",              tags=["Зал Славы"])
-app.include_router(analytics_router,         prefix="/api",              tags=["Аналитика"])
 
 @app.get("/")
 def root():

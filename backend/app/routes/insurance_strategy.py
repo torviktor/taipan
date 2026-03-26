@@ -30,7 +30,7 @@ def get_insurance(
     или только своих (родитель/спортсмен)."""
     if current_user.role in (UserRole.manager, UserRole.admin):
         athletes = db.query(Athlete).filter(Athlete.is_archived == False).all()
-    elif current_user.role == UserRole.parent:
+    elif current_user.role in (UserRole.parent, UserRole.athlete):
         athletes = db.query(Athlete).filter(
             Athlete.user_id == current_user.id,
             Athlete.is_archived == False
@@ -54,9 +54,15 @@ def update_insurance(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Обновить дату страховки спортсмена (только менеджер/админ)."""
-    if current_user.role not in (UserRole.manager, UserRole.admin):
-        raise HTTPException(403, "Только тренер или администратор")
+    """Обновить дату страховки спортсмена (тренер/админ или родитель своего ребёнка)."""
+    if current_user.role not in (UserRole.manager, UserRole.admin, UserRole.parent, UserRole.athlete):
+        raise HTTPException(403, "Нет доступа")
+    # Родитель может обновлять только своих детей
+    if current_user.role in (UserRole.parent, UserRole.athlete):
+        from app.models.user import Athlete as AthleteModel
+        allowed = [a.id for a in db.query(AthleteModel).filter(AthleteModel.user_id == current_user.id).all()]
+        if data.athlete_id not in allowed:
+            raise HTTPException(403, "Нет доступа к этому спортсмену")
 
     athlete = db.query(Athlete).filter(Athlete.id == data.athlete_id).first()
     if not athlete:
