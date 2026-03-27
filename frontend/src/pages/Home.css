@@ -74,25 +74,17 @@
 .hero-btns { display: flex; gap: 16px; flex-wrap: wrap; }
 
 /* ── Hero shimmer ────────────────────────────────────────────────────── */
-@keyframes shimmer {
-  0%   { background-position: 200% center; }
-  100% { background-position: -200% center; }
+@keyframes shimmer-shadow {
+  0%   { text-shadow: -200px 0 18px rgba(74,144,217,0), -200px 0 6px rgba(74,144,217,0); }
+  50%  { text-shadow:    0px 0 28px rgba(74,144,217,0.7),    0px 0 10px rgba(74,144,217,0.4); }
+  100% { text-shadow:  200px 0 18px rgba(74,144,217,0),  200px 0 6px rgba(74,144,217,0); }
 }
+
 .hero-title-shimmer {
-  background: linear-gradient(
-    90deg,
-    var(--white)  0%,
-    var(--white) 35%,
-    #4a90d9       50%,
-    var(--white) 65%,
-    var(--white) 100%
-  );
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  color: transparent;        /* ← ДОБАВИТЬ */
-  animation: shimmer 4s linear infinite;
+  color: var(--red);
+  -webkit-text-fill-color: var(--red);
+  background: none;
+  animation: shimmer-shadow 4s ease-in-out infinite;
 }
 
 /* ── Hero stagger — каждый блок со своим delay (как в портфолио) ─────── */
@@ -139,10 +131,10 @@
   position: fixed;
   pointer-events: none;
   z-index: 9999;
-  width: 300px;
-  height: 300px;
+  width: 160px;
+  height: 160px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(26,79,160,0.15) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(26,79,160,0.06) 0%, transparent 70%);
   transform: translate(-50%, -50%);
   transition: left 0.08s linear, top 0.08s linear;
   mix-blend-mode: screen;
