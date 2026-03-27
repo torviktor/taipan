@@ -88,6 +88,10 @@
     var(--white) 100%
   );
   background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;        /* ← ДОБАВИТЬ */
   animation: shimmer 4s linear infinite;
 }
 
