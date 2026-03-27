@@ -1,3 +1,7 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Home.css — полная версия с анимациями
+   ═══════════════════════════════════════════════════════════════════════ */
+
 /* ── HERO ────────────────────────────────────────────────────────────── */
 .hero {
   position: relative;
@@ -69,6 +73,120 @@
 }
 .hero-btns { display: flex; gap: 16px; flex-wrap: wrap; }
 
+/* ── Hero shimmer ────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+.hero-title-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--white)   0%,
+    var(--white)  35%,
+    var(--red-hot) 50%,
+    var(--white)  65%,
+    var(--white) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 4s linear infinite;
+}
+
+/* ── Hero stagger — каждый блок со своим delay (как в портфолио) ─────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.hero-stagger-1 {
+  opacity: 0;
+  animation: fadeUp 0.55s ease forwards;
+  animation-delay: 0.10s;
+}
+.hero-stagger-2 {
+  opacity: 0;
+  animation: fadeUp 0.55s ease forwards;
+  animation-delay: 0.28s;
+}
+.hero-stagger-3 {
+  opacity: 0;
+  animation: fadeUp 0.55s ease forwards;
+  animation-delay: 0.46s;
+}
+
+/* ── Пульсирующая вертикальная линия ────────────────────────────────── */
+@keyframes pulse-line {
+  0%, 100% { opacity: 0.18; }
+  50%       { opacity: 0.55; }
+}
+.hero-pulse-line {
+  position: absolute;
+  left: 48%;
+  top: 10%;
+  bottom: 10%;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, var(--red), transparent);
+  animation: pulse-line 3s ease-in-out infinite;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* ── Cursor glow ─────────────────────────────────────────────────────── */
+.cursor-glow {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(204,0,0,0.10) 0%, transparent 65%);
+  transform: translate(-50%, -50%);
+  transition: left 0.08s linear, top 0.08s linear;
+  mix-blend-mode: screen;
+}
+
+/* ── Scroll reveal — секция-обёртка ─────────────────────────────────── */
+.reveal-section {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 0.65s ease, transform 0.65s ease;
+}
+.reveal-section.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Scroll reveal — дочерние элементы (с индивидуальным delay) ──────── */
+/* По умолчанию скрыты; становятся видимыми когда родитель .is-visible */
+.reveal-child {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.is-visible .reveal-child {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* stat-item — тот же механизм, с stagger через inline transitionDelay */
+.stat-item {
+  text-align: center;
+  flex: 1;
+  min-width: 100px;
+  padding: 0 8px;
+  cursor: default;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s ease, transform 0.5s ease, scale 0.2s;
+}
+.stat-item:hover { transform: translateY(0) scale(1.08); }
+.is-visible .stat-item {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* ── СЧЁТЧИКИ ────────────────────────────────────────────────────────── */
 .stats {
   background: var(--dark);
@@ -84,15 +202,6 @@
   gap: 8px;
 }
 .stat-row { display: contents; }
-.stat-item {
-  text-align: center;
-  flex: 1;
-  min-width: 100px;
-  padding: 0 8px;
-  cursor: default;
-  transition: transform 0.2s;
-}
-.stat-item:hover { transform: scale(1.08); }
 .stat-number {
   font-family: 'Bebas Neue', sans-serif;
   font-size: clamp(40px, 5vw, 64px);
@@ -102,7 +211,7 @@
   transition: color 0.2s, text-shadow 0.2s;
 }
 .stat-item:hover .stat-number {
-  color: #ff2222;
+  color: var(--red-hot);
   text-shadow: 0 0 30px rgba(204,0,0,0.5);
 }
 .stat-label {
@@ -132,9 +241,9 @@
   padding: 40px 32px;
   position: relative;
   overflow: hidden;
-  transition: background 0.3s, transform 0.3s;
-  animation: fadeUp 0.6s ease both;
   cursor: pointer;
+  /* reveal-child даёт opacity/transform; hover добавляет translateY и shadow */
+  transition: opacity 0.55s ease, transform 0.55s ease, background 0.3s, box-shadow 0.3s;
 }
 .section-card::before {
   content: '';
@@ -144,7 +253,12 @@
   background: var(--red);
   transition: height 0.3s;
 }
-.section-card:hover { background: var(--dark2); transform: translateY(-4px); }
+/* когда reveal сработал — hover работает независимо */
+.is-visible .section-card:hover {
+  background: var(--dark2);
+  transform: translateY(-6px) !important;
+  box-shadow: 0 12px 40px rgba(204,0,0,0.15);
+}
 .section-card:hover::before { height: 100%; }
 .section-card-num {
   font-family: 'Bebas Neue', sans-serif;
@@ -182,6 +296,24 @@
   transition: opacity 0.3s, transform 0.3s;
 }
 .section-card:hover .section-card-arrow { opacity: 1; transform: translateX(0); }
+
+/* ── Кнопки CTA ──────────────────────────────────────────────────────── */
+.btn-cta {
+  transition: background 0.2s, transform 0.25s ease, box-shadow 0.25s ease !important;
+}
+.btn-primary.btn-cta:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 8px 28px rgba(204,0,0,0.40) !important;
+}
+.btn-outline.btn-cta:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 8px 28px rgba(204,0,0,0.20) !important;
+}
+
+/* ── section-title inline-block (как в портфолио, задел под sweep) ───── */
+.section-title {
+  display: inline-block;
+}
 
 /* ── ФОТО БЛОК ───────────────────────────────────────────────────────── */
 .photo-block {
@@ -265,7 +397,16 @@
   inset: 0;
   background: linear-gradient(transparent 60%, rgba(8,8,8,0.6) 100%);
 }
-.trainer-info { border-top: 2px solid var(--red); padding-top: 24px; }
+.trainer-info {
+  border-top: 2px solid var(--red);
+  padding-top: 24px;
+  /* hover: подсветка рамки как .edu-card в портфолио */
+  transition: border-top-color 0.3s, box-shadow 0.3s;
+}
+.trainer-info:hover {
+  border-top-color: var(--red-hot);
+  box-shadow: 0 -2px 24px rgba(204,0,0,0.12);
+}
 .trainer-rank {
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 13px; font-weight: 700;
@@ -297,7 +438,16 @@
   align-items: start;
 }
 .map-address { display: flex; flex-direction: column; gap: 24px; }
-.map-address-item { display: flex; gap: 16px; align-items: flex-start; }
+
+/* translateX(4px) hover — как .hero-contact-item в портфолио */
+.map-address-item {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  transition: transform 0.2s ease;
+}
+.map-address-item:hover { transform: translateX(4px); }
+
 .map-svg-icon { color: var(--red); flex-shrink: 0; margin-top: 3px; }
 .map-address-item strong {
   display: block;
@@ -322,6 +472,7 @@
   .trainer-img-wrap { height: 320px; }
   .map-wrap { grid-template-columns: 1fr; }
   .hero-logo { height: 80px; width: 80px; }
+  .hero-pulse-line { display: none; }
 }
 @media (max-width: 600px) {
   .photo-grid { grid-template-columns: 1fr; }
@@ -333,4 +484,6 @@
   .hero-title { font-size: clamp(44px, 15vw, 80px); letter-spacing: 3px; }
   .hero-subtitle { font-size: 9px; letter-spacing: 1.5px; white-space: normal; }
   .hero-desc { font-size: 14px; }
+  .cursor-glow { display: none; }
+  .map-address-item:hover { transform: none; }
 }

@@ -6,10 +6,12 @@
   transition: all 0.3s ease;
 }
 .navbar.scrolled {
-  background: rgba(8, 8, 8, 0.95);
-  backdrop-filter: blur(10px);
+  background: rgba(8, 8, 8, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   padding: 14px 0;
-  border-bottom: 1px solid #222;
+  border-bottom: 1px solid rgba(204, 0, 0, 0.18);
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.55);
 }
 
 /* ── INNER ───────────────────────────────────────────────────────────── */

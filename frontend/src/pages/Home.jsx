@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import './Home.css'
 
+/* ── COUNTER ─────────────────────────────────────────────────────────── */
 function Counter({ target, suffix = '', duration = 2000 }) {
   const [count, setCount] = useState(0)
   const ref = useRef(null)
@@ -25,7 +26,22 @@ function Counter({ target, suffix = '', duration = 2000 }) {
   return <span ref={ref}>{count}{suffix}</span>
 }
 
+/* ── HOOK: useInView ────────────────────────────────────────────────── */
+function useInView(threshold = 0.12) {
+  const ref = useRef(null)
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); observer.disconnect() } },
+      { threshold }
+    )
+    if (ref.current) observer.observe(ref.current)
+    return () => observer.disconnect()
+  }, [threshold])
+  return [ref, visible]
+}
 
+/* ── ИКОНКИ ─────────────────────────────────────────────────────────── */
 function IconLocation() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="map-svg-icon">
@@ -50,6 +66,7 @@ function IconMail() {
   )
 }
 
+/* ── ДАННЫЕ ──────────────────────────────────────────────────────────── */
 const TRAINER = {
   name:  'Ротарь Екатерина Валерьевна',
   rank:  '3 дан по тхэквондо ГТФ',
@@ -73,11 +90,35 @@ const STATS = [
   { target: 7,   suffix: '',  label: 'МС и КМС' },
 ]
 
+/* ── КОМПОНЕНТ ───────────────────────────────────────────────────────── */
 export default function Home() {
   const navigate = useNavigate()
 
+  /* cursor glow */
+  const glowRef = useRef(null)
+  useEffect(() => {
+    const move = (e) => {
+      if (glowRef.current) {
+        glowRef.current.style.left = e.clientX + 'px'
+        glowRef.current.style.top  = e.clientY + 'px'
+      }
+    }
+    window.addEventListener('mousemove', move)
+    return () => window.removeEventListener('mousemove', move)
+  }, [])
+
+  /* scroll reveal refs */
+  const [statsRef,   statsVis]   = useInView(0.1)
+  const [groupsRef,  groupsVis]  = useInView(0.1)
+  const [photoRef,   photoVis]   = useInView(0.1)
+  const [trainerRef, trainerVis] = useInView(0.1)
+  const [mapRef,     mapVis]     = useInView(0.1)
+
   return (
     <main className="home">
+
+      {/* cursor glow */}
+      <div className="cursor-glow" ref={glowRef} />
 
       {/* ── HERO ─────────────────────────────────────────────────── */}
       <section className="hero">
@@ -85,34 +126,44 @@ export default function Home() {
           <img src="https://images.unsplash.com/photo-1555597673-b21d5c935865?w=1600&fit=crop" alt="Тхэквондо" />
           <div className="hero-overlay" />
         </div>
+
+        {/* пульсирующая вертикальная линия */}
+        <div className="hero-pulse-line" />
+
         <div className="container hero-content">
-          <div className="hero-text animate-fade-up">
-            <div className="hero-brand">
+          <div className="hero-text">
+            {/* stagger по аналогии с портфолио: brand 0.1s, desc 0.3s, btns 0.5s */}
+            <div className="hero-brand hero-stagger-1">
               <img src="/logo.png" alt="Тайпан" className="hero-logo" />
               <div className="hero-brand-text">
-                <h1 className="hero-title">ТАЙПАН</h1>
+                <h1 className="hero-title">
+                  <span className="hero-title-shimmer">ТАЙПАН</span>
+                </h1>
                 <p className="hero-subtitle">Клуб тхэквондо · Павловский Посад</p>
               </div>
             </div>
-            <p className="hero-desc">
+            <p className="hero-desc hero-stagger-2">
               Профессиональные тренировки для детей и взрослых.<br/>
               Первое занятие — <strong>бесплатно.</strong>
             </p>
-            <div className="hero-btns">
-              <Link to="/apply" className="btn-primary">Записаться</Link>
-              <Link to="/schedule" className="btn-outline">Расписание</Link>
+            <div className="hero-btns hero-stagger-3">
+              <Link to="/apply"    className="btn-primary btn-cta">Записаться</Link>
+              <Link to="/schedule" className="btn-outline btn-cta">Расписание</Link>
             </div>
           </div>
         </div>
       </section>
 
       {/* ── СЧЁТЧИКИ ─────────────────────────────────────────────── */}
-      <section className="stats">
+      <section
+        className={`stats reveal-section${statsVis ? ' is-visible' : ''}`}
+        ref={statsRef}
+      >
         <div className="container stats-grid">
           {STATS.map((s, i) => (
             <div key={i} className="stat-row">
               {i > 0 && <div className="stat-divider" />}
-              <div className="stat-item">
+              <div className="stat-item" style={{ transitionDelay: `${i * 0.07}s` }}>
                 <div className="stat-number"><Counter target={s.target} suffix={s.suffix} /></div>
                 <div className="stat-label">{s.label}</div>
               </div>
@@ -122,17 +173,20 @@ export default function Home() {
       </section>
 
       {/* ── СЕКЦИИ ───────────────────────────────────────────────── */}
-      <section className="section sections-block">
+      <section
+        className={`section sections-block reveal-section${groupsVis ? ' is-visible' : ''}`}
+        ref={groupsRef}
+      >
         <div className="container">
-          <p className="section-label">Для всех возрастов</p>
-          <h2 className="section-title">НАШИ ГРУППЫ</h2>
-          <div className="divider" />
+          <p className="section-label reveal-child" style={{ transitionDelay: '0.05s' }}>Для всех возрастов</p>
+          <h2 className="section-title reveal-child" style={{ transitionDelay: '0.12s' }}>НАШИ ГРУППЫ</h2>
+          <div className="divider reveal-child" style={{ transitionDelay: '0.18s' }} />
           <div className="sections-grid">
             {SECTIONS.map((s, i) => (
               <div
-                className="section-card"
+                className="section-card reveal-child"
                 key={i}
-                style={{ animationDelay: `${i * 0.1}s` }}
+                style={{ transitionDelay: `${0.22 + i * 0.08}s` }}
                 onClick={() => navigate(s.link)}
                 role="button"
                 tabIndex={0}
@@ -150,44 +204,45 @@ export default function Home() {
       </section>
 
       {/* ── ФОТО БЛОК ────────────────────────────────────────────── */}
-      <section className="photo-block">
+      <section
+        className={`photo-block reveal-section${photoVis ? ' is-visible' : ''}`}
+        ref={photoRef}
+      >
         <div className="photo-grid">
-          <div className="photo-main">
-            <img src="/photo1.jpg" alt="Тренировка" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+          <div className="photo-main photo-placeholder">
             <div className="photo-caption">
               <span>ТРЕНИРОВКИ</span>
               <p>Тренировки в группах, индивидуальные занятия</p>
             </div>
           </div>
           <div className="photo-side">
-            <div style={{ flex:1, overflow:'hidden', position:'relative' }}>
-              <img src="/photo2.jpg" alt="Соревнования" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-            </div>
-            <div style={{ flex:1, overflow:'hidden', position:'relative' }}>
-              <img src="/photo3.jpg" alt="Победители" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-            </div>
+            <div className="photo-placeholder-sm" />
+            <div className="photo-placeholder-sm" />
           </div>
         </div>
         <div className="photo-label">
           <span className="section-label">Зал в центре города</span>
           <h2 className="section-title">МЕСТО ГДЕ<br/>РОЖДАЮТСЯ<br/>ЧЕМПИОНЫ</h2>
-          <p className="photo-label-desc">Тренировки, соревнования, победы — всё начинается здесь</p>
-          <Link to="/apply" className="btn-primary">Первое занятие бесплатно</Link>
+          <p className="photo-label-desc">Скоро здесь появятся фотографии с наших тренировок и соревнований</p>
+          <Link to="/apply" className="btn-primary btn-cta">Первое занятие бесплатно</Link>
         </div>
       </section>
 
       {/* ── ТРЕНЕР ───────────────────────────────────────────────── */}
-      <section className="section trainers-section">
+      <section
+        className={`section trainers-section reveal-section${trainerVis ? ' is-visible' : ''}`}
+        ref={trainerRef}
+      >
         <div className="container">
-          <p className="section-label">Профессионал своего дела</p>
-          <h2 className="section-title">ТРЕНЕР</h2>
-          <div className="divider" />
+          <p className="section-label reveal-child" style={{ transitionDelay: '0.05s' }}>Профессионал своего дела</p>
+          <h2 className="section-title reveal-child" style={{ transitionDelay: '0.12s' }}>ТРЕНЕР</h2>
+          <div className="divider reveal-child" style={{ transitionDelay: '0.18s' }} />
           <div className="trainer-single">
-            <div className="trainer-img-wrap">
-              <img src="/coach.jpg" alt="Тренер" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }} />
+            <div className="trainer-img-wrap reveal-child" style={{ transitionDelay: '0.22s' }}>
+              <div className="trainer-img-placeholder"><span>Фото тренера</span></div>
               <div className="trainer-overlay" />
             </div>
-            <div className="trainer-info">
+            <div className="trainer-info reveal-child" style={{ transitionDelay: '0.34s' }}>
               <div className="trainer-rank">{TRAINER.rank}</div>
               <h3 className="trainer-name">{TRAINER.name}</h3>
               <p className="trainer-bio">{TRAINER.bio}</p>
@@ -198,28 +253,31 @@ export default function Home() {
       </section>
 
       {/* ── КАРТА ────────────────────────────────────────────────── */}
-      <section className="section map-section">
+      <section
+        className={`section map-section reveal-section${mapVis ? ' is-visible' : ''}`}
+        ref={mapRef}
+      >
         <div className="container">
-          <p className="section-label">Мы находимся</p>
-          <h2 className="section-title">КАК НАС НАЙТИ</h2>
-          <div className="divider" />
+          <p className="section-label reveal-child" style={{ transitionDelay: '0.05s' }}>Мы находимся</p>
+          <h2 className="section-title reveal-child" style={{ transitionDelay: '0.12s' }}>КАК НАС НАЙТИ</h2>
+          <div className="divider reveal-child" style={{ transitionDelay: '0.18s' }} />
           <div className="map-wrap">
             <div className="map-address">
-              <div className="map-address-item">
+              <div className="map-address-item reveal-child" style={{ transitionDelay: '0.22s' }}>
                 <IconLocation />
                 <div>
                   <strong>Адрес</strong>
                   <p>Павловский Посад, ул. Кирова, 95</p>
                 </div>
               </div>
-              <div className="map-address-item">
+              <div className="map-address-item reveal-child" style={{ transitionDelay: '0.30s' }}>
                 <IconPhone />
                 <div>
                   <strong>Телефон</strong>
                   <p><a href="tel:+79091652800">+7 (909) 165-28-00</a></p>
                 </div>
               </div>
-              <div className="map-address-item">
+              <div className="map-address-item reveal-child" style={{ transitionDelay: '0.38s' }}>
                 <IconMail />
                 <div>
                   <strong>Email</strong>
@@ -227,16 +285,17 @@ export default function Home() {
                 </div>
               </div>
               <a
-                href="https://yandex.ru/maps/-/CPR1nQKu"
+                href="https://yandex.ru/maps/?text=Павловский+Посад,+ул.+Кирова,+95"
                 target="_blank"
                 rel="noreferrer"
-                className="btn-primary map-btn"
+                className="btn-primary map-btn btn-cta reveal-child"
+                style={{ transitionDelay: '0.46s' }}
               >
                 Открыть в Яндекс Картах →
               </a>
             </div>
             <iframe
-              src="https://yandex.ru/map-widget/v1/?ll=38.673440%2C55.781140&z=16&pt=38.673440%2C55.781140%2Cpm2rdm"
+              src="https://yandex.ru/map-widget/v1/?ll=38.6572%2C55.7697&z=16&pt=38.6572%2C55.7697%2Cpm2rdm"
               width="100%"
               height="400"
               style={{ border: 'none' }}
