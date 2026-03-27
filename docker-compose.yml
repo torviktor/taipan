@@ -24,6 +24,7 @@ services:
       - competition_files:/app/static/competition-files
       - analytics_files:/app/static/analytics
       - hof_files:/app/static/hall-of-fame
+      - static_files:/app/static
     environment:
       DATABASE_URL:        postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       SECRET_KEY:          ${SECRET_KEY}
@@ -31,12 +32,10 @@ services:
       TELEGRAM_BOT_TOKEN:  ${TELEGRAM_BOT_TOKEN}
       SITE_URL:            ${SITE_URL:-http://185.152.92.101}
       ANTHROPIC_API_KEY:   ${ANTHROPIC_API_KEY}
-      YANDEX_API_KEY:    ${YANDEX_API_KEY}
-      YANDEX_FOLDER_ID:  ${YANDEX_FOLDER_ID}
+      YANDEX_API_KEY:      ${YANDEX_API_KEY}
+      YANDEX_FOLDER_ID:    ${YANDEX_FOLDER_ID}
     ports:
       - "8000:8000"
-    volumes:
-      - static_files:/app/static 
     restart: always
 
   celery_worker:
