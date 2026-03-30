@@ -47,13 +47,14 @@ about: (
       </div>
     </div>
 
-    {/* ── Фото тренера во всю ширину ── */}
-    <div style={{ width:'100%', margin:'36px 0 16px', border:'1px solid var(--gray-dim)' }}>
-      <img
-        src="/coach_2.jpg"
-        alt=""
-        style={{ width:'100%', height:'auto', display:'block' }}
-      />
+    {/* ── Фото тренера + сертификат ── */}
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, margin:'36px 0 16px' }}>
+      <div style={{ border:'1px solid var(--gray-dim)', overflow:'hidden' }}>
+        <img src="/coach_2.webp" alt="Ротарь Екатерина Валерьевна" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+      </div>
+      <div style={{ border:'1px solid var(--gray-dim)', overflow:'hidden' }}>
+        <img src="/certificate.webp" alt="Сертификат GTF" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+      </div>
     </div>
 
     <h3>Кто стоит за клубом</h3>
@@ -88,19 +89,6 @@ about: (
     <p>Всё прозрачно. Родители всегда могут узнать, на что именно потрачены средства.</p>
 
     <h3>Почему мы — официальный клуб</h3>
-
-    {/* ── Блок документов во всю ширину — над текстом раздела ── */}
-    <div style={{ display:'flex', gap:16, marginBottom:24, flexWrap:'wrap' }}>
-      <div style={{ flex:1, minWidth:200, padding:'40px 24px', border:'1px dashed var(--gray-dim)', borderTop:'3px solid var(--gray-dim)', background:'var(--dark2)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:10 }}>
-        <div style={{ fontFamily:'Barlow Condensed', fontSize:'13px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', textAlign:'center' }}>Документ 1</div>
-        <div style={{ color:'var(--gray-dim)', fontSize:'13px', fontStyle:'italic', textAlign:'center' }}>в разработке</div>
-      </div>
-      <div style={{ flex:1, minWidth:200, padding:'40px 24px', border:'1px dashed var(--gray-dim)', borderTop:'3px solid var(--gray-dim)', background:'var(--dark2)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:10 }}>
-        <div style={{ fontFamily:'Barlow Condensed', fontSize:'13px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', textAlign:'center' }}>Документ 2</div>
-        <div style={{ color:'var(--gray-dim)', fontSize:'13px', fontStyle:'italic', textAlign:'center' }}>в разработке</div>
-      </div>
-    </div>
-    <p style={{ color:'var(--gray)', fontSize:'13px', fontStyle:'italic', marginBottom:20 }}>Здесь будут размещены официальные документы клуба (в разработке)</p>
 
     <p>Мы входим в структуру <strong>Федерации тхэквондо ГТФ России</strong>. Это значит:</p>
     <ul>
@@ -173,11 +161,12 @@ emblem: (
 members: (
   <div className="about-body">
 
-    {/* ── 3 фото вверху раздела ── */}
-    <div className="about-photo-grid" style={{ display:'grid', gap:4, marginBottom:32 }}>
-      <img src="/photo4.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
-      <img src="/photo5.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
-      <img src="/photo6.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+    {/* ── 4 фото вверху раздела ── */}
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:32 }}>
+      <img src="/members1.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+      <img src="/members2.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+      <img src="/members3.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+      <img src="/members4.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
     </div>
 
     <div className="about-lead">
@@ -185,6 +174,14 @@ members: (
       <p className="about-lead-name">Это настоящее сообщество, где каждый — часть чего-то большего</p>
       <p>Здесь занимаются дети, подростки и взрослые, которые выбрали путь самосовершенствования, уважения и настоящей дружбы. Каждый, кто надевает добок и повязывает пояс, становится частью легенды, которая началась с генерала Чхве Хон Хи и продолжается сегодня в нашем зале.</p>
       <p>Заниматься в нашем клубе — это гордость и большая честь. Ты не просто ходишь на тренировки — ты растёшь в настоящего воина с сердцем и принципами.</p>
+    </div>
+
+    {/* ── 4 фото перед блоком "Каждый участник клуба" ── */}
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:32 }}>
+      <img src="/athletes1.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+      <img src="/athletes2.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+      <img src="/athletes3.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+      <img src="/athletes4.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
     </div>
 
     <h3>Каждый участник клуба</h3>
@@ -222,8 +219,8 @@ members: (
     </div>
 
     {/* ── фото тренера перед блоком о тренере ── */}
-    <div style={{ width:'100%', margin:'32px 0 16px' }}>
-      <img src="/coach3.jpg" alt="" style={{ width:'100%', height:'auto', display:'block' }} />
+    <div style={{ width:'100%', margin:'32px 0 16px', border:'1px solid var(--gray-dim)' }}>
+      <img src="/trainer_action.webp" alt="" style={{ width:'100%', height:'auto', display:'block' }} />
     </div>
 
     <h3>Тренер — сердце и душа клуба</h3>

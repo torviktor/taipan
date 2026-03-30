@@ -208,21 +208,26 @@ export default function Home() {
         ref={photoRef}
       >
         <div className="photo-grid">
-          <div className="photo-main photo-placeholder">
+          <div className="photo-main">
+            <img src="/photo1.webp" alt="Тренировки" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} />
             <div className="photo-caption">
               <span>ТРЕНИРОВКИ</span>
               <p>Тренировки в группах, индивидуальные занятия</p>
             </div>
           </div>
           <div className="photo-side">
-            <div className="photo-placeholder-sm" />
-            <div className="photo-placeholder-sm" />
+            <div style={{flex:1,overflow:'hidden'}}>
+              <img src="/photo2.webp" alt="Команда" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} />
+            </div>
+            <div style={{flex:1,overflow:'hidden'}}>
+              <img src="/photo3.webp" alt="Соревнования" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} />
+            </div>
           </div>
         </div>
         <div className="photo-label">
           <span className="section-label">Зал в центре города</span>
           <h2 className="section-title">МЕСТО ГДЕ<br/>РОЖДАЮТСЯ<br/>ЧЕМПИОНЫ</h2>
-          <p className="photo-label-desc">Скоро здесь появятся фотографии с наших тренировок и соревнований</p>
+          <p className="photo-label-desc">Фотографии с наших тренировок и соревнований</p>
           <Link to="/apply" className="btn-primary btn-cta">Первое занятие бесплатно</Link>
         </div>
       </section>
