@@ -18,6 +18,7 @@ import Champions from './pages/Champions'
 import Privacy from './pages/Privacy'
 import Quiz from './pages/Quiz'
 import NewsPage from './pages/News'
+import CookieBanner from './components/CookieBanner'
 // import TaipanGPT from './components/TaipanGPT'
 
 export default function App() {
@@ -45,6 +46,7 @@ export default function App() {
       </Routes>
       <Footer />
       {/* <TaipanGPT /> */}
+      <CookieBanner />
     </>
   )
 }
