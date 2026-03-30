@@ -14,7 +14,7 @@ from app.routes.hall_of_fame_routes import router as hof_router
 from app.routes.insurance_strategy import router as insurance_strategy_router
 from app.routes.analytics import router as analytics_router
 from app.models import user, event, attendance, competition, certification, achievement, camp
-from app.models import hall_of_fame, analytics
+from app.models import hall_of_fame, analytics, news
 import os
 
 Base.metadata.create_all(bind=engine)
