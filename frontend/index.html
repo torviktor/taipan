@@ -25,6 +25,11 @@
     <meta property="og:locale" content="ru_RU" />
     <meta property="og:site_name" content="Клуб тхэквондо Тайпан" />
 
+    <!-- ── Google Search Console — подтверждение прав на сайт ── -->
+    <!-- ЗАМЕНИТЕ content на ваш реальный код из Search Console -->
+    <!-- Инструкция: Search Console → Настройки → Подтверждение прав → HTML-тег -->
+    <meta name="google-site-verification" content="ВСТАВЬТЕ_ВАШ_КОД_ИЗ_GOOGLE_SEARCH_CONSOLE" />
+
     <!-- ── Микроразметка организации (JSON-LD) ── -->
     <script type="application/ld+json">
     {
@@ -109,11 +114,13 @@
            webvisor: true
       });
     </script>
-    <noscript><div><img src="https://mc.yandex.ru/watch/108203400" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
     <!-- /Яндекс.Метрика -->
 
   </head>
   <body>
+    <!-- Яндекс.Метрика noscript (для браузеров без JS) -->
+    <noscript><div><img src="https://mc.yandex.ru/watch/108203400" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
