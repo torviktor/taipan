@@ -238,9 +238,8 @@ export default function Home() {
           <h2 className="section-title reveal-child" style={{ transitionDelay: '0.12s' }}>ТРЕНЕР</h2>
           <div className="divider reveal-child" style={{ transitionDelay: '0.18s' }} />
           <div className="trainer-single">
-            <div className="trainer-img-wrap reveal-child" style={{ transitionDelay: '0.22s' }}>
-              <div className="trainer-img-placeholder"><span>Фото тренера</span></div>
-              <div className="trainer-overlay" />
+            <div className="trainer-img-wrap">
+              <img src="/coach.webp" alt="Ротарь Екатерина Валерьевна" className="trainer-photo" />
             </div>
             <div className="trainer-info reveal-child" style={{ transitionDelay: '0.34s' }}>
               <div className="trainer-rank">{TRAINER.rank}</div>
