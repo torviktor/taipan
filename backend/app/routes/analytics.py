@@ -23,7 +23,7 @@ router = APIRouter()
 UPLOAD_DIR = "/app/static/analytics"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-ADMIN_PHONE = "89253653597"
+ADMIN_PHONE = "79253653597"
 
 
 # ─── Создать аналитику (с файлом) — менеджер ────────────────────────────────

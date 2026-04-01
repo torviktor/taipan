@@ -4501,7 +4501,7 @@ function AnalyticsAdminTab({ token, athletes }) {
 
   const h = { Authorization: `Bearer ${token}` }
   const userPhone = (localStorage.getItem('phone') || '').replace(/[\+\s\-\(\)]/g, '')
-  const isDataAdmin = userPhone === '89253653597'
+  const isDataAdmin = userPhone === '79253653597'
 
   useEffect(() => { load() }, [])
 
@@ -5248,7 +5248,7 @@ export default function Cabinet() {
                     <td className="td-actions">
                       <button className="td-btn td-btn-edit" onClick={() => openAnalyticsFromApp(a)}>Исполнить</button>
                       <button className="td-btn td-btn-del" onClick={() => setDeleteAppConfirm({ id: a.id, full_name: a.full_name })}>Удалить</button>
-                      {(localStorage.getItem('phone') || '').replace(/[\+\s\-\(\)]/g, '') === '89253653597' && (() => {
+                      {(localStorage.getItem('phone') || '').replace(/[\+\s\-\(\)]/g, '') === '79253653597' && (() => {
                         const matched = athletes.find(x => x.full_name.toLowerCase() === a.full_name.toLowerCase() || x.parent_name?.toLowerCase() === a.full_name.toLowerCase())
                         if (!matched) return null
                         return <button className="td-btn" style={{color:'#c8962a', borderColor:'#c8962a'}} onClick={async () => {
