@@ -44,6 +44,7 @@ export default function Login() {
       localStorage.setItem('token',     r.data.access_token)
       localStorage.setItem('role',      r.data.role)
       localStorage.setItem('full_name', r.data.full_name)
+      localStorage.setItem('phone',     normalizePhone(phone))
       if (['admin', 'manager'].includes(r.data.role)) {
         navigate('/admin')
       } else {
