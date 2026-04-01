@@ -36,6 +36,11 @@ services:
       YANDEX_FOLDER_ID:    ${YANDEX_FOLDER_ID}
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     restart: always
 
   celery_worker:
