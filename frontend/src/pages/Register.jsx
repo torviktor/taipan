@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import './Register.css'
+import { formatPhone } from '../utils/phone'
 const API = '/api'
 const emptyAthlete = () => ({
   full_name: '', birth_date: '', gender: 'male', gup: '', dan: '', has_dan: false
@@ -65,15 +66,7 @@ export default function Register() {
   })
   const [athletes, setAthletes] = useState([emptyAthlete()])
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-  const formatPhone = (v) => {
-    const d = v.replace(/\D/g, '').slice(0, 11)
-    if (d.length <= 1) return d ? '+7' : ''
-    if (d.length <= 4) return `+7 (${d.slice(1)}`
-    if (d.length <= 7) return `+7 (${d.slice(1,4)}) ${d.slice(4)}`
-    if (d.length <= 9) return `+7 (${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`
-    return `+7 (${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7,9)}-${d.slice(9)}`
-  }
-  const buildAthletePayload = (a) => ({
+const buildAthletePayload = (a) => ({
     full_name:  a.full_name,
     birth_date: a.birth_date,
     gender:     a.gender,

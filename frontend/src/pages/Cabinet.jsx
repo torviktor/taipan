@@ -2971,7 +2971,6 @@ function HallOfFameAdmin({ token }) {
 // ── ВКЛАДКА НОВОСТИ (тренер) ─────────────────────────────────────────────────
 
 function NewsTab({ token }) {
-  const API = '/api'
   const h   = { Authorization: `Bearer ${token}` }
   const hj  = { ...h, 'Content-Type': 'application/json' }
 

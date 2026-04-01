@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(python3 -m py_compile backend/app/main.py)",
+      "Bash(python -m py_compile backend/app/main.py)"
+    ]
+  }
+}
