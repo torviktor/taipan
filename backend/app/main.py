@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -63,6 +64,10 @@ app.include_router(analytics_router,          prefix="/api", tags=["Аналит
 app.include_router(news_router,       prefix="/api", tags=["Новости"])
 app.include_router(news_admin_router,  prefix="/api", tags=["Новости Admin"])
 app.include_router(hof_router,               prefix="/api",              tags=["Зал Славы"])
+
+@app.get("/health")
+def health():
+    return JSONResponse({"status": "ok"})
 
 @app.get("/")
 def root():
