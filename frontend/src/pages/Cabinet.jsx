@@ -8,78 +8,11 @@ import InsuranceTab from './InsuranceTab'
 import StrategyTab  from './StrategyTab'
 import { API, GROUPS, getSeason, seasonLabel, currentSeason, currentSeasonLabel, seasonRange } from '../cabinet/constants'
 import { useSorted, SortIcon, Th, ColFilter } from '../cabinet/tableUtils'
-
-function ResetPasswordModal({ user, token, onClose }) {
-  const [pwd, setPwd] = useState('')
-  const [msg, setMsg] = useState('')
-  const [loading, setLoading] = useState(false)
-  const save = async () => {
-    if (pwd.length < 4) { setMsg('Минимум 4 символа'); return }
-    setLoading(true)
-    const r = await fetch(`${API}/users/${user.user_id}/reset-password`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ new_password: pwd }),
-    })
-    setLoading(false)
-    if (r.ok) { setMsg('Пароль изменён'); setTimeout(onClose, 1200) }
-    else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
-  }
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()}>
-        <h3>Сброс пароля</h3>
-        <p>{user.parent_name}</p>
-        <input type="text" placeholder="Новый пароль" value={pwd}
-          onChange={e => setPwd(e.target.value)} className="modal-input" />
-        {msg && <div className="modal-msg">{msg}</div>}
-        <div className="modal-btns-row">
-          <button className="btn-primary" onClick={save} disabled={loading}>{loading ? '...' : 'Сохранить'}</button>
-          <button className="btn-outline" onClick={onClose}>Отмена</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Простой линейный SVG-график ───────────────────────────────────────────────
-function LineChart({ data, xKey, yKey, color = 'var(--red)', height = 180 }) {
-  if (!data || data.length === 0) return <div className="cabinet-empty">Нет данных</div>
-  const vals = data.map(d => d[yKey])
-  const max  = Math.max(...vals, 1)
-  const W = 620, H = height
-  // Увеличиваем нижний отступ если много точек — для диагональных подписей
-  const bottomPad = data.length > 6 ? 60 : 36
-  const PAD = { t: 20, r: 20, b: bottomPad, l: 36 }
-  const iw = W - PAD.l - PAD.r
-  const ih = H - PAD.t - PAD.b
-  const px = i => PAD.l + (i / (data.length - 1 || 1)) * iw
-  const py = v => PAD.t + ih - (v / max) * ih
-  const pts = data.map((d, i) => `${px(i)},${py(d[yKey])}`).join(' ')
-  const area = `M${px(0)},${py(0)} ` + data.map((d,i) => `L${px(i)},${py(d[yKey])}`).join(' ') + ` L${px(data.length-1)},${PAD.t+ih} L${px(0)},${PAD.t+ih} Z`
-  const diagonal = data.length > 6
-  return (
-    <svg viewBox={`0 0 ${W} ${H + (diagonal ? 20 : 0)}`} style={{ width:'100%', maxWidth:W, display:'block' }}>
-      {[0,0.5,1].map(f => <line key={f} x1={PAD.l} x2={W-PAD.r} y1={PAD.t+ih*(1-f)} y2={PAD.t+ih*(1-f)} stroke="var(--gray-dim)" strokeDasharray="4 3"/>)}
-      <path d={area} fill={color} fillOpacity="0.1"/>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
-      {data.map((d, i) => (
-        <g key={i}>
-          <circle cx={px(i)} cy={py(d[yKey])} r="4" fill={color}/>
-          <text x={px(i)} y={py(d[yKey])-8} textAnchor="middle" fontSize="11" fill="var(--white)">{d[yKey]}</text>
-          {diagonal
-            ? <text
-                transform={`translate(${px(i)}, ${H - bottomPad + 14}) rotate(-40)`}
-                textAnchor="end" fontSize="10" fill="var(--gray)"
-              >{d[xKey]}</text>
-            : <text x={px(i)} y={H - bottomPad + 16} textAnchor="middle" fontSize="10" fill="var(--gray)">{d[xKey]}</text>
-          }
-        </g>
-      ))}
-      {[0, Math.round(max/2), max].map(v => <text key={v} x={PAD.l-4} y={py(v)+4} textAnchor="end" fontSize="10" fill="var(--gray)">{v}</text>)}
-    </svg>
-  )
-}
+import ResetPasswordModal from '../cabinet/ResetPasswordModal'
+import LineChart from '../cabinet/LineChart'
+import ConfirmModal from '../cabinet/ConfirmModal'
+import UnreadBadge from '../cabinet/UnreadBadge'
+import BeltDisplay from '../cabinet/BeltDisplay'
 
 // ── ЖУРНАЛ ПОСЕЩАЕМОСТИ ────────────────────────────────────────────────────────
 function AttendanceTab({ token, athletes }) {
@@ -2183,46 +2116,6 @@ function ParentCampsTab({ token, athletes }) {
   )
 }
 
-// ── КАСТОМНОЕ ПОДТВЕРЖДЕНИЕ ───────────────────────────────────────────────────
-
-function ConfirmModal({ message, onConfirm, onCancel, confirmText = 'Подтвердить', danger = false }) {
-  return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
-        <p style={{ color:'var(--white)', fontSize:'0.95rem', lineHeight:1.6, marginBottom:20 }}>{message}</p>
-        <div className="modal-btns-row">
-          <button
-            className={danger ? 'btn-primary' : 'btn-primary'}
-            style={danger ? { background:'var(--red)' } : {}}
-            onClick={onConfirm}
-          >{confirmText}</button>
-          <button className="btn-outline" onClick={onCancel}>Отмена</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── БЕЙДЖ НЕПРОЧИТАННЫХ УВЕДОМЛЕНИЙ ──────────────────────────────────────────
-
-function UnreadBadge({ token }) {
-  const [count, setCount] = useState(0)
-  const load = async () => {
-    try {
-      const r = await fetch(`${API}/notifications/unread-count`, { headers: { Authorization: `Bearer ${token}` } })
-      if (r.ok) { const d = await r.json(); setCount(d.count) }
-    } catch {}
-  }
-  useEffect(() => {
-    load()
-    const interval = setInterval(load, 30000)
-    // Обновляем когда пользователь читает уведомления
-    window.addEventListener('notifications-read', load)
-    return () => { clearInterval(interval); window.removeEventListener('notifications-read', load) }
-  }, [token])
-  if (count === 0) return null
-  return <span className="tab-badge">{count}</span>
-}
 
 // ── АТТЕСТАЦИЯ ────────────────────────────────────────────────────────────────
 
@@ -4107,99 +4000,6 @@ const STATUS_LABELS = {
   rejected:   { label: 'Отклонена',    color: '#CC0000' },
 }
 
-// ── ПОЯС СПОРТСМЕНА ───────────────────────────────────────────────────────────
-
-const BELT_CONFIG = {
-  // gup: { label, colors: [основной, полоска] }
-  null: { label: 'Без пояса',     colors: ['#888888', null] },
-  0:    { label: 'Без пояса',     colors: ['#888888', null] },
-  11:   { label: '11 гып',        colors: ['#FF8C00', null] },         // оранжевый
-  10:   { label: '10 гып',        colors: ['#f0f0f0', null] },         // белый
-  9:    { label: '9 гып',         colors: ['#f0f0f0', '#FFD700'] },    // белый/жёлтый
-  8:    { label: '8 гып',         colors: ['#FFD700', null] },         // жёлтый
-  7:    { label: '7 гып',         colors: ['#FFD700', '#3a9a3a'] },    // жёлтый/зелёный
-  6:    { label: '6 гып',         colors: ['#3a9a3a', null] },         // зелёный
-  5:    { label: '5 гып',         colors: ['#3a9a3a', '#1a6ab5'] },    // зелёный/синий
-  4:    { label: '4 гып',         colors: ['#1a6ab5', null] },         // синий
-  3:    { label: '3 гып',         colors: ['#1a6ab5', '#CC0000'] },    // синий/красный
-  2:    { label: '2 гып',         colors: ['#CC0000', null] },         // красный
-  1:    { label: '1 гып',         colors: ['#CC0000', '#111111'] },    // красный/чёрный
-}
-
-function BeltSVG({ colors, stripes = 0, width = 220, height = 32 }) {
-  const [main, stripe] = colors
-  const r = 6 // corner radius
-
-  return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.5))'}}>
-      <defs>
-        <linearGradient id={`belt-grad-${main}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={main} stopOpacity="1"/>
-          <stop offset="40%" stopColor={main} stopOpacity="0.85"/>
-          <stop offset="100%" stopColor={main} stopOpacity="0.7"/>
-        </linearGradient>
-        {/* Stitching texture */}
-        <pattern id="stitch" x="0" y="0" width="16" height={height} patternUnits="userSpaceOnUse">
-          <line x1="8" y1="4" x2="8" y2={height-4} stroke="rgba(255,255,255,0.12)" strokeWidth="1" strokeDasharray="3,3"/>
-        </pattern>
-      </defs>
-
-      {/* Основной пояс */}
-      <rect x="0" y="0" width={width} height={height} rx={r} ry={r} fill={`url(#belt-grad-${main})`}/>
-      {/* Текстура */}
-      <rect x="0" y="0" width={width} height={height} rx={r} ry={r} fill="url(#stitch)" opacity="0.6"/>
-      {/* Блик сверху */}
-      <rect x={r} y="1" width={width - r*2} height={height/3} rx={r/2} fill="rgba(255,255,255,0.12)"/>
-      {/* Обводка */}
-      <rect x="0.5" y="0.5" width={width-1} height={height-1} rx={r} ry={r} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1"/>
-
-      {/* Полоска если есть */}
-      {stripe && (
-        <>
-          <rect x={0} y={height*0.35} width={width} height={height*0.3} fill={stripe} opacity="0.9"/>
-          <rect x={0} y={height*0.35} width={width} height={height*0.3} fill="url(#stitch)" opacity="0.4"/>
-        </>
-      )}
-
-      {/* Насечки для данов (на черном поясе) */}
-      {stripes > 0 && Array.from({length: stripes}).map((_, i) => (
-        <rect key={i} x={width - 28 - i*16} y={4} width={10} height={height-8} rx={2} fill="#FFD700" opacity="0.9"/>
-      ))}
-    </svg>
-  )
-}
-
-function BeltDisplay({ gup, dan }) {
-  if (dan) {
-    // Чёрный пояс с насечками
-    return (
-      <div style={{ marginTop:16, display:'flex', alignItems:'center', gap:16 }}>
-        <div>
-          <div style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', color:'#FFD700', letterSpacing:'0.05em', textShadow:'0 0 12px rgba(200,150,42,0.6)', marginBottom:6 }}>
-            {dan} ДАН
-          </div>
-          <BeltSVG colors={['#111111', null]} stripes={dan}/>
-        </div>
-      </div>
-    )
-  }
-
-  const cfg = BELT_CONFIG[gup] || BELT_CONFIG[null]
-
-  return (
-    <div style={{ marginTop:16, display:'flex', alignItems:'center', gap:16 }}>
-      <div>
-        <div style={{ fontFamily:'Bebas Neue', fontSize:'1.2rem', letterSpacing:'0.05em', marginBottom:6,
-          color: gup !== null && gup !== undefined && gup !== 0 ? '#c8962a' : 'var(--gray)',
-          textShadow: gup ? '0 0 10px rgba(200,150,42,0.5)' : 'none'
-        }}>
-          {cfg.label}
-        </div>
-        <BeltSVG colors={cfg.colors}/>
-      </div>
-    </div>
-  )
-}
 
 // ── МОДАЛ СОЗДАНИЯ АНАЛИТИКИ ──────────────────────────────────────────────────
 

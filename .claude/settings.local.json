@@ -3,7 +3,8 @@
     "allow": [
       "Bash(git:*)",
       "Bash(python3 -m py_compile backend/app/main.py)",
-      "Bash(python -m py_compile backend/app/main.py)"
+      "Bash(python -m py_compile backend/app/main.py)",
+      "Bash(node -e \"const fs=require\\('fs'\\);const c=fs.readFileSync\\('frontend/src/pages/Cabinet.jsx','utf8'\\);let d=0;for\\(const ch of c\\){if\\(ch==='{'\\)d++;if\\(ch==='}'\\)d--;}console.log\\('depth:',d\\)\")"
     ]
   }
 }
