@@ -6,72 +6,8 @@ import './Competitions.css'
 import CompApplicationMatrix from './CompApplicationMatrix'
 import InsuranceTab from './InsuranceTab'
 import StrategyTab  from './StrategyTab'
-
-const API = '/api'
-
-// ── Спортивный сезон (сентябрь–август) ────────────────────────────────────────
-// Сезон 2025/2026 = сен 2025 – авг 2026
-const getSeason = (d) => {
-  const date = d ? new Date(d) : new Date()
-  const year = date.getFullYear()
-  const month = date.getMonth() + 1 // 1-12
-  return month >= 9 ? year : year - 1  // начало сезона
-}
-const seasonLabel = (y) => `${y}/${y+1}`
-const currentSeason = getSeason()
-const currentSeasonLabel = seasonLabel(currentSeason)
-// Диапазон дат сезона
-const seasonRange = (y) => {
-  if (!y && y !== 0) return { start: '2000-01-01', end: '2099-12-31' }
-  return {
-    start: `${y}-09-01`,
-    end:   `${y+1}-08-31`
-  }
-}
-
-const GROUPS = ['Младшая группа (6–10 лет)', 'Старшая группа (11+)']
-
-function useSorted(data) {
-  const [sort, setSort] = useState({ key: null, dir: 'asc' })
-  const toggle = (key) => setSort(s =>
-    s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }
-  )
-  const sorted = useMemo(() => {
-    if (!sort.key) return data
-    return [...data].sort((a, b) => {
-      const va = a[sort.key] ?? '', vb = b[sort.key] ?? ''
-      const cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb), 'ru')
-      return sort.dir === 'asc' ? cmp : -cmp
-    })
-  }, [data, sort])
-  return { sorted, sort, toggle }
-}
-
-function SortIcon({ active, dir }) {
-  if (!active) return <span className="sort-icon sort-icon-idle">o</span>
-  return <span className="sort-icon sort-icon-active">{dir === 'asc' ? 'v' : '^'}</span>
-}
-
-function Th({ children, colKey, sort, toggle, filter }) {
-  return (
-    <th className="th-sortable" style={{ verticalAlign: 'top' }}>
-      <div className="th-inner" onClick={() => toggle(colKey)}>
-        {children} <SortIcon active={sort.key === colKey} dir={sort.dir} />
-      </div>
-      {filter}
-    </th>
-  )
-}
-
-function ColFilter({ value, onChange, options, placeholder }) {
-  return (
-    <select className="col-filter" value={value} onChange={e => onChange(e.target.value)}
-      onClick={e => e.stopPropagation()}>
-      <option value="">{placeholder || 'Все'}</option>
-      {options.map(o => <option key={o} value={o}>{o}</option>)}
-    </select>
-  )
-}
+import { API, GROUPS, getSeason, seasonLabel, currentSeason, currentSeasonLabel, seasonRange } from '../cabinet/constants'
+import { useSorted, SortIcon, Th, ColFilter } from '../cabinet/tableUtils'
 
 function ResetPasswordModal({ user, token, onClose }) {
   const [pwd, setPwd] = useState('')
