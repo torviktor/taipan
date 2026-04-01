@@ -25,13 +25,13 @@ jobs:
             sudo git fetch origin main
             sudo git reset --hard origin/main
 
-            # ── 3. Миграция БД
-            sleep 3
-            sudo docker compose exec -T backend python /app/migrations/add_insurance_strategy_fields.py
-
-            # ── 4. Пересборка и запуск
+            # ── 3. Пересборка и запуск
             sudo docker compose build --no-cache backend frontend
             sudo docker compose up -d
             sudo docker image prune -f
+
+            # ── 4. Миграция БД (после старта новых контейнеров)
+            sleep 10
+            sudo docker compose exec -T backend python /app/migrations/add_insurance_strategy_fields.py
 
             echo "Деплой завершён"
