@@ -43,12 +43,23 @@ async def create_analytics(
         raise HTTPException(status_code=404, detail="Спортсмен не найден")
     file_path = file_name = None
     if file:
-        ext = os.path.splitext(file.filename)[1] if file.filename else ""
+        ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx"}
+        MAX_SIZE = 20 * 1024 * 1024  # 20MB
+        safe_basename = os.path.basename(file.filename) if file.filename else ""
+        ext = os.path.splitext(safe_basename)[1].lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(status_code=400, detail="Недопустимый тип файла. Разрешены: .pdf, .docx, .xlsx")
+        contents = await file.read()
+        if len(contents) > MAX_SIZE:
+            raise HTTPException(status_code=400, detail="Файл слишком большой. Максимум 20MB")
         unique_name = f"{uuid.uuid4().hex}{ext}"
+        full_path = os.path.abspath(os.path.join(UPLOAD_DIR, unique_name))
+        if not full_path.startswith(os.path.abspath(UPLOAD_DIR) + os.sep):
+            raise HTTPException(status_code=400, detail="Недопустимый путь к файлу")
         file_path = f"/static/analytics/{unique_name}"
-        with open(os.path.join(UPLOAD_DIR, unique_name), "wb") as f:
-            f.write(await file.read())
-        file_name = file.filename
+        with open(full_path, "wb") as f:
+            f.write(contents)
+        file_name = safe_basename
     record = Analytics(athlete_id=athlete_id, title=title, comment=comment or None,
                        file_path=file_path, file_name=file_name, created_by=current_user.id)
     db.add(record); db.flush()
@@ -359,12 +370,13 @@ def download_analytics_file(
     filename: str,
     current_user: User = Depends(get_current_user)
 ):
-    if ".." in filename or "/" in filename:
+    safe_filename = os.path.basename(filename)
+    filepath = os.path.abspath(os.path.join(UPLOAD_DIR, safe_filename))
+    if not filepath.startswith(os.path.abspath(UPLOAD_DIR) + os.sep):
         raise HTTPException(400, "Недопустимое имя файла")
-    filepath = os.path.join(UPLOAD_DIR, filename)
     if not os.path.exists(filepath):
         raise HTTPException(404, "Файл не найден")
-    ext = os.path.splitext(filename)[1].lower()
+    ext = os.path.splitext(safe_filename)[1].lower()
     media_types = {
         '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -372,4 +384,4 @@ def download_analytics_file(
         '.csv':  'text/csv; charset=utf-8',
     }
     media_type = media_types.get(ext, 'application/octet-stream')
-    return FileResponse(path=filepath, media_type=media_type, filename=filename)
+    return FileResponse(path=filepath, media_type=media_type, filename=safe_filename)

@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
@@ -9,6 +11,7 @@ from app.core.security import hash_password, verify_password, create_access_toke
 from app.models.user import User, UserRole, Athlete, Gender
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 # ─── Схемы ────────────────────────────────────────────────────────────────────
 class AthleteData(BaseModel):
@@ -58,7 +61,8 @@ def calc_age(birth_date: date) -> int:
 # Фронтенд вызывает этот роут когда пользователь вводит телефон.
 # Если телефон уже есть — сообщаем сколько детей уже зарегистрировано.
 @router.get("/check-phone/{phone}", response_model=CheckPhoneResponse)
-def check_phone(phone: str, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def check_phone(request: Request, phone: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.phone == phone).first()
     if not user:
         return CheckPhoneResponse(exists=False, athletes_count=0, athletes=[])
@@ -71,7 +75,8 @@ def check_phone(phone: str, db: Session = Depends(get_db)):
 
 # ─── Регистрация нового пользователя ──────────────────────────────────────────
 @router.post("/register", response_model=TokenResponse)
-def register(data: RegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def register(request: Request, data: RegisterRequest, db: Session = Depends(get_db)):
     # Запрет регистрации как спортсмен для детей до 11 лет
     if data.role == UserRole.athlete:
         age = calc_age(data.athlete.birth_date)
@@ -147,7 +152,8 @@ def add_athlete(data: AddAthleteRequest, db: Session = Depends(get_db)):
 
 # ─── Вход ─────────────────────────────────────────────────────────────────────
 @router.post("/login", response_model=TokenResponse)
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.phone == form.username).first()
     if not user or not verify_password(form.password, user.password):
         raise HTTPException(status_code=401, detail="Неверный телефон или пароль")

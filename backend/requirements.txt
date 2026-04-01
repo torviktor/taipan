@@ -17,3 +17,4 @@ celery==5.3.6          # Фоновые задачи
 redis==5.0.3           # Брокер для Celery
 celery[redis]==5.3.6
 pywebpush==2.0.0       # Web Push уведомления
+slowapi==0.1.9

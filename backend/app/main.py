@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from app.core.database import engine, Base
 from app.routes import auth, applications, schedule, users, payments
 from app.routes import events, telegram
@@ -27,9 +29,12 @@ app = FastAPI(
     version="1.0.0"
 )
 
+app.state.limiter = auth.limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://taipan-tkd.ru"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
