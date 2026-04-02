@@ -41,7 +41,7 @@ export default function AnalyticsAdminTab({ token, athletes }) {
     setExporting(athleteId)
     try {
       const r = await fetch(`${API}/analytics/export/${athleteId}`, { headers: h })
-      if (!r.ok) { const d = await r.json(); alert(d.detail || 'Ошибка'); setExporting(null); return }
+      if (!r.ok) { let msg = 'Ошибка'; try { const d = await r.json(); msg = d.detail || msg } catch {} alert(msg); setExporting(null); return }
       const data = await r.json()
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
@@ -104,9 +104,18 @@ export default function AnalyticsAdminTab({ token, athletes }) {
                     {r.file_path
                       ? <button style={{color:'var(--red)', fontSize:'13px', fontWeight:700, background:'none', border:'none', cursor:'pointer', padding:0}}
                     onClick={async () => {
-                      const filename = r.file_path.split('/').pop()
-                      const res = await fetch(`${API}/analytics/download/${filename}`, { headers: { Authorization: `Bearer ${token}` } })
-                      if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url) }
+                      try {
+                        const filename = r.file_path.split('/').pop()
+                        const res = await fetch(`${API}/analytics/download/${filename}`, { headers: { Authorization: `Bearer ${token}` } })
+                        if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.detail || 'Ошибка загрузки файла'); return }
+                        const blob = await res.blob()
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = r.file_name || filename
+                        document.body.appendChild(a); a.click(); document.body.removeChild(a)
+                        setTimeout(() => URL.revokeObjectURL(url), 100)
+                      } catch { alert('Ошибка загрузки файла') }
                     }}>Скачать</button>
                       : <span style={{color:'var(--gray-dim)'}}>--</span>}
                   </td>
