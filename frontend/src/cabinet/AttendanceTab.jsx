@@ -101,11 +101,12 @@ export default function AttendanceTab({ token, athletes }) {
         sid = (await cr.json()).id
       }
       const records = Object.entries(marks).map(([athlete_id, present]) => ({ athlete_id: parseInt(athlete_id), present }))
-      await fetch(`${API}/attendance/sessions/${sid}/mark`, {
+      const mr = await fetch(`${API}/attendance/sessions/${sid}/mark`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ records })
       })
+      if (!mr.ok) { const e = await mr.json(); setMsg(e.detail || 'Ошибка сохранения галочек'); setSaving(false); return }
       setMsg(`Сохранено! Присутствовало: ${records.filter(r => r.present).length} из ${records.length}`)
       loadSessions()
     } catch { setMsg('Ошибка сохранения') }

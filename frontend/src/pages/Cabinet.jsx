@@ -24,6 +24,7 @@ import NotificationsTab from '../cabinet/NotificationsTab'
 import InsuranceAdminTab from '../cabinet/InsuranceAdminTab'
 import { AchievementBadge, AchievementsLeaderboard } from '../cabinet/AchievementsTab'
 import AchievementsTab from '../cabinet/AchievementsTab'
+import AnalyticsModal from '../cabinet/AnalyticsModal'
 const CertificationTab  = lazy(() => import('../cabinet/CertificationTab'))
 const HallOfFameAdmin   = lazy(() => import('../cabinet/HallOfFameAdmin'))
 const CampsTab          = lazy(() => import('../cabinet/CampsTab'))

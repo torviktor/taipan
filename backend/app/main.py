@@ -18,8 +18,9 @@ from app.routes.news_routes import router as news_router
 from app.routes.news_admin import router as news_admin_router
 from app.routes.insurance_strategy import router as insurance_strategy_router
 from app.routes.analytics import router as analytics_router
+from app.routes.competition_files import router as competition_files_router
 from app.models import user, event, attendance, competition, certification, achievement, camp
-from app.models import hall_of_fame, analytics, news
+from app.models import hall_of_fame, analytics, news, competition_file
 import os
 
 Base.metadata.create_all(bind=engine)
@@ -61,6 +62,7 @@ app.include_router(achievements_router,      prefix="/api",              tags=["
 app.include_router(camps_router,             prefix="/api",              tags=["Сборы"])
 app.include_router(insurance_strategy_router, prefix="/api", tags=["Страховка и стратегия"])
 app.include_router(analytics_router,          prefix="/api", tags=["Аналитика"])
+app.include_router(competition_files_router,  prefix="/api", tags=["Файлы соревнований"])
 app.include_router(news_router,       prefix="/api", tags=["Новости"])
 app.include_router(news_admin_router,  prefix="/api", tags=["Новости Admin"])
 app.include_router(hof_router,               prefix="/api",              tags=["Зал Славы"])
