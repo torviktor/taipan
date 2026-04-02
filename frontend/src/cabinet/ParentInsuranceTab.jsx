@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { API } from './constants'
 
-function InsuranceStatus({ athleteId, token }) {
+export function InsuranceStatus({ athleteId, token }) {
   const [expiry, setExpiry] = useState(null)
   const today = new Date().toISOString().slice(0,10)
 
