@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import './Cabinet.css'
@@ -24,13 +24,13 @@ import NotificationsTab from '../cabinet/NotificationsTab'
 import InsuranceAdminTab from '../cabinet/InsuranceAdminTab'
 import { AchievementBadge, AchievementsLeaderboard } from '../cabinet/AchievementsTab'
 import AchievementsTab from '../cabinet/AchievementsTab'
-import CertificationTab from '../cabinet/CertificationTab'
-import HallOfFameAdmin from '../cabinet/HallOfFameAdmin'
-import CampsTab from '../cabinet/CampsTab'
-import InfoTab from '../cabinet/InfoTab'
-import AnalyticsAdminTab from '../cabinet/AnalyticsAdminTab'
-import CompetitionsTab from '../cabinet/CompetitionsTab'
-import NewsTab from '../cabinet/NewsTab'
+const CertificationTab  = lazy(() => import('../cabinet/CertificationTab'))
+const HallOfFameAdmin   = lazy(() => import('../cabinet/HallOfFameAdmin'))
+const CampsTab          = lazy(() => import('../cabinet/CampsTab'))
+const InfoTab           = lazy(() => import('../cabinet/InfoTab'))
+const AnalyticsAdminTab = lazy(() => import('../cabinet/AnalyticsAdminTab'))
+const CompetitionsTab   = lazy(() => import('../cabinet/CompetitionsTab'))
+const NewsTab           = lazy(() => import('../cabinet/NewsTab'))
 
 
 
@@ -269,6 +269,7 @@ export default function Cabinet() {
   // ── КАБИНЕТ РОДИТЕЛЯ ────────────────────────────────────────────────────────
   if (!isAdmin) {
     return (
+      <Suspense fallback={<div className="cabinet-loading">Загрузка...</div>}>
       <main className="cabinet-page">
         <div className="container cabinet-container">
           <div className="cabinet-header">
@@ -338,11 +339,13 @@ export default function Cabinet() {
           {parentView === 'analytics'     && !loading && <ParentAnalyticsTab token={token} athletes={myAthletes}/>}
         </div>
       </main>
+      </Suspense>
     )
   }
 
   // ── КАБИНЕТ АДМИНА ──────────────────────────────────────────────────────────
   return (
+    <Suspense fallback={<div className="cabinet-loading">Загрузка...</div>}>
     <main className="cabinet-page">
       {resetUser && <ResetPasswordModal user={resetUser} token={token} onClose={() => setResetUser(null)} />}
       <div className="container cabinet-container">
@@ -693,5 +696,6 @@ export default function Cabinet() {
       </div>
     </div>
     </main>
+    </Suspense>
   )
 }
