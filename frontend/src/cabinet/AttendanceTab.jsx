@@ -81,7 +81,7 @@ export default function AttendanceTab({ token, athletes }) {
         const data = await r.json()
         const em = {}
         data.athletes.forEach(a => { em[a.id] = a.present })
-        initMarks(data.athletes, em)
+        initMarks(groupAthletes, em)
         setActiveSession(data); setNotes(data.notes || ''); setViewMode('session')
       }
     } catch {}

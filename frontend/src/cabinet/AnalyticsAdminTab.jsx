@@ -40,7 +40,8 @@ export default function AnalyticsAdminTab({ token, athletes }) {
   async function exportData(athleteId, athleteName) {
     setExporting(athleteId)
     try {
-      const r = await fetch(`${API}/analytics/export/${athleteId}`, { headers: h })
+      const tok = localStorage.getItem('token')
+      const r = await fetch(`${API}/analytics/export/${athleteId}`, { headers: { Authorization: `Bearer ${tok}` } })
       if (!r.ok) { let msg = 'Ошибка'; try { const d = await r.json(); msg = d.detail || msg } catch {} alert(msg); setExporting(null); return }
       const data = await r.json()
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -105,8 +106,9 @@ export default function AnalyticsAdminTab({ token, athletes }) {
                       ? <button style={{color:'var(--red)', fontSize:'13px', fontWeight:700, background:'none', border:'none', cursor:'pointer', padding:0}}
                     onClick={async () => {
                       try {
+                        const tok = localStorage.getItem('token')
                         const filename = r.file_path.split('/').pop()
-                        const res = await fetch(`${API}/analytics/download/${filename}`, { headers: { Authorization: `Bearer ${token}` } })
+                        const res = await fetch(`${API}/analytics/download/${filename}`, { headers: { Authorization: `Bearer ${tok}` } })
                         if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.detail || 'Ошибка загрузки файла'); return }
                         const blob = await res.blob()
                         const url = URL.createObjectURL(blob)
