@@ -386,7 +386,7 @@ export default function Cabinet() {
           {parentView === 'notifications' && <NotificationsTab token={token}/>}
           {parentView === 'insurance'     && <ParentInsuranceTab token={token} athletes={myAthletes}/>}
           {parentView === 'fees'          && <MyFeesTab token={token}/>}
-          {parentView === 'info'          && <InfoTab isAdmin={false} token={token}/>}
+          {parentView === 'info'          && <InfoTab isAdmin={false} isManager={false} token={token}/>}
           {parentView === 'analytics'     && !loading && <ParentAnalyticsTab token={token} athletes={myAthletes}/>}
         </div>
       </main>
@@ -478,7 +478,7 @@ export default function Cabinet() {
         {view === 'achievements'  && <AchievementsLeaderboard token={token} />}
         {view === 'camps'         && <CampsTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'news'          && <NewsTab token={token} />}
-        {view === 'info'          && <InfoTab isAdmin={true} token={token} />}
+        {view === 'info'          && <InfoTab isAdmin={role === 'admin'} isManager={role === 'manager' || role === 'admin'} token={token} />}
         {view === 'analytics'     && <AnalyticsAdminTab token={token} athletes={athletes} />}
         {view === 'insurance_admin' && <InsuranceAdminTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'hof'           && <HallOfFameAdmin token={token} />}

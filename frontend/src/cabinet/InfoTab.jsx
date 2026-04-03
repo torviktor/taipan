@@ -2,7 +2,7 @@ import { useState } from 'react'
 import InsuranceTab from '../pages/InsuranceTab'
 import StrategyTab from '../pages/StrategyTab'
 
-export default function InfoTab({ isAdmin, token }) {
+export default function InfoTab({ isAdmin, isManager = false, token }) {
   const [section, setSection] = useState('rating')
 
   const SectionBtn = ({ id, label }) => (
@@ -47,6 +47,7 @@ export default function InfoTab({ isAdmin, token }) {
         <SectionBtn id="equipment"    label="Экипировка"/>
         <SectionBtn id="antidoping"   label="Антидопинг"/>
         {isAdmin && <SectionBtn id="strategy"   label="Стратегия"/>}
+        {isManager && <SectionBtn id="fees"     label="Взносы"/>}
         {isAdmin && <SectionBtn id="admin"      label="Памятка тренера"/>}
       </div>
 
@@ -425,6 +426,110 @@ export default function InfoTab({ isAdmin, token }) {
                 <span style={{ color:'var(--red)', fontSize:'0.78rem', fontFamily:'Barlow Condensed', fontWeight:700 }}>PDF</span>
               </a>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── ВЗНОСЫ ── */}
+      {section === 'fees' && isManager && (
+        <div>
+          <H2>Система клубных взносов</H2>
+
+          <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderRadius:10, padding:'18px 22px', marginBottom:24 }}>
+            <P>Взносы — ежемесячная оплата занятий в клубе. Система автоматически отслеживает статус каждого спортсмена и уведомляет родителей. Ваша задача — фиксировать факт получения денег и при необходимости связываться с должниками.</P>
+          </div>
+
+          <H2>1. Как устроен учёт</H2>
+          <P><Hl>Единица учёта — спортсмен.</Hl> Если у родителя двое детей в клубе, он платит за каждого отдельно. В таблице взносов каждый ребёнок — отдельная строка. Рядом указаны ФИО и телефон родителя-плательщика.</P>
+          <P>Взрослые спортсмены (роль «спортсмен») платят сами за себя и также отображаются в таблице.</P>
+
+          <H2>2. Настройка дедлайна</H2>
+          <P>Вкладка «Взносы» содержит кнопку <Hl>«Настройка взноса»</Hl>. Здесь задаётся два параметра один раз:</P>
+          <div style={{ background:'var(--dark2)', borderRadius:8, padding:'16px 20px', marginBottom:18, lineHeight:2 }}>
+            <div style={{ display:'flex', gap:12, marginBottom:8 }}>
+              <span style={{ color:'var(--red)', fontFamily:'Barlow Condensed', fontWeight:700, minWidth:160 }}>ДЕНЬ МЕСЯЦА</span>
+              <span style={{ color:'var(--gray)' }}>Число от 1 до 28. Дедлайн наступает каждый месяц в этот день. Например: 10 — значит оплата до 10-го числа каждого месяца.</span>
+            </div>
+            <div style={{ display:'flex', gap:12 }}>
+              <span style={{ color:'var(--red)', fontFamily:'Barlow Condensed', fontWeight:700, minWidth:160 }}>СУММА ВЗНОСА</span>
+              <span style={{ color:'var(--gray)' }}>Стоимость занятий в месяц. Применяется ко всем спортсменам одинаково.</span>
+            </div>
+          </div>
+          <P>После сохранения настройки система автоматически создаёт записи взносов для всех активных спортсменов на текущий месяц и рассылает уведомления родителям с просьбой внести оплату.</P>
+          <P>Настройку можно изменить в любой момент — новые параметры вступят в силу со следующего месяца. Уже созданные записи текущего месяца не изменяются.</P>
+
+          <H2>3. Статусы взносов</H2>
+          <div style={{ overflowX:'auto', marginBottom:18 }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'0.92rem' }}>
+              <thead>
+                <tr style={{ background:'var(--dark2)' }}>
+                  {['Статус','Цвет','Когда','Что делать'].map(h => (
+                    <th key={h} style={{ padding:'10px 14px', textAlign:'left', color:'var(--gray)', fontFamily:'Barlow Condensed', letterSpacing:'0.05em', borderBottom:'1px solid var(--gray-dim)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ['Ожидание', 'Серый',    'До дедлайна — месяц ещё не начался или дедлайн не наступил', 'Ничего не требуется'],
+                  ['К оплате', 'Жёлтый',  'Дедлайн наступил, оплата ещё не внесена (0–7 дней)', 'Напомнить родителю при встрече'],
+                  ['Просрочено','Красный', 'Прошло более 7 дней после дедлайна без оплаты', 'Связаться с родителем, зафиксировать причину'],
+                  ['Оплачено',  'Зелёный', 'Менеджер зафиксировал получение денег', 'Готово'],
+                ].map((row, i) => (
+                  <tr key={i} style={{ borderBottom:'1px solid var(--gray-dim)', background: i%2===0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                    <td style={{ padding:'10px 14px', color:'var(--white)', fontWeight:600 }}>{row[0]}</td>
+                    <td style={{ padding:'10px 14px', color: i===0?'var(--gray)':i===1?'#f5c518':i===2?'var(--red)':'#4caf50' }}>{row[1]}</td>
+                    <td style={{ padding:'10px 14px', color:'var(--gray)' }}>{row[2]}</td>
+                    <td style={{ padding:'10px 14px', color:'var(--gray)' }}>{row[3]}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <H2>4. Как зафиксировать оплату</H2>
+          <P>В таблице взносов нажмите кнопку <Hl>«Внести»</Hl> напротив нужного спортсмена. Откроется окно с двумя полями:</P>
+          <div style={{ background:'var(--dark2)', borderRadius:8, padding:'16px 20px', marginBottom:18, lineHeight:2 }}>
+            <div><span style={{ color:'var(--white)' }}>Сумма</span> <span style={{ color:'var(--gray)' }}>— по умолчанию подставляется полная сумма взноса. Можно уменьшить, если родитель заплатил частично.</span></div>
+            <div><span style={{ color:'var(--white)' }}>Комментарий</span> <span style={{ color:'var(--gray)' }}>— необязательно. Например: «наличные», «перевод на карту», «за два месяца».</span></div>
+          </div>
+          <P>После нажатия «Сохранить» статус сразу меняется на <Hl>«Оплачено»</Hl>, а родитель получает уведомление в личном кабинете: «Оплата за [месяц] принята».</P>
+          <P>Частичная оплата: если внесена сумма меньше полной — в столбце «Долг» отобразится остаток. Статус при этом остаётся «К оплате» или «Просрочено» — пока долг не погашен полностью.</P>
+
+          <H2>5. Уведомления родителей</H2>
+          <P>Система автоматически отправляет три типа уведомлений в личный кабинет родителя:</P>
+          <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:18 }}>
+            {[
+              { label:'Внесите оплату', color:'#f5c518', text:'Отправляется в день дедлайна. Сообщает сумму и срок.' },
+              { label:'Просрочено',     color:'var(--red)', text:'Отправляется на 8-й день после дедлайна если оплата не внесена. Просит связаться с тренером.' },
+              { label:'Оплата принята', color:'#4caf50', text:'Отправляется сразу после того как менеджер фиксирует оплату.' },
+            ].map((item, i) => (
+              <div key={i} style={{ display:'flex', gap:14, alignItems:'flex-start', background:'var(--dark2)', borderRadius:8, padding:'12px 16px', borderLeft:`3px solid ${item.color}` }}>
+                <span style={{ color:item.color, fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.9rem', minWidth:140, paddingTop:1 }}>{item.label}</span>
+                <span style={{ color:'var(--gray)', fontSize:'0.92rem', lineHeight:1.6 }}>{item.text}</span>
+              </div>
+            ))}
+          </div>
+          <P>Кнопка <Hl>«Уведомить должников»</Hl> позволяет вручную разослать напоминания всем, у кого статус «К оплате» или «Просрочено» в текущем месяце — не дожидаясь автоматики.</P>
+
+          <H2>6. Экспорт и отчётность</H2>
+          <P>Кнопка <Hl>«Экспорт xlsx»</Hl> формирует файл Excel за выбранный месяц. В файле два листа:</P>
+          <div style={{ background:'var(--dark2)', borderRadius:8, padding:'16px 20px', marginBottom:18, lineHeight:2 }}>
+            <div><span style={{ color:'var(--white)' }}>Все взносы</span> <span style={{ color:'var(--gray)' }}>— полный список всех спортсменов с суммами и статусами.</span></div>
+            <div><span style={{ color:'var(--white)' }}>Долги</span> <span style={{ color:'var(--gray)' }}>— только те, кто не оплатил. Удобно для отчёта тренеру.</span></div>
+          </div>
+
+          <H2>7. Красный счётчик на вкладке</H2>
+          <P>На вкладке «Взносы» в меню кабинета отображается красный счётчик — количество спортсменов с просроченным взносом в текущем месяце. Счётчик обновляется каждые 5 минут автоматически.</P>
+
+          <H3>Важно помнить</H3>
+          <P><Hl>Менеджер — тоже родитель.</Hl> Ваши собственные дети также отображаются в таблице взносов. Фиксировать свою оплату вы можете сами, либо попросить второго менеджера или тренера.</P>
+          <P>Архивные спортсмены не появляются в таблице взносов. История их платежей сохраняется в системе, но в активной работе не участвует.</P>
+
+          <div style={{ margin:'28px 0 4px', padding:'20px 24px', borderTop:'1px solid var(--gray-dim)', borderRight:'1px solid var(--gray-dim)', borderBottom:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', borderRadius:10, background:'var(--dark2)', textAlign:'center' }}>
+            <p style={{ fontStyle:'italic', color:'var(--gray)', fontSize:'0.95rem', lineHeight:1.7, margin:0 }}>
+              Системный учёт взносов освобождает время от рутины.<br/>
+              <span style={{color:'var(--white)'}}>Два клика — и все знают кто оплатил.</span>
+            </p>
           </div>
         </div>
       )}
