@@ -35,6 +35,11 @@ celery_app.conf.update(
             "task":     "app.tasks.generate_weekly_announcement",
             "schedule": crontab(hour=10, minute=0, day_of_week=0),
         },
+        # Генерация взносов — 1-го числа каждого месяца в 09:00
+        "generate-monthly-fees": {
+            "task":     "app.tasks.generate_monthly_fees",
+            "schedule": crontab(day_of_month=1, hour=9, minute=0),
+        },
     },
 )
 
@@ -66,3 +71,16 @@ def fetch_vk_news_task():
 def generate_weekly_announcement():
     from app.tasks.yandex_gpt import run_weekly_announcement
     return run_weekly_announcement()
+
+
+@celery_app.task(name="app.tasks.generate_monthly_fees")
+def generate_monthly_fees_task():
+    from app.core.database import SessionLocal
+    from app.routes.fees import generate_monthly_fees
+    db = SessionLocal()
+    try:
+        count = generate_monthly_fees(db, notify=True)
+        print(f"[fees] Создано записей взносов: {count}")
+        return count
+    finally:
+        db.close()

@@ -8,19 +8,36 @@ const STATUS = {
   pending: { bg: 'var(--dark2)', color: 'var(--gray)', label: 'ОЖИДАНИЕ' },
 }
 
+const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь',
+                   'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
+
+function getRecentPeriods(n = 6) {
+  const result = []
+  const now = new Date()
+  for (let i = 0; i <= n; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+    const label = `${MONTHS_RU[d.getMonth()]} ${d.getFullYear()}`
+    result.push({ value, label })
+  }
+  return result
+}
+
 export default function FeesTab({ token }) {
-  const [deadlines,      setDeadlines]      = useState([])
+  const periods = useMemo(() => getRecentPeriods(6), [])
+
+  const [config,         setConfig]         = useState(null)
   const [fees,           setFees]           = useState([])
   const [summary,        setSummary]        = useState(null)
-  const [selectedPeriod, setSelectedPeriod] = useState('')
+  const [selectedPeriod, setSelectedPeriod] = useState(() => getRecentPeriods(6)[0].value)
   const [filterStatus,   setFilterStatus]   = useState('')
   const [filterGroup,    setFilterGroup]    = useState('')
-  const [deadlineModal,  setDeadlineModal]  = useState(false)
+  const [configModal,    setConfigModal]    = useState(false)
   const [payModal,       setPayModal]       = useState(null)
   const [loading,        setLoading]        = useState(false)
   const [msg,            setMsg]            = useState('')
 
-  // New deadline form
+  // Config form
   const [newDayOfMonth, setNewDayOfMonth] = useState('')
   const [newAmount,     setNewAmount]     = useState('')
   const [saving,        setSaving]        = useState(false)
@@ -29,20 +46,23 @@ export default function FeesTab({ token }) {
   const [payAmount, setPayAmount] = useState('')
   const [payNote,   setPayNote]   = useState('')
 
-  useEffect(() => { loadDeadlines() }, [])
+  useEffect(() => { loadConfig() }, [])
   useEffect(() => { loadFees(); loadSummary() }, [selectedPeriod])
 
-  const loadDeadlines = async () => {
+  const loadConfig = async () => {
     try {
       const r = await fetch(`${API}/fees/deadlines`, { headers: { Authorization: `Bearer ${token}` } })
-      if (r.ok) setDeadlines(await r.json())
+      if (r.ok) {
+        const data = await r.json()
+        setConfig(data.length > 0 ? data[0] : null)
+      }
     } catch {}
   }
 
   const loadFees = async () => {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/fees/`, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await fetch(`${API}/fees/?period=${selectedPeriod}`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) setFees(await r.json())
     } catch {}
     setLoading(false)
@@ -50,15 +70,19 @@ export default function FeesTab({ token }) {
 
   const loadSummary = async () => {
     try {
-      const url = selectedPeriod
-        ? `${API}/fees/summary?period=${selectedPeriod}`
-        : `${API}/fees/summary`
-      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await fetch(`${API}/fees/summary?period=${selectedPeriod}`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) setSummary(await r.json())
     } catch {}
   }
 
-  const createDeadline = async () => {
+  const openConfigModal = () => {
+    setNewDayOfMonth(config ? String(config.day_of_month) : '')
+    setNewAmount(config ? String(config.amount_due) : '')
+    setMsg('')
+    setConfigModal(true)
+  }
+
+  const saveConfig = async () => {
     if (!newDayOfMonth || !newAmount) { setMsg('Заполните все поля'); return }
     const day = parseInt(newDayOfMonth)
     if (day < 1 || day > 28) { setMsg('День должен быть от 1 до 28'); return }
@@ -72,15 +96,14 @@ export default function FeesTab({ token }) {
       })
       if (!r.ok) {
         const err = await r.json().catch(() => ({}))
-        setMsg(err.detail || 'Ошибка при создании дедлайна')
+        setMsg(err.detail || 'Ошибка сохранения')
         setSaving(false)
         return
       }
-      setDeadlineModal(false)
-      setNewDayOfMonth('')
-      setNewAmount('')
-      setMsg('Настройка сохранена')
-      await Promise.all([loadDeadlines(), loadFees(), loadSummary()])
+      setConfigModal(false)
+      await loadConfig()
+      await loadFees()
+      await loadSummary()
     } catch { setMsg('Ошибка соединения') }
     setSaving(false)
   }
@@ -117,10 +140,7 @@ export default function FeesTab({ token }) {
   const exportXlsx = async () => {
     setMsg('')
     try {
-      const url = selectedPeriod
-        ? `${API}/fees/export?period=${selectedPeriod}`
-        : `${API}/fees/export`
-      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await fetch(`${API}/fees/export?period=${selectedPeriod}`, { headers: { Authorization: `Bearer ${token}` } })
       if (!r.ok) {
         const err = await r.json().catch(() => ({}))
         setMsg(err.detail || 'Ошибка экспорта')
@@ -130,7 +150,7 @@ export default function FeesTab({ token }) {
       const objUrl = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = objUrl
-      a.download = `взносы_${selectedPeriod || 'все'}.xlsx`
+      a.download = `взносы_${selectedPeriod}.xlsx`
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -139,68 +159,57 @@ export default function FeesTab({ token }) {
   }
 
   const filteredFees = useMemo(() => fees.filter(f => {
-    if (selectedPeriod && f.period !== selectedPeriod) return false
     if (filterStatus && f.status !== filterStatus) return false
     if (filterGroup && f.athlete_group !== filterGroup) return false
     return true
-  }), [fees, selectedPeriod, filterStatus, filterGroup])
+  }), [fees, filterStatus, filterGroup])
 
   const groups = useMemo(() =>
     [...new Set(fees.map(f => f.athlete_group).filter(Boolean))].sort()
   , [fees])
 
-  const periods = useMemo(() =>
-    [...new Set(fees.map(f => f.period).filter(Boolean))].sort().reverse()
-  , [fees])
-
   const fmt = (n) => Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 
-  // Latest setting (list is ordered newest first)
-  const currentSetting = deadlines.length > 0 ? deadlines[0] : null
+  const selectedPeriodLabel = periods.find(p => p.value === selectedPeriod)?.label || selectedPeriod
 
   return (
     <div>
-      {/* ── Модал настройки дедлайна ── */}
-      {deadlineModal && (
-        <div className="modal-overlay" onClick={() => setDeadlineModal(false)}>
+      {/* ── Модал настройки взноса ── */}
+      {configModal && (
+        <div className="modal-overlay" onClick={() => setConfigModal(false)}>
           <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
             <h3 style={{ marginBottom: 16 }}>Настройка ежемесячного взноса</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={{ color: 'var(--gray)', fontSize: '0.8rem', display: 'block', marginBottom: 4 }}>День месяца для дедлайна</label>
                 <input
-                  type="number"
-                  min="1"
-                  max="28"
+                  type="number" min="1" max="28"
                   value={newDayOfMonth}
                   onChange={e => setNewDayOfMonth(e.target.value)}
                   placeholder="Например: 10"
-                  className="td-input"
-                  style={{ width: '100%' }}
+                  className="td-input" style={{ width: '100%' }}
                 />
                 <div style={{ color: 'var(--gray)', fontSize: '0.75rem', marginTop: 4 }}>
-                  Взносы будут считаться просроченными если не внесены до этого числа каждого месяца
+                  Взносы считаются просроченными если не внесены до этого числа каждого месяца
                 </div>
               </div>
               <div>
                 <label style={{ color: 'var(--gray)', fontSize: '0.8rem', display: 'block', marginBottom: 4 }}>Сумма взноса (руб.)</label>
                 <input
-                  type="number"
-                  min="0"
+                  type="number" min="0"
                   value={newAmount}
                   onChange={e => setNewAmount(e.target.value)}
                   placeholder="2000"
-                  className="td-input"
-                  style={{ width: '100%' }}
+                  className="td-input" style={{ width: '100%' }}
                 />
               </div>
             </div>
             {msg && <div className="att-msg" style={{ marginTop: 10 }}>{msg}</div>}
             <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-              <button className="btn-primary" style={{ padding: '8px 20px', fontSize: '13px' }} onClick={createDeadline} disabled={saving}>
-                {saving ? 'Сохранение...' : 'Сохранить'}
+              <button className="btn-primary" style={{ padding: '8px 20px', fontSize: '13px' }} onClick={saveConfig} disabled={saving}>
+                {saving ? 'Сохранение...' : 'Сохранить настройку'}
               </button>
-              <button className="btn-outline" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => { setDeadlineModal(false); setMsg('') }}>Отмена</button>
+              <button className="btn-outline" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => setConfigModal(false)}>Отмена</button>
             </div>
           </div>
         </div>
@@ -215,24 +224,11 @@ export default function FeesTab({ token }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <label style={{ color: 'var(--gray)', fontSize: '0.8rem', display: 'block', marginBottom: 4 }}>Сумма (руб.)</label>
-                <input
-                  type="number"
-                  value={payAmount}
-                  onChange={e => setPayAmount(e.target.value)}
-                  className="td-input"
-                  style={{ width: '100%' }}
-                />
+                <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} className="td-input" style={{ width: '100%' }} />
               </div>
               <div>
                 <label style={{ color: 'var(--gray)', fontSize: '0.8rem', display: 'block', marginBottom: 4 }}>Примечание</label>
-                <input
-                  type="text"
-                  value={payNote}
-                  onChange={e => setPayNote(e.target.value)}
-                  placeholder="необязательно"
-                  className="td-input"
-                  style={{ width: '100%' }}
-                />
+                <input type="text" value={payNote} onChange={e => setPayNote(e.target.value)} placeholder="необязательно" className="td-input" style={{ width: '100%' }} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
@@ -246,12 +242,12 @@ export default function FeesTab({ token }) {
       )}
 
       {/* ── Сообщение ── */}
-      {msg && !deadlineModal && <div className="att-msg" style={{ marginBottom: 12 }}>{msg}</div>}
+      {msg && !configModal && <div className="att-msg" style={{ marginBottom: 12 }}>{msg}</div>}
 
       {/* ── Текущая настройка ── */}
-      {currentSetting && (
+      {config && (
         <div style={{ color: 'var(--gray)', fontSize: '0.82rem', marginBottom: 10 }}>
-          Дедлайн: каждое {currentSetting.day_of_month}-е число&nbsp;·&nbsp;Сумма: {fmt(currentSetting.amount_due)} руб.
+          Дедлайн: каждое {config.day_of_month}-е число&nbsp;·&nbsp;Сумма: {fmt(config.amount_due)} руб.
         </div>
       )}
 
@@ -260,16 +256,12 @@ export default function FeesTab({ token }) {
         <select
           value={selectedPeriod}
           onChange={e => setSelectedPeriod(e.target.value)}
-          className="td-input"
-          style={{ minWidth: 160 }}
+          className="td-input" style={{ minWidth: 160 }}
         >
-          <option value="">Все периоды</option>
-          {periods.map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
+          {periods.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
         </select>
-        <button className="btn-primary" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => { setMsg(''); setDeadlineModal(true) }}>
-          {currentSetting ? 'Изменить настройку' : '+ Дедлайн'}
+        <button className="btn-primary" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={openConfigModal}>
+          Настройка взноса
         </button>
         <button className="btn-outline" style={{ padding: '8px 14px', fontSize: '13px' }} onClick={exportXlsx}>
           Экспорт xlsx
@@ -361,7 +353,9 @@ export default function FeesTab({ token }) {
               })}
             </tbody>
           </table>
-          {filteredFees.length === 0 && <div className="cabinet-empty">Взносов не найдено</div>}
+          {filteredFees.length === 0 && (
+            <div className="cabinet-empty">Взносов за {selectedPeriodLabel} нет</div>
+          )}
         </div>
       )}
     </div>

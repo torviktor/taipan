@@ -26,7 +26,7 @@ def require_manager(u: User = Depends(get_current_user)) -> User:
 # ── Схемы ─────────────────────────────────────────────────────────────────────
 
 class DeadlineCreate(BaseModel):
-    day_of_month: int   # 1–28, дедлайн каждого месяца
+    day_of_month: int   # 1–28
     amount_due: float
 
 
@@ -35,7 +35,19 @@ class PayBody(BaseModel):
     note: Optional[str] = None
 
 
-# ── Хелперы ───────────────────────────────────────────────────────────────────
+# ── Константы ─────────────────────────────────────────────────────────────────
+
+MONTHS_RU = {
+    1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель',
+    5: 'Май', 6: 'Июнь', 7: 'Июль', 8: 'Август',
+    9: 'Сентябрь', 10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь',
+}
+
+MONTHS_RU_GEN = {
+    1: "январь", 2: "февраль", 3: "март", 4: "апрель",
+    5: "май", 6: "июнь", 7: "июль", 8: "август",
+    9: "сентябрь", 10: "октябрь", 11: "ноябрь", 12: "декабрь",
+}
 
 STATUS_ORDER = {
     FeeStatus.overdue: 0,
@@ -44,15 +56,15 @@ STATUS_ORDER = {
     FeeStatus.paid: 3,
 }
 
-MONTH_RU = {
-    1: "январь", 2: "февраль", 3: "март", 4: "апрель",
-    5: "май", 6: "июнь", 7: "июль", 8: "август",
-    9: "сентябрь", 10: "октябрь", 11: "ноябрь", 12: "декабрь",
-}
-
 
 def period_label(d: date_type) -> str:
-    return f"{MONTH_RU.get(d.month, str(d.month))} {d.year}"
+    """Для уведомлений: 'январь 2026'"""
+    return f"{MONTHS_RU_GEN.get(d.month, str(d.month))} {d.year}"
+
+
+def period_label_nom(d: date_type) -> str:
+    """Для отображения: 'Январь 2026'"""
+    return f"{MONTHS_RU.get(d.month, str(d.month))} {d.year}"
 
 
 def fee_to_dict(f: MonthlyFee) -> dict:
@@ -62,6 +74,7 @@ def fee_to_dict(f: MonthlyFee) -> dict:
     debt = max(0.0, amount_due - amount_paid)
     athlete = f.athlete
     parent = athlete.user if athlete else None
+    period = f.period
     return {
         "id": f.id,
         "athlete_id": f.athlete_id,
@@ -69,7 +82,8 @@ def fee_to_dict(f: MonthlyFee) -> dict:
         "athlete_group": (athlete.group or athlete.auto_group) if athlete else "",
         "parent_name": parent.full_name if parent else "",
         "parent_phone": parent.phone if parent else "",
-        "period": str(f.period),
+        "period": str(period),
+        "period_label": period_label_nom(period) if period else "",
         "amount_due": amount_due,
         "amount_paid": amount_paid,
         "debt": debt,
@@ -79,6 +93,59 @@ def fee_to_dict(f: MonthlyFee) -> dict:
         "note": f.note,
         "paid_at": f.paid_at.isoformat() if f.paid_at else None,
     }
+
+
+# ── Генерация взносов ──────────────────────────────────────────────────────────
+
+def generate_monthly_fees(db: Session, notify: bool = True) -> int:
+    """
+    Создать MonthlyFee записи для всех активных спортсменов на текущий месяц.
+    Вызывается при сохранении настройки и планировщиком каждый месяц.
+    """
+    today = date_type.today()
+    period = date_type(today.year, today.month, 1)
+
+    config = db.query(FeeDeadline).order_by(FeeDeadline.created_at.desc()).first()
+    if not config:
+        return 0
+
+    athletes = db.query(Athlete).filter(Athlete.is_archived == False).all()
+
+    new_athlete_ids = []
+    for athlete in athletes:
+        exists = db.query(MonthlyFee).filter(
+            MonthlyFee.athlete_id == athlete.id,
+            MonthlyFee.period == period,
+        ).first()
+        if exists:
+            continue
+        db.add(MonthlyFee(
+            athlete_id=athlete.id,
+            deadline_id=config.id,
+            period=period,
+            amount_due=config.amount_due,
+            amount_paid=0,
+        ))
+        new_athlete_ids.append(athlete.id)
+
+    db.commit()
+
+    if notify and new_athlete_ids:
+        deadline_str = config.deadline.strftime("%d.%m.%Y")
+        plabel = period_label(period)
+        amount_str = f"{float(config.amount_due):.0f}"
+        new_ids_set = set(new_athlete_ids)
+        for athlete in athletes:
+            if athlete.id in new_ids_set and athlete.user_id:
+                db.add(Notification(
+                    user_id=athlete.user_id,
+                    type="fee",
+                    title=f"Клубный взнос за {plabel}",
+                    body=f"Внесите оплату до {deadline_str}. Сумма: {amount_str} руб.",
+                ))
+        db.commit()
+
+    return len(new_athlete_ids)
 
 
 # ── Дедлайны ──────────────────────────────────────────────────────────────────
@@ -113,60 +180,32 @@ def create_deadline(
     period = date_type(today.year, today.month, 1)
     current_deadline = date_type(today.year, today.month, body.day_of_month)
 
-    # Check duplicate for current period
-    existing = db.query(FeeDeadline).filter(FeeDeadline.period == period).first()
-    if existing:
-        raise HTTPException(400, "Дедлайн для текущего месяца уже существует")
-
-    deadline_obj = FeeDeadline(
-        period=period,
-        deadline=current_deadline,
-        amount_due=body.amount_due,
-        created_by=current_user.id,
-    )
-    db.add(deadline_obj)
-    db.flush()
-
-    athletes = db.query(Athlete).filter(Athlete.is_archived == False).all()
-    plabel = period_label(period)
-    deadline_str = current_deadline.strftime("%d.%m.%Y")
-
-    added = 0
-    for athlete in athletes:
-        # Skip if MonthlyFee already exists for this athlete + period
-        existing_fee = db.query(MonthlyFee).filter(
-            MonthlyFee.athlete_id == athlete.id,
-            MonthlyFee.period == period,
-        ).first()
-        if existing_fee:
-            continue
-
-        fee = MonthlyFee(
-            athlete_id=athlete.id,
-            deadline_id=deadline_obj.id,
+    # Upsert: обновляем существующую настройку или создаём новую
+    config = db.query(FeeDeadline).order_by(FeeDeadline.created_at.desc()).first()
+    if config:
+        config.period = period
+        config.deadline = current_deadline
+        config.amount_due = body.amount_due
+        db.commit()
+        db.refresh(config)
+    else:
+        config = FeeDeadline(
             period=period,
+            deadline=current_deadline,
             amount_due=body.amount_due,
-            amount_paid=0,
+            created_by=current_user.id,
         )
-        db.add(fee)
+        db.add(config)
+        db.commit()
+        db.refresh(config)
 
-        if athlete.user_id:
-            notif = Notification(
-                user_id=athlete.user_id,
-                type="fee",
-                title=f"Клубный взнос за {plabel}",
-                body=f"Внесите оплату до {deadline_str}. Сумма: {body.amount_due:.0f} руб.",
-            )
-            db.add(notif)
-        added += 1
+    created = generate_monthly_fees(db, notify=True)
 
-    db.commit()
-    db.refresh(deadline_obj)
     return {
-        "id": deadline_obj.id,
-        "day_of_month": deadline_obj.deadline.day,
-        "amount_due": float(deadline_obj.amount_due),
-        "athletes_count": added,
+        "day_of_month": config.deadline.day,
+        "amount_due": float(config.amount_due),
+        "athletes_count": created,
+        "message": "Настройка сохранена",
     }
 
 
@@ -174,10 +213,20 @@ def create_deadline(
 
 @router.get("/")
 def list_fees(
+    period: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     _: User = Depends(require_manager),
 ):
-    fees = db.query(MonthlyFee).all()
+    today = date_type.today()
+    if period:
+        try:
+            period_date = date_type.fromisoformat(period)
+        except ValueError:
+            period_date = date_type(today.year, today.month, 1)
+    else:
+        period_date = date_type(today.year, today.month, 1)
+
+    fees = db.query(MonthlyFee).filter(MonthlyFee.period == period_date).all()
     result = [fee_to_dict(f) for f in fees]
     result.sort(key=lambda x: STATUS_ORDER.get(FeeStatus(x["status"]), 99))
     return result
@@ -205,17 +254,15 @@ def pay_fee(
     else:
         fee.paid_at = None
 
-    # Notify parent
     athlete = fee.athlete
-    if athlete:
+    if athlete and athlete.user_id:
         plabel = period_label(fee.period)
-        notif = Notification(
+        db.add(Notification(
             user_id=athlete.user_id,
             type="fee",
             title=f"Взнос за {plabel} принят",
             body=f"Получено: {body.amount_paid:.0f} руб. из {float(fee.amount_due):.0f} руб.",
-        )
-        db.add(notif)
+        ))
 
     db.commit()
     db.refresh(fee)
@@ -236,9 +283,20 @@ def my_fees(
     athlete_ids = [a.id for a in athletes]
     if not athlete_ids:
         return []
-    fees = db.query(MonthlyFee).filter(MonthlyFee.athlete_id.in_(athlete_ids)).all()
+
+    today = date_type.today()
+    y, m = today.year, today.month - 6
+    if m <= 0:
+        y -= 1
+        m += 12
+    since = date_type(y, m, 1)
+
+    fees = db.query(MonthlyFee).filter(
+        MonthlyFee.athlete_id.in_(athlete_ids),
+        MonthlyFee.period >= since,
+    ).all()
     result = [fee_to_dict(f) for f in fees]
-    result.sort(key=lambda x: (x["period"] or "", STATUS_ORDER.get(FeeStatus(x["status"]), 99)))
+    result.sort(key=lambda x: x["period"] or "", reverse=True)
     return result
 
 
@@ -250,15 +308,16 @@ def summary(
     db: Session = Depends(get_db),
     _: User = Depends(require_manager),
 ):
-    query = db.query(MonthlyFee)
+    today = date_type.today()
     if period:
         try:
             period_date = date_type.fromisoformat(period)
-            query = query.filter(MonthlyFee.period == period_date)
         except ValueError:
-            pass
+            period_date = date_type(today.year, today.month, 1)
+    else:
+        period_date = date_type(today.year, today.month, 1)
 
-    fees = query.all()
+    fees = db.query(MonthlyFee).filter(MonthlyFee.period == period_date).all()
     total_due = sum(float(f.amount_due or 0) for f in fees)
     total_paid = sum(float(f.amount_paid or 0) for f in fees)
     total_debt = max(0.0, total_due - total_paid)
@@ -285,19 +344,20 @@ def export_fees(
 ):
     try:
         import openpyxl
-        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.styles import Font
     except ImportError:
         raise HTTPException(500, "openpyxl не установлен")
 
-    query = db.query(MonthlyFee)
+    today = date_type.today()
     if period:
         try:
             period_date = date_type.fromisoformat(period)
-            query = query.filter(MonthlyFee.period == period_date)
         except ValueError:
-            pass
+            period_date = date_type(today.year, today.month, 1)
+    else:
+        period_date = date_type(today.year, today.month, 1)
 
-    fees = query.all()
+    fees = db.query(MonthlyFee).filter(MonthlyFee.period == period_date).all()
     dicts = [fee_to_dict(f) for f in fees]
 
     STATUS_RU = {
@@ -309,11 +369,10 @@ def export_fees(
 
     wb = openpyxl.Workbook()
 
-    # Sheet 1: все взносы
     ws1 = wb.active
     ws1.title = "Все взносы"
-    headers = ["Спортсмен", "Группа", "Родитель", "Телефон", "Период", "К оплате", "Внесено", "Долг", "Дедлайн", "Статус", "Примечание"]
-    ws1.append(headers)
+    col_headers = ["Спортсмен", "Группа", "Родитель", "Телефон", "Период", "К оплате", "Внесено", "Долг", "Дедлайн", "Статус", "Примечание"]
+    ws1.append(col_headers)
     for cell in ws1[1]:
         cell.font = Font(bold=True)
 
@@ -323,7 +382,7 @@ def export_fees(
             d["athlete_group"],
             d["parent_name"],
             d["parent_phone"],
-            d["period"],
+            d["period_label"],
             d["amount_due"],
             d["amount_paid"],
             d["debt"],
@@ -332,9 +391,8 @@ def export_fees(
             d["note"] or "",
         ])
 
-    # Sheet 2: долги
     ws2 = wb.create_sheet("Долги")
-    ws2.append(headers)
+    ws2.append(col_headers)
     for cell in ws2[1]:
         cell.font = Font(bold=True)
 
@@ -345,7 +403,7 @@ def export_fees(
                 d["athlete_group"],
                 d["parent_name"],
                 d["parent_phone"],
-                d["period"],
+                d["period_label"],
                 d["amount_due"],
                 d["amount_paid"],
                 d["debt"],
@@ -358,10 +416,10 @@ def export_fees(
     wb.save(buf)
     buf.seek(0)
 
-    filename = f"взносы_{period or 'все'}.xlsx"
-    headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
+    filename = f"взносы_{period or 'текущий'}.xlsx"
+    resp_headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers=headers,
+        headers=resp_headers,
     )

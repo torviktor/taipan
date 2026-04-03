@@ -32,7 +32,7 @@ export default function MyFeesTab({ token }) {
       {loading && <div className="cabinet-loading">Загрузка...</div>}
 
       {!loading && fees.length === 0 && (
-        <div className="cabinet-empty">Взносов нет.</div>
+        <div className="cabinet-empty">Данные о взносах появятся в начале месяца.</div>
       )}
 
       {!loading && fees.length > 0 && (
@@ -40,9 +40,8 @@ export default function MyFeesTab({ token }) {
           <table className="athletes-table">
             <thead>
               <tr>
-                <th style={{ textAlign: 'left' }}>Спортсмен</th>
-                <th>Период</th>
-                <th>Сумма</th>
+                <th style={{ textAlign: 'left' }}>Период</th>
+                <th>К оплате</th>
                 <th>Внесено</th>
                 <th>Долг</th>
                 <th>Статус</th>
@@ -53,8 +52,7 @@ export default function MyFeesTab({ token }) {
                 const st = STATUS[f.status] || STATUS.pending
                 return (
                   <tr key={f.id}>
-                    <td className="td-name">{f.athlete_name}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{f.period}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{f.period_label || f.period}</td>
                     <td>{fmt(f.amount_due)}</td>
                     <td style={{ color: f.amount_paid > 0 ? '#4caf50' : 'var(--gray)' }}>{fmt(f.amount_paid)}</td>
                     <td style={{ color: f.debt > 0 ? 'var(--red)' : 'var(--gray)' }}>{fmt(f.debt)}</td>
