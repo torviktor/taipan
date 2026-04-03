@@ -255,9 +255,12 @@ export default function Cabinet() {
     p.parent_name.toLowerCase().includes(search.toLowerCase()) ||
     p.children.join(' ').toLowerCase().includes(search.toLowerCase())
   )
+  const isAnalyticsApp = (a) => !!(a.comment && a.comment.toLowerCase().includes('аналитику'))
+
   const filteredApps = applications.filter(a =>
-    a.full_name.toLowerCase().includes(search.toLowerCase()) ||
-    (a.phone||'').includes(search)
+    (a.status === 'new' || a.status === 'processing') &&
+    (a.full_name.toLowerCase().includes(search.toLowerCase()) ||
+    (a.phone||'').includes(search))
   )
 
   const { sorted: sortedAthletes, sort: sortA,  toggle: toggleA  } = useSorted(filteredAthletes)
@@ -653,19 +656,26 @@ export default function Cabinet() {
                   <Th colKey="created_at" sort={sortAp} toggle={toggleAp}>Дата</Th>
                   <Th colKey="full_name"  sort={sortAp} toggle={toggleAp}>ФИО</Th>
                   <Th colKey="phone"      sort={sortAp} toggle={toggleAp}>Телефон</Th>
+                  <th>Тип</th>
                   <th>Комментарий</th>
                   <th>Действия</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedApps.map(a => (
+                {sortedApps.map(a => {
+                  const isAnalytics = isAnalyticsApp(a)
+                  const typeBadge = isAnalytics
+                    ? <span style={{ display:'inline-block', padding:'2px 8px', borderRadius:3, fontSize:'0.72rem', fontFamily:'Barlow Condensed', fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', background:'rgba(200,150,42,0.15)', color:'#c8962a', border:'1px solid rgba(200,150,42,0.4)', whiteSpace:'nowrap' }}>Аналитика</span>
+                    : <span style={{ display:'inline-block', padding:'2px 8px', borderRadius:3, fontSize:'0.72rem', fontFamily:'Barlow Condensed', fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', background:'rgba(108,186,108,0.12)', color:'#6cba6c', border:'1px solid rgba(108,186,108,0.35)', whiteSpace:'nowrap' }}>Первичное посещение</span>
+                  return (
                   <tr key={a.id}>
                     <td style={{ whiteSpace:'nowrap' }}>{new Date(a.created_at).toLocaleDateString('ru')}</td>
                     <td className="td-name">{a.full_name}</td>
                     <td>{a.phone}</td>
+                    <td>{typeBadge}</td>
                     <td style={{ fontSize:'13px', color:'var(--gray)', maxWidth:'200px' }}>{a.comment || '—'}</td>
                     <td className="td-actions">
-                      <button className="td-btn td-btn-edit" onClick={() => openAnalyticsFromApp(a)}>Исполнить</button>
+                      <button className="td-btn td-btn-edit" onClick={() => isAnalytics ? openAnalyticsFromApp(a) : updateAppStatus(a.id, 'confirmed')}>Исполнить</button>
                       <button className="td-btn td-btn-del" onClick={() => setDeleteAppConfirm({ id: a.id, full_name: a.full_name })}>Удалить</button>
                       {(localStorage.getItem('phone') || '').replace(/[\+\s\-\(\)]/g, '') === '79253653597' && (() => {
                         const matched = athletes.find(x => x.full_name.toLowerCase() === a.full_name.toLowerCase() || x.parent_name?.toLowerCase() === a.full_name.toLowerCase())
@@ -687,7 +697,8 @@ export default function Cabinet() {
                       })()}
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
             {sortedApps.length === 0 && !loading && <div className="cabinet-empty">Заявок нет</div>}
