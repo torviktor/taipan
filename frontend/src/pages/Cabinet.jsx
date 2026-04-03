@@ -32,6 +32,8 @@ const InfoTab           = lazy(() => import('../cabinet/InfoTab'))
 const AnalyticsAdminTab = lazy(() => import('../cabinet/AnalyticsAdminTab'))
 const CompetitionsTab   = lazy(() => import('../cabinet/CompetitionsTab'))
 const NewsTab           = lazy(() => import('../cabinet/NewsTab'))
+const FeesTab           = lazy(() => import('../cabinet/FeesTab'))
+const MyFeesTab         = lazy(() => import('../cabinet/MyFeesTab'))
 
 
 
@@ -66,13 +68,42 @@ export default function Cabinet() {
   const [deleteAppConfirm, setDeleteAppConfirm] = useState(null) // { id, full_name }
   const [cf, setCfState] = useState({ gender:'', group:'', gup_dan:'', parent_name:'' })
   const setCf = (k, v) => setCfState(f => ({ ...f, [k]: v }))
+  const [userRoles, setUserRoles] = useState({}) // user_id → role
   const resetFilters = () => { setSearch(''); setCfState({ gender:'', group:'', gup_dan:'', parent_name:'' }) }
 
   useEffect(() => {
     if (!token) { navigate('/login'); return }
-    if (isAdmin) { loadAthletes(); loadApplications() }
+    if (isAdmin) { loadAthletes(); loadApplications(); loadUserRoles() }
     else loadMyAthletes()
   }, [])
+
+  const loadUserRoles = async () => {
+    try {
+      const r = await fetch(`${API}/users/`, { headers: { Authorization: `Bearer ${token}` } })
+      if (r.ok) {
+        const data = await r.json()
+        const map = {}
+        data.forEach(u => { map[u.id] = u.role })
+        setUserRoles(map)
+      }
+    } catch {}
+  }
+
+  const changeUserRole = async (userId, newRole) => {
+    try {
+      const r = await fetch(`${API}/users/${userId}/role`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole }),
+      })
+      if (r.ok) {
+        setUserRoles(prev => ({ ...prev, [userId]: newRole }))
+      } else {
+        const err = await r.json()
+        alert(err.detail || 'Ошибка')
+      }
+    } catch {}
+  }
 
   const loadAthletes = async () => {
     setLoading(true)
@@ -300,6 +331,7 @@ export default function Cabinet() {
             </button>
             <button className={`cabinet-tab ${parentView==='analytics'?'active':''}`} onClick={() => setParentView('analytics')}>Аналитика</button>
             <button className={`cabinet-tab ${parentView==='insurance'?'active':''}`} onClick={() => setParentView('insurance')}>Страхование</button>
+            <button className={`cabinet-tab ${parentView==='fees'?'active':''}`} onClick={() => setParentView('fees')}>Взносы</button>
             <button className={`cabinet-tab ${parentView==='info'?'active':''}`} style={{color: parentView==='info' ? undefined : 'var(--gray)'}} onClick={() => setParentView('info')}>Информация</button>
           </div>
 
@@ -339,6 +371,7 @@ export default function Cabinet() {
           {parentView === 'rating'        && !loading && <RatingTab token={token} myAthleteIds={myAthletes.map(a=>a.id)}/>}
           {parentView === 'notifications' && <NotificationsTab token={token}/>}
           {parentView === 'insurance'     && <ParentInsuranceTab token={token} athletes={myAthletes}/>}
+          {parentView === 'fees'          && <MyFeesTab token={token}/>}
           {parentView === 'info'          && <InfoTab isAdmin={false} token={token}/>}
           {parentView === 'analytics'     && !loading && <ParentAnalyticsTab token={token} athletes={myAthletes}/>}
         </div>
@@ -375,6 +408,7 @@ export default function Cabinet() {
       <button className={`cabinet-tab ${view==='athletes'?'active':''}`} onClick={() => setView('athletes')}>Спортсмены ({athletes.filter(a=>!a.is_archived).length})</button>
       <button className={`cabinet-tab ${view==='parents'?'active':''}`} onClick={() => setView('parents')}>Родители ({parents.length})</button>
       <button className={`cabinet-tab ${view==='insurance_admin'?'active':''}`} onClick={() => setView('insurance_admin')}>Страхование</button>
+      <button className={`cabinet-tab ${view==='fees'?'active':''}`} onClick={() => setView('fees')}>Взносы</button>
       <button className={`cabinet-tab ${view==='archive'?'active':''}`} style={{ color: view==='archive' ? undefined : 'var(--gray)' }} onClick={() => setView('archive')}>Архив ({athletes.filter(a=>a.is_archived).length})</button>
       <button className={`cabinet-tab ${view==='applications'?'active':''}`} onClick={() => setView('applications')}>Заявки{applications.filter(a => a.status==='new').length > 0 && <span className="tab-badge">{applications.filter(a => a.status==='new').length}</span>}</button>
       <button className={`cabinet-tab ${view==='hof'?'active':''}`} style={{ color: view==='hof' ? undefined : '#c8962a' }} onClick={() => setView('hof')}>Зал Славы</button>
@@ -409,7 +443,7 @@ export default function Cabinet() {
 
           </div>
 
-        {view !== 'attendance' && view !== 'competitions' && view !== 'rating' && view !== 'certification' && view !== 'achievements' && view !== 'camps' && view !== 'archive' && view !== 'analytics' && view !== 'insurance_admin' && (
+        {view !== 'attendance' && view !== 'competitions' && view !== 'rating' && view !== 'certification' && view !== 'achievements' && view !== 'camps' && view !== 'archive' && view !== 'analytics' && view !== 'insurance_admin' && view !== 'fees' && (
           <div className="cabinet-toolbar">
             <div className="cabinet-search">
               <input type="text" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} />
@@ -434,6 +468,7 @@ export default function Cabinet() {
         {view === 'analytics'     && <AnalyticsAdminTab token={token} athletes={athletes} />}
         {view === 'insurance_admin' && <InsuranceAdminTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'hof'           && <HallOfFameAdmin token={token} />}
+        {view === 'fees'          && <FeesTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'archive'       && (
           <div>
             <div style={{ marginBottom:16, color:'var(--gray)', fontSize:'0.9rem' }}>
@@ -597,6 +632,7 @@ export default function Cabinet() {
                     <Th colKey="parent_name"  sort={sortP} toggle={toggleP}>ФИО</Th>
                     <Th colKey="parent_phone" sort={sortP} toggle={toggleP}>Телефон</Th>
                     <Th colKey="children"     sort={sortP} toggle={toggleP}>Спортсмены</Th>
+                    <th>Роль</th>
                     <th>Пароль</th>
                     <th></th>
                   </tr>
@@ -612,6 +648,24 @@ export default function Cabinet() {
                       </td>
                       <td>{p.parent_phone}</td>
                       <td>{p.children.join(', ') || '—'}</td>
+                      <td>
+                        {role === 'admin' ? (
+                          <select
+                            value={userRoles[p.user_id] || 'parent'}
+                            onChange={e => changeUserRole(p.user_id, e.target.value)}
+                            className="td-input td-input-sm"
+                            style={{ color: userRoles[p.user_id] === 'admin' ? 'var(--red)' : userRoles[p.user_id] === 'manager' ? '#c8962a' : 'var(--gray)' }}
+                          >
+                            <option value="parent">parent</option>
+                            <option value="manager">manager</option>
+                            <option value="admin">admin</option>
+                          </select>
+                        ) : (
+                          <span style={{ fontSize: '0.78rem', color: userRoles[p.user_id] === 'admin' ? 'var(--red)' : userRoles[p.user_id] === 'manager' ? '#c8962a' : 'var(--gray)' }}>
+                            {userRoles[p.user_id] || 'parent'}
+                          </span>
+                        )}
+                      </td>
                       <td><button className="td-btn td-btn-edit" onClick={() => setResetUser(p)}>Сбросить пароль</button></td>
                       <td><button className="td-btn" style={{color:'var(--gray)',border:'1px solid var(--gray-dim)'}} onClick={() => archiveParent(p.user_id, null)}>В архив</button></td>
                     </tr>

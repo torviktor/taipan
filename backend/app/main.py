@@ -19,8 +19,10 @@ from app.routes.news_admin import router as news_admin_router
 from app.routes.insurance_strategy import router as insurance_strategy_router
 from app.routes.analytics import router as analytics_router
 from app.routes.competition_files import router as competition_files_router
+from app.routes.fees import router as fees_router
 from app.models import user, event, attendance, competition, certification, achievement, camp
 from app.models import hall_of_fame, analytics, news, competition_file
+from app.models import fees as fees_model
 import os
 
 Base.metadata.create_all(bind=engine)
@@ -66,6 +68,7 @@ app.include_router(competition_files_router,  prefix="/api", tags=["Файлы �
 app.include_router(news_router,       prefix="/api", tags=["Новости"])
 app.include_router(news_admin_router,  prefix="/api", tags=["Новости Admin"])
 app.include_router(hof_router,               prefix="/api",              tags=["Зал Славы"])
+app.include_router(fees_router,              prefix="/api/fees",         tags=["fees"])
 
 @app.get("/health")
 def health():

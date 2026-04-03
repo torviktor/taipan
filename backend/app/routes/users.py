@@ -219,6 +219,34 @@ def delete_athlete(
     db.commit()
     return {"ok": True}
 
+# ─── Смена роли пользователя (только admin) ──────────────────────────────────
+class RoleUpdateRequest(BaseModel):
+    role: str
+
+@router.patch("/{user_id}/role")
+def update_user_role(
+    user_id: int, data: RoleUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(403, "Только администратор может менять роли")
+    allowed_roles = ("parent", "athlete", "manager", "admin")
+    if data.role not in allowed_roles:
+        raise HTTPException(400, f"Недопустимая роль. Разрешены: {', '.join(allowed_roles)}")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "Пользователь не найден")
+    # Cannot demote last admin
+    if user.role == "admin" and data.role != "admin":
+        admin_count = db.query(User).filter(User.role == "admin").count()
+        if admin_count <= 1:
+            raise HTTPException(400, "Нельзя понизить роль единственного администратора")
+    user.role = data.role
+    db.commit()
+    return {"ok": True, "user_id": user_id, "role": data.role}
+
+
 # ─── Сброс пароля (только admin/manager) ─────────────────────────────────────
 @router.patch("/{user_id}/reset-password")
 def reset_password(

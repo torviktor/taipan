@@ -44,6 +44,7 @@ export default function NotificationsTab({ token }) {
     if (t === 'certification') return { text: 'АТТЕСТ.', color: '#6a8ecb', bg: '#1a1a2e' }
     if (t === 'competition')   return { text: 'ТУРНИР',  color: '#c8962a', bg: '#2a1e0a' }
     if (t === 'camp')          return { text: 'СБОРЫ',   color: '#6cba6c', bg: '#1c2a1c' }
+    if (t === 'fee')           return { text: 'ВЗНОС',   color: '#4caf50', bg: '#1a2e1a' }
     return                            { text: 'INFO',    color: 'var(--gray)', bg: 'var(--dark)' }
   }
   const unreadCount = notifs.filter(n => !n.is_read).length
