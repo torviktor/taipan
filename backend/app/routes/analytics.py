@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
+from sqlalchemy import func, case
 from typing import Optional
 from datetime import date
 from app.core.database import get_db
@@ -205,11 +205,11 @@ def export_analytics_data(athlete_id: int, db: Session = Depends(get_db),
 
     att_top = (db.query(Athlete.id, Athlete.full_name,
                         func.count(Attendance.id).label("tot"),
-                        func.sum(Attendance.present.cast('integer')).label("pres"))
+                        func.sum(case((Attendance.present, 1), else_=0)).label("pres"))
                .join(Attendance, Athlete.id == Attendance.athlete_id)
                .filter(Athlete.is_archived == False)
                .group_by(Athlete.id)
-               .order_by(func.sum(Attendance.present.cast('integer')).desc()).limit(10).all())
+               .order_by(func.sum(case((Attendance.present, 1), else_=0)).desc()).limit(10).all())
 
     attendance = {
         "total": tot_att, "present": pres_att, "absent": tot_att - pres_att,

@@ -104,13 +104,16 @@ def get_session(session_id: int, db: Session = Depends(get_db), _=Depends(requir
     if not s:
         raise HTTPException(status_code=404, detail="Не найдено")
 
-    # Загружаем всех спортсменов группы
-    athletes = db.query(Athlete).filter(
-        Athlete.group == ("Младшая группа" if s.group_name == "junior" else "Старшая группа")
-    ).all()
-
     # Текущие отметки
     marks = {r.athlete_id: r.present for r in s.records}
+
+    # Если есть записи — берём спортсменов из них (надёжнее точного совпадения по группе)
+    if marks:
+        athletes = db.query(Athlete).filter(Athlete.id.in_(marks.keys())).all()
+    else:
+        athletes = db.query(Athlete).filter(
+            Athlete.group == ("Младшая группа" if s.group_name == "junior" else "Старшая группа")
+        ).all()
 
     return {
         "id": s.id,
