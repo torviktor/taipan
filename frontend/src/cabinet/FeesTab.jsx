@@ -137,6 +137,25 @@ export default function FeesTab({ token }) {
     setSaving(false)
   }
 
+  const notifyOverdue = async () => {
+    setMsg('')
+    try {
+      const res = await fetch(`${API}/fees/notify-overdue`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const d = await res.json()
+        setMsg(d.sent > 0
+          ? `Уведомления отправлены: ${d.sent} чел.`
+          : 'Должников без уведомления не найдено')
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setMsg(err.detail || 'Ошибка отправки уведомлений')
+      }
+    } catch (e) { setMsg('Ошибка: ' + e.message) }
+  }
+
   const exportXlsx = async () => {
     setMsg('')
     try {
@@ -262,6 +281,9 @@ export default function FeesTab({ token }) {
         </select>
         <button className="btn-primary" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={openConfigModal}>
           Настройка взноса
+        </button>
+        <button className="btn-outline" style={{ padding: '8px 14px', fontSize: '13px' }} onClick={notifyOverdue}>
+          Уведомить должников
         </button>
         <button className="btn-outline" style={{ padding: '8px 14px', fontSize: '13px' }} onClick={exportXlsx}>
           Экспорт xlsx

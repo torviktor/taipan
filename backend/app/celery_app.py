@@ -40,6 +40,11 @@ celery_app.conf.update(
             "task":     "app.tasks.generate_monthly_fees",
             "schedule": crontab(day_of_month=1, hour=9, minute=0),
         },
+        # Уведомление должников — ежедневно в 10:00
+        "notify-overdue-fees": {
+            "task":     "app.tasks.notify_overdue_fees",
+            "schedule": crontab(hour=10, minute=0),
+        },
     },
 )
 
@@ -82,5 +87,18 @@ def generate_monthly_fees_task():
         count = generate_monthly_fees(db, notify=True)
         print(f"[fees] Создано записей взносов: {count}")
         return count
+    finally:
+        db.close()
+
+
+@celery_app.task(name="app.tasks.notify_overdue_fees")
+def notify_overdue_fees_task():
+    from app.core.database import SessionLocal
+    from app.routes.fees import notify_overdue
+    db = SessionLocal()
+    try:
+        sent = notify_overdue(db)
+        print(f"[fees] Уведомлений должникам отправлено: {sent}")
+        return sent
     finally:
         db.close()

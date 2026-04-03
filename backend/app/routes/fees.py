@@ -6,7 +6,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -423,3 +423,120 @@ def export_fees(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers=resp_headers,
     )
+
+
+# ── Автоуведомление должников (вызывается планировщиком) ──────────────────────
+
+def notify_overdue(db: Session) -> int:
+    """
+    Найти MonthlyFee где дедлайн был ровно 7 дней назад (первый день overdue).
+    Отправить уведомление родителю/спортсмену.
+    """
+    from datetime import timedelta
+    today = date_type.today()
+    overdue_start = today - timedelta(days=7)  # дедлайн был 7 дней назад
+
+    fees = (
+        db.query(MonthlyFee)
+        .join(FeeDeadline, MonthlyFee.deadline_id == FeeDeadline.id)
+        .options(
+            joinedload(MonthlyFee.athlete),
+        )
+        .filter(
+            FeeDeadline.deadline == overdue_start,
+            MonthlyFee.amount_paid < MonthlyFee.amount_due,
+        )
+        .all()
+    )
+
+    sent = 0
+    for fee in fees:
+        athlete = fee.athlete
+        if not athlete or not athlete.user_id:
+            continue
+        month_label = period_label(fee.period)
+        debt = float(fee.amount_due or 0) - float(fee.amount_paid or 0)
+        db.add(Notification(
+            user_id=athlete.user_id,
+            type="fee",
+            title="Просрочен взнос",
+            body=f"Взнос за {month_label} не внесён. Долг: {debt:.0f} руб. Пожалуйста, свяжитесь с тренером.",
+            link_id=fee.id,
+        ))
+        sent += 1
+
+    db.commit()
+    return sent
+
+
+# ── Уведомить должников вручную ───────────────────────────────────────────────
+
+@router.post("/notify-overdue")
+def notify_overdue_manual(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_manager),
+):
+    today = date_type.today()
+    period_date = date_type(today.year, today.month, 1)
+
+    fees = (
+        db.query(MonthlyFee)
+        .join(FeeDeadline, MonthlyFee.deadline_id == FeeDeadline.id)
+        .options(joinedload(MonthlyFee.athlete))
+        .filter(
+            MonthlyFee.period == period_date,
+            MonthlyFee.amount_paid < MonthlyFee.amount_due,
+            FeeDeadline.deadline <= today,
+        )
+        .all()
+    )
+
+    sent = 0
+    for fee in fees:
+        athlete = fee.athlete
+        if not athlete or not athlete.user_id:
+            continue
+        status = fee.computed_status
+        if status not in (FeeStatus.due, FeeStatus.overdue):
+            continue
+        month_label = period_label(fee.period)
+        debt = float(fee.amount_due or 0) - float(fee.amount_paid or 0)
+        deadline_str = fee.deadline_obj.deadline.strftime("%d.%m.%Y") if fee.deadline_obj else ""
+        if status == FeeStatus.due:
+            body = f"Внесите взнос за {month_label}. Сумма: {debt:.0f} руб. Дедлайн: {deadline_str}."
+        else:
+            body = f"Просрочен взнос за {month_label}. Долг: {debt:.0f} руб. Обратитесь к тренеру."
+        db.add(Notification(
+            user_id=athlete.user_id,
+            type="fee",
+            title="Напоминание о взносе",
+            body=body,
+            link_id=fee.id,
+        ))
+        sent += 1
+
+    db.commit()
+    return {"sent": sent}
+
+
+# ── Счётчик просроченных взносов ──────────────────────────────────────────────
+
+@router.get("/overdue-count")
+def overdue_count(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_manager),
+):
+    today = date_type.today()
+    period_date = date_type(today.year, today.month, 1)
+
+    count = (
+        db.query(MonthlyFee)
+        .join(FeeDeadline, MonthlyFee.deadline_id == FeeDeadline.id)
+        .filter(
+            MonthlyFee.period == period_date,
+            MonthlyFee.amount_paid < MonthlyFee.amount_due,
+            FeeDeadline.deadline < today,
+        )
+        .count()
+    )
+    return {"count": count}
