@@ -1,6 +1,7 @@
 import io
 from datetime import datetime, date as date_type
 from typing import Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -25,8 +26,7 @@ def require_manager(u: User = Depends(get_current_user)) -> User:
 # ── Схемы ─────────────────────────────────────────────────────────────────────
 
 class DeadlineCreate(BaseModel):
-    period: date_type
-    deadline: date_type
+    day_of_month: int   # 1–28, дедлайн каждого месяца
     amount_due: float
 
 
@@ -88,12 +88,11 @@ def list_deadlines(
     db: Session = Depends(get_db),
     _: User = Depends(require_manager),
 ):
-    rows = db.query(FeeDeadline).order_by(FeeDeadline.period.desc()).all()
+    rows = db.query(FeeDeadline).order_by(FeeDeadline.created_at.desc()).all()
     return [
         {
             "id": d.id,
-            "period": str(d.period),
-            "deadline": str(d.deadline),
+            "day_of_month": d.deadline.day,
             "amount_due": float(d.amount_due),
             "created_at": d.created_at.isoformat() if d.created_at else None,
         }
@@ -107,51 +106,67 @@ def create_deadline(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_manager),
 ):
-    # Check duplicate
-    existing = db.query(FeeDeadline).filter(FeeDeadline.period == body.period).first()
-    if existing:
-        raise HTTPException(400, "Дедлайн для этого периода уже существует")
+    if not 1 <= body.day_of_month <= 28:
+        raise HTTPException(400, "День месяца должен быть от 1 до 28")
 
-    deadline = FeeDeadline(
-        period=body.period,
-        deadline=body.deadline,
+    today = date_type.today()
+    period = date_type(today.year, today.month, 1)
+    current_deadline = date_type(today.year, today.month, body.day_of_month)
+
+    # Check duplicate for current period
+    existing = db.query(FeeDeadline).filter(FeeDeadline.period == period).first()
+    if existing:
+        raise HTTPException(400, "Дедлайн для текущего месяца уже существует")
+
+    deadline_obj = FeeDeadline(
+        period=period,
+        deadline=current_deadline,
         amount_due=body.amount_due,
         created_by=current_user.id,
     )
-    db.add(deadline)
-    db.flush()  # get deadline.id
+    db.add(deadline_obj)
+    db.flush()
 
-    # Auto-create fees for all active athletes
     athletes = db.query(Athlete).filter(Athlete.is_archived == False).all()
-    plabel = period_label(body.period)
-    deadline_str = body.deadline.strftime("%d.%m.%Y")
+    plabel = period_label(period)
+    deadline_str = current_deadline.strftime("%d.%m.%Y")
 
+    added = 0
     for athlete in athletes:
+        # Skip if MonthlyFee already exists for this athlete + period
+        existing_fee = db.query(MonthlyFee).filter(
+            MonthlyFee.athlete_id == athlete.id,
+            MonthlyFee.period == period,
+        ).first()
+        if existing_fee:
+            continue
+
         fee = MonthlyFee(
             athlete_id=athlete.id,
-            deadline_id=deadline.id,
-            period=body.period,
+            deadline_id=deadline_obj.id,
+            period=period,
             amount_due=body.amount_due,
             amount_paid=0,
         )
         db.add(fee)
 
-        # Notify parent
-        notif = Notification(
-            user_id=athlete.user_id,
-            type="fee",
-            title=f"Клубный взнос за {plabel}",
-            body=f"Внесите оплату до {deadline_str}. Сумма: {body.amount_due:.0f} руб.",
-        )
-        db.add(notif)
+        if athlete.user_id:
+            notif = Notification(
+                user_id=athlete.user_id,
+                type="fee",
+                title=f"Клубный взнос за {plabel}",
+                body=f"Внесите оплату до {deadline_str}. Сумма: {body.amount_due:.0f} руб.",
+            )
+            db.add(notif)
+        added += 1
 
     db.commit()
-    db.refresh(deadline)
+    db.refresh(deadline_obj)
     return {
-        "id": deadline.id,
-        "period": str(deadline.period),
-        "deadline": str(deadline.deadline),
-        "amount_due": float(deadline.amount_due),
+        "id": deadline_obj.id,
+        "day_of_month": deadline_obj.deadline.day,
+        "amount_due": float(deadline_obj.amount_due),
+        "athletes_count": added,
     }
 
 
@@ -343,9 +358,10 @@ def export_fees(
     wb.save(buf)
     buf.seek(0)
 
-    filename = f"fees_{period or 'all'}.xlsx"
+    filename = f"взносы_{period or 'все'}.xlsx"
+    headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers=headers,
     )
