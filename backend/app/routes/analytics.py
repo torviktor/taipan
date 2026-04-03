@@ -332,27 +332,116 @@ def export_analytics_data(athlete_id: int, db: Session = Depends(get_db),
                     "top5": [{"place": i+1, "count": r.c, "is_this": r.id == athlete_id} for i, r in enumerate(ach_top[:5])],
                     "rank": next((i+1 for i, r in enumerate(ach_top) if r.id == athlete_id), None)}
 
-    # ── Промт ────────────────────────────────────────────────────────────────
+    # ── Промт — с реальными данными ─────────────────────────────────────────
+
+    # Посещаемость: таблица по месяцам
+    att_table_lines = []
+    for m in attendance["monthly"]:
+        att_table_lines.append(
+            f"  {m['month']}: {m['athlete_sessions']} занятий, присутствовал {m['athlete_present']}, "
+            f"{m['athlete_pct']}% (среднее по клубу {m['club_avg_pct']}%)"
+        )
+    att_table = "\n".join(att_table_lines) if att_table_lines else "  нет данных"
+    att_rank_str = f"место #{attendance['rank']} в топе клуба" if attendance['rank'] else "в топ-10 не входит"
+
+    # Соревнования: список
+    comp_lines = []
+    for c in competitions["results"]:
+        parts = []
+        if c["sparring"]["place"]: parts.append(f"спарринг {c['sparring']['place']} место ({c['sparring']['fights']} боёв)")
+        if c["stopball"]["place"]: parts.append(f"стопбол {c['stopball']['place']} место ({c['stopball']['fights']} боёв)")
+        if c["tegtim"]["place"]:   parts.append(f"тэгтим {c['tegtim']['place']} место ({c['tegtim']['fights']} боёв)")
+        if c["tuli"]["place"]:     parts.append(f"тули {c['tuli']['place']} место ({c['tuli']['perfs']} выступл.)")
+        comp_lines.append(f"  {c['date']} — {c['name']} ({c['level']}, {c['type']}): {', '.join(parts) if parts else 'без мест'} | рейтинг {c['rating']}")
+    comp_table = "\n".join(comp_lines) if comp_lines else "  соревнований нет"
+
+    def pos_str(p):
+        if not p: return "нет данных"
+        return f"{p['place']} из {p['of']} (рейтинг {p['rating']})"
+
+    disc_pct = competitions["discipline_pct"]
+    disc_str = ", ".join(f"{k} {v}%" for k, v in disc_pct.items())
+
+    # Аттестации: список
+    cert_lines = []
+    for c in certifications["results"]:
+        status = "сдал" if c["passed"] else "не сдал"
+        cert_lines.append(f"  {c['date'] or '?'} — {c['from']} → {c['to']}: {status}")
+    cert_table = "\n".join(cert_lines) if cert_lines else "  аттестаций нет"
+    cert_pace_str = (
+        f"среднее время между аттестациями: спортсмен {certifications['athlete_avg_days']} дн., "
+        f"клуб {certifications['club_avg_days']} дн."
+        if certifications["athlete_avg_days"] is not None else "данных о темпе аттестаций недостаточно"
+    )
+
+    # Сборы: список
+    camp_lines = []
+    for c in camps["results"]:
+        camp_lines.append(f"  {c['name']} ({c['dates']}): {c['status']}")
+    camp_table = "\n".join(camp_lines) if camp_lines else "  сборов нет"
+    camps_effect = competitions["camps_effect"]
+    camps_effect_str = (
+        f"средний рейтинг участников сборов {camps_effect['avg_camp']}, "
+        f"не участников {camps_effect['avg_no_camp']}"
+    )
+
+    # Ачивки
+    ach_lines = [f"  {x['name']} ({x['tier']}) — {x['date'] or '?'}" for x in achievements["list"]]
+    ach_table = "\n".join(ach_lines) if ach_lines else "  ачивок нет"
+    ach_rank_str = f"место #{achievements['rank']} в топе клуба" if achievements['rank'] else "в топ-10 не входит"
+
+    gender_ru = "девочка" if gender == "female" else "мальчик"
+
     prompt = f"""Ты — профессиональный аналитик спортивного клуба тхэквондо «Тайпан» (Павловский Посад, федерация ГТФ).
-Подготовь развёрнутый аналитический отчёт по спортсмену {a.full_name} ({age} лет, {belt}, группа «{group}»).
+Подготовь развёрнутый аналитический отчёт по спортсмену. Все данные реальные — используй только их.
 
-Структура отчёта:
+═══════════════════════════════════════════
+ДАННЫЕ СПОРТСМЕНА
+═══════════════════════════════════════════
 
-1. ПРЕВЬЮ — Краткая справка: имя, возраст, пояс, пол. Контекст: в клубе {len(all_ath)} активных спортсменов, из них {profile['club_context']['same_age_and_gender']} {'девочек' if gender=='female' else 'мальчиков'} в возрасте {age_cat} лет, с таким же поясом — {profile['club_context']['same_belt']}. Общее впечатление в 2-3 предложениях.
+ПРОФИЛЬ:
+  Имя: {a.full_name}
+  Возраст: {age} лет ({age_cat}), {gender_ru}
+  Пояс: {belt}
+  Группа: {group}
+  Вес: {f"{profile['weight']} кг" if profile['weight'] else "не указан"}
+  В клубе {len(all_ath)} активных спортсменов; таких же по возрасту и полу: {profile['club_context']['same_age_and_gender']}; с таким же поясом: {profile['club_context']['same_belt']}
 
-2. ПОСЕЩАЕМОСТЬ — Динамика по месяцам, сравнение со средним по клубу. Тренды. Место в топе клуба. Рекомендации.
+ПОСЕЩАЕМОСТЬ (итого {attendance['present']} из {attendance['total']} занятий, {attendance['pct']}%, {att_rank_str}):
+{att_table}
 
-3. СОРЕВНОВАНИЯ И РЕЙТИНГ — Количество турниров, уровни. Общий рейтинг и позиция в 5 срезах (общий, по возрасту, по группе, по полу, по гыпу). Распределение очков по дисциплинам (спарринг/стопбол/тэгтим/тули) — если 80%+ из одной дисциплины, рекомендуй развивать другие. Анализ: перерастает ли спортсмен свой пояс по рейтингу или наоборот.
+СОРЕВНОВАНИЯ (турниров: {competitions['total_tournaments']}, суммарный рейтинг: {competitions['total_rating']}):
+{comp_table}
+  Позиции: общий {pos_str(competitions['positions']['overall'])}, по возрасту {pos_str(competitions['positions']['by_age'])}, по группе {pos_str(competitions['positions']['by_group'])}, по полу {pos_str(competitions['positions']['by_gender'])}, по поясу {pos_str(competitions['positions']['by_belt'])}
+  Распределение очков: {disc_str}
 
-4. АТТЕСТАЦИИ — Хронология поясов. Темп vs средний по клубу. Рекомендации.
+АТТЕСТАЦИИ (сдано {certifications['passed']} из {len(certifications['results'])}):
+{cert_table}
+  {cert_pace_str}
 
-5. СБОРЫ — Участие, % по сравнению с клубом. Корреляция: средний рейтинг участников сборов vs тех кто не ездит. Вывод.
+СБОРЫ (участие {camps['confirmed']} из {camps['total']}, {camps['pct']}%; среднее по клубу {camps['club_avg_pct']}%):
+{camp_table}
+  {camps_effect_str}
 
-6. АЧИВКИ — Список, место в топе. Какие ачивки ещё не получены.
+АЧИВКИ (всего {achievements['total']}, {ach_rank_str}):
+{ach_table}
 
-7. КОРРЕЛЯЦИИ И ВЫВОДЫ — Связь посещаемости и рейтинга. Связь сборов и результатов. Сильные стороны. Зоны роста. 3-5 конкретных рекомендаций.
+═══════════════════════════════════════════
+ЗАДАНИЕ
+═══════════════════════════════════════════
 
-Тон: профессиональный, дружелюбный. Обращайся к родителям на «вы». Конкретные цифры. Без эмодзи. Оформи с заголовками."""
+На основе приведённых данных подготовь отчёт со следующими разделами:
+
+1. ПРЕВЬЮ — имя, возраст, пояс, пол, общее впечатление в 2-3 предложениях.
+2. ПОСЕЩАЕМОСТЬ — динамика по месяцам, сравнение со средним по клубу, тренды, место в топе, рекомендации.
+3. СОРЕВНОВАНИЯ И РЕЙТИНГ — турниры, уровни, рейтинг, позиции в 5 срезах, распределение по дисциплинам (если 80%+ из одной — рекомендуй развивать другие), анализ соответствия поясу.
+4. АТТЕСТАЦИИ — хронология, темп vs клуб, рекомендации.
+5. СБОРЫ — участие, % vs клуб, корреляция с рейтингом, вывод.
+6. АЧИВКИ — список, место в топе, что ещё не получено.
+7. КОРРЕЛЯЦИИ И ВЫВОДЫ — связь посещаемости и рейтинга, связь сборов и результатов, сильные стороны, зоны роста, 3-5 конкретных рекомендаций.
+
+Тон: профессиональный, дружелюбный. Обращайся к родителям на «вы». Без эмодзи. Оформи с заголовками.
+Все цифры реальные — не придумывай данные которых нет. Если данных недостаточно для вывода — так и напиши."""
 
     return JSONResponse(content={
         "prompt": prompt,
