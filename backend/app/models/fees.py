@@ -10,6 +10,7 @@ class FeeStatus(str, enum.Enum):
     due = "due"
     overdue = "overdue"
     paid = "paid"
+    subsidized = "subsidized"
 
 
 class FeeDeadline(Base):
@@ -34,12 +35,15 @@ class MonthlyFee(Base):
     paid_at = Column(DateTime, nullable=True)
     recorded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     note = Column(Text, nullable=True)
+    is_subsidized = Column(Boolean, default=False, nullable=True, server_default='false')
     athlete = relationship("Athlete")
     deadline_obj = relationship("FeeDeadline", back_populates="fees")
     recorder = relationship("User", foreign_keys=[recorded_by])
 
     @property
     def computed_status(self) -> FeeStatus:
+        if self.is_subsidized:
+            return FeeStatus.subsidized
         if float(self.amount_paid or 0) >= float(self.amount_due or 0):
             return FeeStatus.paid
         today = date_type.today()

@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { API } from './constants'
 
 const STATUS = {
-  paid:    { bg: '#1a2e1a', color: '#4caf50', label: 'ОПЛАЧЕНО' },
-  due:     { bg: '#2a2410', color: '#f5c518', label: 'К ОПЛАТЕ' },
-  overdue: { bg: '#2a1010', color: 'var(--red)', label: 'ПРОСРОЧЕНО' },
-  pending: { bg: 'var(--dark2)', color: 'var(--gray)', label: 'ОЖИДАНИЕ' },
+  paid:       { bg: '#1a2e1a', color: '#4caf50',       label: 'ОПЛАЧЕНО' },
+  due:        { bg: '#2a2410', color: '#f5c518',        label: 'К ОПЛАТЕ' },
+  overdue:    { bg: '#2a1010', color: 'var(--red)',     label: 'ПРОСРОЧЕНО' },
+  pending:    { bg: 'var(--dark2)', color: 'var(--gray)', label: 'ОЖИДАНИЕ' },
+  subsidized: { bg: '#1a1a1a', color: 'var(--gray)',   label: 'БЮДЖЕТ' },
 }
 
 export default function MyFeesTab({ token }) {
@@ -51,7 +52,7 @@ export default function MyFeesTab({ token }) {
               {fees.map(f => {
                 const st = STATUS[f.status] || STATUS.pending
                 return (
-                  <tr key={f.id}>
+                  <tr key={f.id} style={{ opacity: f.is_subsidized ? 0.6 : 1, transition: 'opacity 0.25s' }}>
                     <td style={{ whiteSpace: 'nowrap' }}>{f.period_label || f.period}</td>
                     <td>{fmt(f.amount_due)}</td>
                     <td style={{ color: f.amount_paid > 0 ? '#4caf50' : 'var(--gray)' }}>{fmt(f.amount_paid)}</td>

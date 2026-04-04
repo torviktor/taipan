@@ -2,11 +2,14 @@ import { useState, useEffect, useMemo } from 'react'
 import { API } from './constants'
 
 const STATUS = {
-  paid:    { bg: '#1a2e1a', color: '#4caf50', label: 'ОПЛАЧЕНО' },
-  due:     { bg: '#2a2410', color: '#f5c518', label: 'К ОПЛАТЕ' },
-  overdue: { bg: '#2a1010', color: 'var(--red)', label: 'ПРОСРОЧЕНО' },
-  pending: { bg: 'var(--dark2)', color: 'var(--gray)', label: 'ОЖИДАНИЕ' },
+  paid:       { bg: '#1a2e1a', color: '#4caf50',       label: 'ОПЛАЧЕНО' },
+  due:        { bg: '#2a2410', color: '#f5c518',        label: 'К ОПЛАТЕ' },
+  overdue:    { bg: '#2a1010', color: 'var(--red)',     label: 'ПРОСРОЧЕНО' },
+  pending:    { bg: 'var(--dark2)', color: 'var(--gray)', label: 'ОЖИДАНИЕ' },
+  subsidized: { bg: '#1a1a1a', color: 'var(--gray)',   label: 'БЮДЖЕТ' },
 }
+
+const STATUS_SORT = { overdue: 0, due: 1, pending: 2, paid: 3, subsidized: 4 }
 
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь',
                    'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
@@ -137,6 +140,26 @@ export default function FeesTab({ token }) {
     setSaving(false)
   }
 
+  const toggleSubsidized = async (feeId, isSubsidized) => {
+    try {
+      const res = await fetch(`${API}/fees/${feeId}/subsidized`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ is_subsidized: isSubsidized }),
+      })
+      if (res.ok) {
+        setFees(prev => prev.map(f =>
+          f.id === feeId
+            ? { ...f, is_subsidized: isSubsidized, status: isSubsidized ? 'subsidized' : 'pending' }
+            : f
+        ))
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setMsg(err.detail || 'Ошибка')
+      }
+    } catch (e) { setMsg('Ошибка: ' + e.message) }
+  }
+
   const notifyOverdue = async () => {
     setMsg('')
     try {
@@ -177,15 +200,21 @@ export default function FeesTab({ token }) {
     } catch (e) { setMsg('Ошибка экспорта: ' + e.message) }
   }
 
-  const filteredFees = useMemo(() => fees.filter(f => {
-    if (filterStatus && f.status !== filterStatus) return false
-    if (filterGroup && f.athlete_group !== filterGroup) return false
-    return true
-  }), [fees, filterStatus, filterGroup])
+  const filteredFees = useMemo(() => {
+    const filtered = fees.filter(f => {
+      if (filterStatus && f.status !== filterStatus) return false
+      if (filterGroup && f.athlete_group !== filterGroup) return false
+      return true
+    })
+    filtered.sort((a, b) => (STATUS_SORT[a.status] ?? 99) - (STATUS_SORT[b.status] ?? 99))
+    return filtered
+  }, [fees, filterStatus, filterGroup])
 
   const groups = useMemo(() =>
     [...new Set(fees.map(f => f.athlete_group).filter(Boolean))].sort()
   , [fees])
+
+  const subsidizedCount = useMemo(() => fees.filter(f => f.is_subsidized).length, [fees])
 
   const fmt = (n) => Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 
@@ -292,12 +321,13 @@ export default function FeesTab({ token }) {
 
       {/* ── Карточки сводки ── */}
       {summary && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 20 }}>
           {[
-            { label: 'Итого к оплате', value: fmt(summary.total_due), color: 'var(--white)' },
-            { label: 'Получено',       value: fmt(summary.total_paid), color: '#4caf50' },
-            { label: 'Долг',           value: fmt(summary.total_debt), color: 'var(--red)' },
-            { label: 'Просрочено',     value: summary.count_overdue,   color: '#f5c518' },
+            { label: 'Итого к оплате', value: fmt(summary.total_due),   color: 'var(--white)' },
+            { label: 'Получено',       value: fmt(summary.total_paid),  color: '#4caf50' },
+            { label: 'Долг',           value: fmt(summary.total_debt),  color: 'var(--red)' },
+            { label: 'Просрочено',     value: summary.count_overdue,    color: '#f5c518' },
+            { label: 'Бюджетников',    value: subsidizedCount,          color: 'var(--gray)' },
           ].map(card => (
             <div key={card.label} style={{ background: 'var(--dark2)', borderRadius: 8, padding: '12px 16px', border: '1px solid var(--gray-dim)' }}>
               <div style={{ color: 'var(--gray)', fontSize: '0.75rem', fontFamily: 'Barlow Condensed', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{card.label}</div>
@@ -315,6 +345,7 @@ export default function FeesTab({ token }) {
           <option value="pending">Ожидание</option>
           <option value="due">К оплате</option>
           <option value="overdue">Просрочено</option>
+          <option value="subsidized">Бюджет</option>
         </select>
         <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)} className="td-input">
           <option value="">Все группы</option>
@@ -339,20 +370,21 @@ export default function FeesTab({ token }) {
                 <th>Дедлайн</th>
                 <th>Статус</th>
                 <th>Действие</th>
+                <th style={{ color: 'var(--gray)', fontSize: '0.78rem' }}>Тип</th>
               </tr>
             </thead>
             <tbody>
               {filteredFees.map(f => {
                 const st = STATUS[f.status] || STATUS.pending
                 return (
-                  <tr key={f.id}>
+                  <tr key={f.id} style={{ opacity: f.is_subsidized ? 0.35 : 1, transition: 'opacity 0.25s' }}>
                     <td className="td-name">{f.athlete_name}</td>
                     <td style={{ fontSize: '0.82rem', color: 'var(--gray)' }}>{f.athlete_group}</td>
                     <td style={{ fontSize: '0.82rem' }}>{f.parent_name}</td>
                     <td style={{ fontSize: '0.82rem', color: 'var(--gray)' }}>{f.parent_phone}</td>
                     <td>{fmt(f.amount_due)}</td>
                     <td style={{ color: f.amount_paid > 0 ? '#4caf50' : 'var(--gray)' }}>{fmt(f.amount_paid)}</td>
-                    <td style={{ color: f.debt > 0 ? 'var(--red)' : 'var(--gray)' }}>{fmt(f.debt)}</td>
+                    <td style={{ color: f.debt > 0 && !f.is_subsidized ? 'var(--red)' : 'var(--gray)' }}>{fmt(f.debt)}</td>
                     <td style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{f.deadline || '—'}</td>
                     <td>
                       <span style={{
@@ -366,8 +398,23 @@ export default function FeesTab({ token }) {
                       </span>
                     </td>
                     <td>
-                      {f.status !== 'paid' && (
+                      {!f.is_subsidized && f.status !== 'paid' && (
                         <button className="td-btn td-btn-edit" onClick={() => openPayModal(f)}>Внести</button>
+                      )}
+                    </td>
+                    <td>
+                      {f.is_subsidized ? (
+                        <button
+                          className="td-btn"
+                          style={{ fontSize: '0.72rem', color: '#c8962a', border: '1px solid #c8962a', background: 'transparent', padding: '3px 8px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          onClick={() => toggleSubsidized(f.id, false)}
+                        >Внебюджет</button>
+                      ) : (
+                        <button
+                          className="td-btn"
+                          style={{ fontSize: '0.72rem', color: 'var(--gray)', border: '1px solid var(--gray-dim)', background: 'transparent', padding: '3px 8px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          onClick={() => toggleSubsidized(f.id, true)}
+                        >Бюджет</button>
                       )}
                     </td>
                   </tr>

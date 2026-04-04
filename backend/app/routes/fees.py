@@ -35,6 +35,10 @@ class PayBody(BaseModel):
     note: Optional[str] = None
 
 
+class SubsidizedBody(BaseModel):
+    is_subsidized: bool
+
+
 # ── Константы ─────────────────────────────────────────────────────────────────
 
 MONTHS_RU = {
@@ -54,6 +58,7 @@ STATUS_ORDER = {
     FeeStatus.due: 1,
     FeeStatus.pending: 2,
     FeeStatus.paid: 3,
+    FeeStatus.subsidized: 4,
 }
 
 
@@ -89,6 +94,7 @@ def fee_to_dict(f: MonthlyFee) -> dict:
         "debt": debt,
         "deadline": str(f.deadline_obj.deadline) if f.deadline_obj else None,
         "status": status.value,
+        "is_subsidized": bool(f.is_subsidized),
         "deadline_id": f.deadline_id,
         "note": f.note,
         "paid_at": f.paid_at.isoformat() if f.paid_at else None,
@@ -111,6 +117,9 @@ def generate_monthly_fees(db: Session, notify: bool = True) -> int:
 
     athletes = db.query(Athlete).filter(Athlete.is_archived == False).all()
 
+    prev_month = date_type(period.year - 1, 12, 1) if period.month == 1 \
+                 else date_type(period.year, period.month - 1, 1)
+
     new_athlete_ids = []
     for athlete in athletes:
         exists = db.query(MonthlyFee).filter(
@@ -119,12 +128,17 @@ def generate_monthly_fees(db: Session, notify: bool = True) -> int:
         ).first()
         if exists:
             continue
+        prev_fee = db.query(MonthlyFee).filter(
+            MonthlyFee.athlete_id == athlete.id,
+            MonthlyFee.period == prev_month,
+        ).first()
         db.add(MonthlyFee(
             athlete_id=athlete.id,
             deadline_id=config.id,
             period=period,
             amount_due=config.amount_due,
             amount_paid=0,
+            is_subsidized=bool(prev_fee.is_subsidized) if prev_fee else False,
         ))
         new_athlete_ids.append(athlete.id)
 
@@ -269,6 +283,24 @@ def pay_fee(
     return fee_to_dict(fee)
 
 
+# ── Статус бюджетника ─────────────────────────────────────────────────────────
+
+@router.patch("/{fee_id}/subsidized")
+def set_subsidized(
+    fee_id: int,
+    body: SubsidizedBody,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_manager),
+):
+    fee = db.query(MonthlyFee).filter(MonthlyFee.id == fee_id).first()
+    if not fee:
+        raise HTTPException(404, "Взнос не найден")
+    fee.is_subsidized = body.is_subsidized
+    db.commit()
+    db.refresh(fee)
+    return fee_to_dict(fee)
+
+
 # ── Мои взносы (родитель/спортсмен) ───────────────────────────────────────────
 
 @router.get("/my")
@@ -365,6 +397,7 @@ def export_fees(
         "due": "К оплате",
         "overdue": "Просрочено",
         "pending": "Ожидание",
+        "subsidized": "Бюджетник",
     }
 
     wb = openpyxl.Workbook()
@@ -397,7 +430,7 @@ def export_fees(
         cell.font = Font(bold=True)
 
     for d in dicts:
-        if d["status"] in ("overdue", "due") and d["debt"] > 0:
+        if d["status"] in ("overdue", "due") and d["debt"] > 0 and not d["is_subsidized"]:
             ws2.append([
                 d["athlete_name"],
                 d["athlete_group"],
@@ -445,6 +478,7 @@ def notify_overdue(db: Session) -> int:
         .filter(
             FeeDeadline.deadline == overdue_start,
             MonthlyFee.amount_paid < MonthlyFee.amount_due,
+            MonthlyFee.is_subsidized != True,
         )
         .all()
     )
@@ -487,6 +521,7 @@ def notify_overdue_manual(
             MonthlyFee.period == period_date,
             MonthlyFee.amount_paid < MonthlyFee.amount_due,
             FeeDeadline.deadline <= today,
+            MonthlyFee.is_subsidized != True,
         )
         .all()
     )
@@ -536,6 +571,7 @@ def overdue_count(
             MonthlyFee.period == period_date,
             MonthlyFee.amount_paid < MonthlyFee.amount_due,
             FeeDeadline.deadline < today,
+            MonthlyFee.is_subsidized != True,
         )
         .count()
     )
