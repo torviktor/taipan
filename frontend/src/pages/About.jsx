@@ -161,12 +161,12 @@ emblem: (
 members: (
   <div className="about-body">
 
-    {/* ── 4 фото вверху раздела ── */}
+    {/* ── 4 фото вверху раздела (мальчики) ── */}
     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:32 }}>
-      <img src="/members1.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
-      <img src="/members2.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
-      <img src="/members3.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
-      <img src="/members4.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+      <img src="/members1.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', objectPosition:'center 30%', display:'block' }} />
+      <img src="/members2.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', objectPosition:'center 30%', display:'block' }} />
+      <img src="/members3.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', objectPosition:'center top', display:'block' }} />
+      <img src="/members4.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', objectPosition:'center top', display:'block' }} />
     </div>
 
     <div className="about-lead">
@@ -176,12 +176,12 @@ members: (
       <p>Заниматься в нашем клубе — это гордость и большая честь. Ты не просто ходишь на тренировки — ты растёшь в настоящего воина с сердцем и принципами.</p>
     </div>
 
-    {/* ── 4 фото перед блоком "Каждый участник клуба" ── */}
+    {/* ── 4 фото перед блоком "Каждый участник клуба" (девушки) ── */}
     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:32 }}>
-      <img src="/athletes1.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
-      <img src="/athletes2.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
-      <img src="/athletes3.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
-      <img src="/athletes4.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+      <img src="/athletes1.webp" alt="" className="athletes-photo athletes-photo--shift-right" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+      <img src="/athletes2.webp" alt="" className="athletes-photo athletes-photo--shift-right" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+      <img src="/athletes3.webp" alt="" className="athletes-photo athletes-photo--shift-left"  style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+      <img src="/athletes4.webp" alt="" className="athletes-photo"                              style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
     </div>
 
     <h3>Каждый участник клуба</h3>

@@ -302,6 +302,18 @@
   object-fit: cover;
 }
 
+/* ── Фото участников — коррекция кадрирования на мобайле ── */
+/* Десктоп: сдвиги не нужны, дефолт */
+.athletes-photo--shift-right { object-position: center top; }
+.athletes-photo--shift-left  { object-position: center top; }
+
+@media (max-width: 600px) {
+  /* Верхний ряд девушек — сдвигаем вправо, чтобы лица оказались по центру */
+  .athletes-photo--shift-right { object-position: 70% top; }
+  /* Нижнее левое фото девушки — сдвигаем влево */
+  .athletes-photo--shift-left  { object-position: 30% top; }
+}
+
 /* ── АДАПТИВ ── */
 @media (max-width: 900px) {
   .about-layout {
