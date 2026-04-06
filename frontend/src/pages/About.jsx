@@ -197,9 +197,9 @@ members: (
     <p>Занятия в клубе подразумевают, что ты (или твои родители) принимаешь цели клуба и готов идти по пути тхэквондо вместе со всеми.</p>
 
     {/* ── 2 фото перед блоком родителей ── */}
-    <div className="about-photo-grid" style={{ display:'grid', gap:4, marginBottom:32 }}>
-      <img src="/photo8.jpg" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
-      <img src="/photo9.jpg" alt="" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:32 }}>
+      <img src="/photo8.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', objectPosition:'center top', display:'block' }} />
+      <img src="/photo9.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', objectPosition:'center 20%', display:'block' }} />
     </div>
 
     <h3>Родители — наши самые важные партнёры</h3>
