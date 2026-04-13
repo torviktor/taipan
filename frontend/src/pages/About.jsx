@@ -520,13 +520,7 @@ export default function About() {
   
   const switchSection = (id) => {
     setActive(id)
-    // Скролл к верху контентной области
-    setTimeout(() => {
-      if (contentRef.current) {
-        const top = contentRef.current.getBoundingClientRect().top + window.scrollY - 120
-        window.scrollTo({ top, behavior: 'smooth' })
-      }
-    }, 0)
+    window.scrollTo(0, 0)
   }
 
   const section = SECTIONS.find(s => s.id === active)
