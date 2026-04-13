@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import './About.css'
 
 const SECTIONS = [
@@ -269,7 +270,7 @@ structure: (
     </p>
     <p>
       Отдельные соревнования, тренировки, спортивные сборы и иные мероприятия публикуются
-      в <a href="/calendar">календаре клуба</a>.
+      в <Link to="/calendar">календаре клуба</Link>.
     </p>
 
   </div>
@@ -520,7 +521,7 @@ export default function About() {
   
   const switchSection = (id) => {
     setActive(id)
-    window.scrollTo(0, 0)
+    setTimeout(() => window.scrollTo(0, 0), 0)
   }
 
   const section = SECTIONS.find(s => s.id === active)
