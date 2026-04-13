@@ -1,6 +1,129 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { API } from './constants'
 import ConfirmModal from './ConfirmModal'
+
+function PhotoPositioner({ item, onClose, onSave }) {
+  const [pos, setPos]   = useState(() => {
+    const parts = (item.photo_position || '50% 20%').split(' ')
+    return { x: parseFloat(parts[0]) || 50, y: parseFloat(parts[1]) || 20 }
+  })
+  const [zoom, setZoom] = useState(100)
+  const dragging = useRef(false)
+  const startMouse = useRef({ x: 0, y: 0 })
+  const startPos   = useRef({ x: 0, y: 0 })
+  const containerRef = useRef(null)
+
+  const onMouseDown = (e) => {
+    e.preventDefault()
+    dragging.current   = true
+    startMouse.current = { x: e.clientX, y: e.clientY }
+    startPos.current   = { ...pos }
+  }
+  const onMouseMove = (e) => {
+    if (!dragging.current || !containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    const dx = (e.clientX - startMouse.current.x) / rect.width  * 100
+    const dy = (e.clientY - startMouse.current.y) / rect.height * 100
+    setPos({
+      x: Math.max(0, Math.min(100, startPos.current.x - dx)),
+      y: Math.max(0, Math.min(100, startPos.current.y - dy)),
+    })
+  }
+  const onMouseUp = () => { dragging.current = false }
+
+  const onTouchStart = (e) => {
+    const t = e.touches[0]
+    dragging.current   = true
+    startMouse.current = { x: t.clientX, y: t.clientY }
+    startPos.current   = { ...pos }
+  }
+  const onTouchMove = (e) => {
+    if (!dragging.current || !containerRef.current) return
+    const t = e.touches[0]
+    const rect = containerRef.current.getBoundingClientRect()
+    const dx = (t.clientX - startMouse.current.x) / rect.width  * 100
+    const dy = (t.clientY - startMouse.current.y) / rect.height * 100
+    setPos({
+      x: Math.max(0, Math.min(100, startPos.current.x - dx)),
+      y: Math.max(0, Math.min(100, startPos.current.y - dy)),
+    })
+  }
+
+  const posStr = `${pos.x.toFixed(1)}% ${pos.y.toFixed(1)}%`
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()}
+        style={{ maxWidth:460, width:'92vw', boxSizing:'border-box', padding:24 }}>
+
+        <div style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.06em',
+          color:'var(--white)', marginBottom:4 }}>Кадрирование фото</div>
+        <div style={{ color:'var(--gray)', fontSize:'0.82rem', marginBottom:16 }}>
+          {item.full_name} — перетащи фото, настрой масштаб
+        </div>
+
+        {/* Превью точно как карточка на сайте */}
+        <div
+          ref={containerRef}
+          onMouseDown={onMouseDown} onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}    onMouseLeave={onMouseUp}
+          onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onMouseUp}
+          style={{
+            width:'100%', height:260, overflow:'hidden', position:'relative',
+            cursor:'grab', borderRadius:8, border:'2px solid var(--red)',
+            background:'var(--dark)', userSelect:'none',
+          }}>
+          <img
+            src={item.photo_url} alt="" draggable={false}
+            style={{
+              width:`${zoom}%`, height:`${zoom}%`,
+              objectFit:'cover',
+              objectPosition:`${pos.x.toFixed(1)}% ${pos.y.toFixed(1)}%`,
+              display:'block', pointerEvents:'none',
+            }}
+          />
+          {/* Сетка правил третей */}
+          <div style={{
+            position:'absolute', inset:0, pointerEvents:'none',
+            backgroundImage:'linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px)',
+            backgroundSize:'33.33% 33.33%',
+          }}/>
+        </div>
+
+        {/* Ползунок масштаба */}
+        <div style={{ marginTop:16, display:'flex', alignItems:'center', gap:12 }}>
+          <span style={{ color:'var(--gray)', fontSize:'0.78rem', fontFamily:'Barlow Condensed',
+            fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', whiteSpace:'nowrap' }}>
+            Масштаб
+          </span>
+          <input type="range" min={100} max={200} step={5} value={zoom}
+            onChange={e => setZoom(Number(e.target.value))}
+            style={{ flex:1, accentColor:'var(--red)' }}/>
+          <span style={{ color:'var(--white)', fontSize:'0.85rem', minWidth:38, textAlign:'right' }}>
+            {zoom}%
+          </span>
+        </div>
+
+        <div style={{ color:'var(--gray-dim)', fontSize:'0.72rem', marginTop:6, textAlign:'center' }}>
+          X: {pos.x.toFixed(0)}%  Y: {pos.y.toFixed(0)}%
+        </div>
+
+        <div style={{ display:'flex', gap:10, marginTop:20 }}>
+          <button className="btn-primary"
+            style={{ flex:1, padding:'9px 0', fontSize:'13px' }}
+            onClick={() => onSave(posStr)}>
+            Сохранить
+          </button>
+          <button className="btn-outline"
+            style={{ flex:1, padding:'9px 0', fontSize:'13px' }}
+            onClick={onClose}>
+            Отмена
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function HallOfFameAdmin({ token }) {
   const [items,     setItems]     = useState([])
@@ -10,6 +133,7 @@ export default function HallOfFameAdmin({ token }) {
   const [msg,       setMsg]       = useState('')
   const [uploading, setUploading] = useState(null)
   const [confirm,   setConfirm]   = useState(null)
+  const [posEditor, setPosEditor] = useState(null)
 
   const h  = { Authorization: `Bearer ${token}` }
   const hj = { ...h, 'Content-Type': 'application/json' }
@@ -67,6 +191,17 @@ export default function HallOfFameAdmin({ token }) {
     setUploading(null)
   }
 
+  const savePosition = async (id, position) => {
+    try {
+      await fetch(`${API}/hall-of-fame/${id}/position`, {
+        method: 'PATCH',
+        headers: hj,
+        body: JSON.stringify({ photo_position: position })
+      })
+      setItems(prev => prev.map(i => i.id === id ? { ...i, photo_position: position } : i))
+    } catch {}
+  }
+
   const belt = (gup, dan) => {
     if (dan) return `${dan} дан`
     if (gup === 0) return 'Без пояса'
@@ -77,6 +212,16 @@ export default function HallOfFameAdmin({ token }) {
   return (
     <div>
       {confirm && <ConfirmModal message={confirm.message} confirmText={confirm.confirmText} danger={confirm.danger} onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)}/>}
+      {posEditor && (
+        <PhotoPositioner
+          item={posEditor}
+          onClose={() => setPosEditor(null)}
+          onSave={async (posStr) => {
+            await savePosition(posEditor.id, posStr)
+            setPosEditor(null)
+          }}
+        />
+      )}
 
       {/* Модальная форма */}
       {showForm && editing && (
@@ -174,7 +319,7 @@ export default function HallOfFameAdmin({ token }) {
             {/* Фото */}
             <div style={{position:'relative', height:220, background:'var(--dark)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden'}}>
               {item.photo_url
-                ? <img src={item.photo_url} alt={item.full_name} style={{width:'100%', height:'100%', objectFit:'cover', objectPosition:'top'}}/>
+                ? <img src={item.photo_url} alt={item.full_name} style={{width:'100%', height:'100%', objectFit:'cover', objectPosition: item.photo_position || '50% 20%'}}/>
                 : <div style={{color:'var(--gray-dim)', fontFamily:'Bebas Neue', fontSize:'1rem', letterSpacing:'0.1em'}}>НЕТ ФОТО</div>
               }
               {/* Кнопка загрузки фото */}
@@ -188,6 +333,18 @@ export default function HallOfFameAdmin({ token }) {
                 <input type="file" accept="image/*" style={{display:'none'}}
                   onChange={e => e.target.files[0] && uploadPhoto(item.id, e.target.files[0])}/>
               </label>
+              {item.photo_url && (
+                <button
+                  onClick={() => setPosEditor(item)}
+                  style={{
+                    position:'absolute', bottom:8, left:8, cursor:'pointer',
+                    background:'rgba(0,0,0,0.75)', border:'1px solid var(--gray-dim)',
+                    borderRadius:6, padding:'5px 10px', fontSize:'0.78rem',
+                    color:'var(--white)', fontFamily:'Barlow Condensed', letterSpacing:'0.05em',
+                  }}>
+                  Кадр
+                </button>
+              )}
             </div>
             {/* Данные */}
             <div style={{padding:'14px 16px'}}>

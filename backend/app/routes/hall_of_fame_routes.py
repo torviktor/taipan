@@ -32,17 +32,21 @@ class HofUpdate(BaseModel):
     sort_order:   Optional[int]  = None
     is_featured:  Optional[bool] = None
 
+class HofPosition(BaseModel):
+    photo_position: str
+
 
 def _out(h: HallOfFame) -> dict:
     return {
-        "id":           h.id,
-        "full_name":    h.full_name,
-        "photo_url":    h.photo_url,
-        "achievements": h.achievements,
-        "gup":          h.gup,
-        "dan":          h.dan,
-        "sort_order":   h.sort_order,
-        "is_featured":  bool(getattr(h, 'is_featured', False)),
+        "id":             h.id,
+        "full_name":      h.full_name,
+        "photo_url":      h.photo_url,
+        "achievements":   h.achievements,
+        "gup":            h.gup,
+        "dan":            h.dan,
+        "sort_order":     h.sort_order,
+        "is_featured":    bool(getattr(h, 'is_featured', False)),
+        "photo_position": h.photo_position or "50% 20%",
     }
 
 
@@ -87,6 +91,18 @@ def update_hof(hof_id: int, data: HofUpdate, db: Session = Depends(get_db), _: U
     if data.is_featured  is not None: h.is_featured  = data.is_featured
     db.commit()
     db.refresh(h)
+    return _out(h)
+
+
+# ── Позиция фото ─────────────────────────────────────────────────────────────
+
+@router.patch("/{hof_id}/position")
+def update_position(hof_id: int, data: HofPosition, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+    h = db.query(HallOfFame).filter(HallOfFame.id == hof_id).first()
+    if not h:
+        raise HTTPException(404, "Не найдено")
+    h.photo_position = data.photo_position
+    db.commit()
     return _out(h)
 
 
