@@ -78,7 +78,7 @@ export default function Champions() {
                       )}
                       {item.photo_url ? (
                         <img src={item.photo_url} alt={item.full_name} className="champion-img"
-                          style={{ objectPosition: (() => { const p=(item.photo_position||'50% 20%').split(' '); return `${p[0]||'50%'} ${p[1]||'20%'}` })() }}
+                          style={{ objectPosition: (() => { const raw=(item.photo_position||'50% 20%').split('/')[0].trim().split(' '); return `${raw[0]||'50%'} ${raw[1]||'20%'}` })() }}
                         />
                       ) : (
                         <div className="champion-img-placeholder">
