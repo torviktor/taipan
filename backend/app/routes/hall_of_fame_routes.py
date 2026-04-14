@@ -85,8 +85,8 @@ def update_hof(hof_id: int, data: HofUpdate, db: Session = Depends(get_db), _: U
         raise HTTPException(404, "Не найдено")
     if data.full_name    is not None: h.full_name    = data.full_name
     if data.achievements is not None: h.achievements = data.achievements
-    if data.gup          is not None: h.gup          = data.gup
-    if data.dan          is not None: h.dan          = data.dan
+    if data.gup          is not None: h.gup          = data.gup if data.gup > 0 else None
+    if data.dan          is not None: h.dan          = data.dan if data.dan > 0 else None
     if data.sort_order   is not None: h.sort_order   = data.sort_order
     if data.is_featured  is not None: h.is_featured  = data.is_featured
     db.commit()
