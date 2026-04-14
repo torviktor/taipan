@@ -3,51 +3,53 @@ import { API } from './constants'
 import ConfirmModal from './ConfirmModal'
 
 function PhotoPositioner({ item, onClose, onSave }) {
+  // pos.x / pos.y: 0..100 — сдвиг в процентах относительно "лишнего" пространства
   const [pos, setPos]   = useState(() => {
     const parts = (item.photo_position || '50% 20%').split(' ')
     return { x: parseFloat(parts[0]) || 50, y: parseFloat(parts[1]) || 20 }
   })
   const [zoom, setZoom] = useState(100)
-  const dragging = useRef(false)
-  const startMouse = useRef({ x: 0, y: 0 })
-  const startPos   = useRef({ x: 0, y: 0 })
+  const dragging    = useRef(false)
+  const startMouse  = useRef({ x: 0, y: 0 })
+  const startPos    = useRef({ x: 0, y: 0 })
   const containerRef = useRef(null)
 
-  const onMouseDown = (e) => {
-    e.preventDefault()
-    dragging.current   = true
-    startMouse.current = { x: e.clientX, y: e.clientY }
-    startPos.current   = { ...pos }
-  }
-  const onMouseMove = (e) => {
-    if (!dragging.current || !containerRef.current) return
-    const rect = containerRef.current.getBoundingClientRect()
-    const dx = (e.clientX - startMouse.current.x) / rect.width  * 100
-    const dy = (e.clientY - startMouse.current.y) / rect.height * 100
-    setPos({
-      x: Math.max(0, Math.min(100, startPos.current.x - dx)),
-      y: Math.max(0, Math.min(100, startPos.current.y - dy)),
-    })
-  }
-  const onMouseUp = () => { dragging.current = false }
+  const canDrag = zoom > 100
 
-  const onTouchStart = (e) => {
-    const t = e.touches[0]
+  const startDrag = (clientX, clientY) => {
+    if (!canDrag) return
     dragging.current   = true
-    startMouse.current = { x: t.clientX, y: t.clientY }
+    startMouse.current = { x: clientX, y: clientY }
     startPos.current   = { ...pos }
   }
-  const onTouchMove = (e) => {
+
+  const moveDrag = (clientX, clientY) => {
     if (!dragging.current || !containerRef.current) return
-    const t = e.touches[0]
     const rect = containerRef.current.getBoundingClientRect()
-    const dx = (t.clientX - startMouse.current.x) / rect.width  * 100
-    const dy = (t.clientY - startMouse.current.y) / rect.height * 100
+    // Сколько % контейнера прошли мышью
+    const dx = (clientX - startMouse.current.x) / rect.width  * 100
+    const dy = (clientY - startMouse.current.y) / rect.height * 100
+    // Делим на (zoom-100)/100 чтобы получить % смещения в пространстве 0..100
+    const factor = (zoom - 100) / 100
     setPos({
-      x: Math.max(0, Math.min(100, startPos.current.x - dx)),
-      y: Math.max(0, Math.min(100, startPos.current.y - dy)),
+      x: Math.max(0, Math.min(100, startPos.current.x - dx / factor)),
+      y: Math.max(0, Math.min(100, startPos.current.y - dy / factor)),
     })
   }
+
+  const onMouseDown = (e) => { e.preventDefault(); startDrag(e.clientX, e.clientY) }
+  const onMouseMove = (e) => moveDrag(e.clientX, e.clientY)
+  const onMouseUp   = () => { dragging.current = false }
+
+  const onTouchStart = (e) => { const t = e.touches[0]; startDrag(t.clientX, t.clientY) }
+  const onTouchMove  = (e) => { const t = e.touches[0]; moveDrag(t.clientX, t.clientY) }
+
+  // Вычисляем left/top для абсолютного позиционирования img
+  // При zoom=150: img занимает 150% контейнера → лишнее пространство = 50%
+  // left смещает от 0 до -50% (когда pos.x=0 → left=0, pos.x=100 → left=-50%)
+  const extra = zoom - 100  // лишнее пространство в %
+  const imgLeft = -(pos.x / 100) * extra
+  const imgTop  = -(pos.y / 100) * extra
 
   const posStr = `${pos.x.toFixed(1)}% ${pos.y.toFixed(1)}%`
 
@@ -59,10 +61,10 @@ function PhotoPositioner({ item, onClose, onSave }) {
         <div style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.06em',
           color:'var(--white)', marginBottom:4 }}>Кадрирование фото</div>
         <div style={{ color:'var(--gray)', fontSize:'0.82rem', marginBottom:16 }}>
-          {item.full_name} — перетащи фото, настрой масштаб
+          {item.full_name} — {canDrag ? 'перетащи фото, настрой масштаб' : 'увеличь масштаб чтобы двигать'}
         </div>
 
-        {/* Превью точно как карточка на сайте */}
+        {/* Превью — точно как карточка на сайте */}
         <div
           ref={containerRef}
           onMouseDown={onMouseDown} onMouseMove={onMouseMove}
@@ -70,16 +72,21 @@ function PhotoPositioner({ item, onClose, onSave }) {
           onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onMouseUp}
           style={{
             width:'100%', height:260, overflow:'hidden', position:'relative',
-            cursor:'grab', borderRadius:8, border:'2px solid var(--red)',
+            cursor: canDrag ? 'grab' : 'default',
+            borderRadius:8, border:'2px solid var(--red)',
             background:'var(--dark)', userSelect:'none',
           }}>
           <img
             src={item.photo_url} alt="" draggable={false}
             style={{
-              width:`${zoom}%`, height:`${zoom}%`,
+              position:'absolute',
+              width:`${zoom}%`,
+              height:`${zoom}%`,
               objectFit:'cover',
-              objectPosition:`${pos.x.toFixed(1)}% ${pos.y.toFixed(1)}%`,
-              display:'block', pointerEvents:'none',
+              left:`${imgLeft}%`,
+              top:`${imgTop}%`,
+              pointerEvents:'none',
+              userSelect:'none',
             }}
           />
           {/* Сетка правил третей */}
@@ -193,12 +200,16 @@ export default function HallOfFameAdmin({ token }) {
 
   const savePosition = async (id, position) => {
     try {
-      await fetch(`${API}/hall-of-fame/${id}/position`, {
+      const r = await fetch(`${API}/hall-of-fame/${id}/position`, {
         method: 'PATCH',
         headers: hj,
         body: JSON.stringify({ photo_position: position })
       })
-      setItems(prev => prev.map(i => i.id === id ? { ...i, photo_position: position } : i))
+      if (r.ok) {
+        // Обновляем items И posEditor — чтобы при повторном открытии читалась новая позиция
+        setItems(prev => prev.map(i => i.id === id ? { ...i, photo_position: position } : i))
+        setPosEditor(prev => prev && prev.id === id ? { ...prev, photo_position: position } : prev)
+      }
     } catch {}
   }
 
@@ -335,7 +346,7 @@ export default function HallOfFameAdmin({ token }) {
               </label>
               {item.photo_url && (
                 <button
-                  onClick={() => setPosEditor(item)}
+                  onClick={() => setPosEditor(items.find(i => i.id === item.id) || item)}
                   style={{
                     position:'absolute', bottom:8, left:8, cursor:'pointer',
                     background:'rgba(0,0,0,0.75)', border:'1px solid var(--gray-dim)',
