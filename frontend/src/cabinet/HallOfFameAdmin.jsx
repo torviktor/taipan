@@ -3,60 +3,59 @@ import { API } from './constants'
 import ConfirmModal from './ConfirmModal'
 
 function PhotoPositioner({ item, onClose, onSave }) {
+  // Позиционирование через transform: translate — фото двигается свободно за пределы контейнера
+  // Сохраняем формат: "Xpx Ypx / zoom%"
   const containerRef = useRef(null)
 
-  const parsePos = (str) => {
-    const parts = (str || '50% 20%').split(' ')
-    return { x: parseFloat(parts[0]) || 50, y: parseFloat(parts[1]) || 20 }
+  const parseState = (str) => {
+    // Формат: "Xpx Ypx / zoom%" или старый "X% Y%"
+    if (!str || str === '50% 20%') return { tx: 0, ty: 0, zoom: 100 }
+    const [posStr, zoomStr] = str.split('/')
+    if (!zoomStr) return { tx: 0, ty: 0, zoom: 100 }
+    const parts = posStr.trim().split(' ')
+    return {
+      tx:   parseFloat(parts[0]) || 0,
+      ty:   parseFloat(parts[1]) || 0,
+      zoom: parseFloat(zoomStr)  || 100,
+    }
   }
 
-  const [pos,  setPos]  = useState(() => parsePos(item.photo_position))
-  const [zoom, setZoom] = useState(100)
+  const initial = parseState(item.photo_position)
+  const [tx,   setTx]   = useState(initial.tx)
+  const [ty,   setTy]   = useState(initial.ty)
+  const [zoom, setZoom] = useState(initial.zoom)
 
   const dragging   = useRef(false)
   const startMouse = useRef({ x:0, y:0 })
-  const startPos   = useRef({ x:0, y:0 })
+  const startTrans = useRef({ tx:0, ty:0 })
 
   const onMouseDown = (e) => {
     e.preventDefault()
     dragging.current   = true
-    startMouse.current = { x:e.clientX, y:e.clientY }
-    startPos.current   = { ...pos }
+    startMouse.current = { x: e.clientX, y: e.clientY }
+    startTrans.current = { tx, ty }
   }
-
   const onMouseMove = (e) => {
-    if (!dragging.current || !containerRef.current) return
-    const rect = containerRef.current.getBoundingClientRect()
-    const dx = (e.clientX - startMouse.current.x) / rect.width  * 100
-    const dy = (e.clientY - startMouse.current.y) / rect.height * 100
-    setPos({
-      x: Math.max(0, Math.min(100, startPos.current.x - dx)),
-      y: Math.max(0, Math.min(100, startPos.current.y - dy)),
-    })
+    if (!dragging.current) return
+    setTx(startTrans.current.tx + (e.clientX - startMouse.current.x))
+    setTy(startTrans.current.ty + (e.clientY - startMouse.current.y))
   }
-
   const onMouseUp = () => { dragging.current = false }
 
   const onTouchStart = (e) => {
     const t = e.touches[0]
     dragging.current   = true
-    startMouse.current = { x:t.clientX, y:t.clientY }
-    startPos.current   = { ...pos }
+    startMouse.current = { x: t.clientX, y: t.clientY }
+    startTrans.current = { tx, ty }
   }
-
   const onTouchMove = (e) => {
-    if (!dragging.current || !containerRef.current) return
+    if (!dragging.current) return
     const t = e.touches[0]
-    const rect = containerRef.current.getBoundingClientRect()
-    const dx = (t.clientX - startMouse.current.x) / rect.width  * 100
-    const dy = (t.clientY - startMouse.current.y) / rect.height * 100
-    setPos({
-      x: Math.max(0, Math.min(100, startPos.current.x - dx)),
-      y: Math.max(0, Math.min(100, startPos.current.y - dy)),
-    })
+    setTx(startTrans.current.tx + (t.clientX - startMouse.current.x))
+    setTy(startTrans.current.ty + (t.clientY - startMouse.current.y))
   }
 
-  const handleSave = () => onSave(`${pos.x.toFixed(1)}% ${pos.y.toFixed(1)}% / ${zoom}%`)
+  const handleSave = () => onSave(`${tx.toFixed(1)}px ${ty.toFixed(1)}px / ${zoom}%`)
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -66,7 +65,7 @@ function PhotoPositioner({ item, onClose, onSave }) {
           Кадрирование фото
         </div>
         <div style={{ color:'var(--gray)', fontSize:'0.82rem', marginBottom:16 }}>
-          {item.full_name} — перетащи фото, регулируй масштаб
+          {item.full_name} — перетащи фото в нужное положение
         </div>
 
         <div
@@ -78,12 +77,11 @@ function PhotoPositioner({ item, onClose, onSave }) {
           <img src={item.photo_url} alt="" draggable={false}
             style={{
               position:'absolute',
-              width:`${zoom}%`, height:`${zoom}%`,
-              objectFit:'cover',
-              objectPosition:`${pos.x.toFixed(1)}% ${pos.y.toFixed(1)}%`,
+              width:'auto', height:`${zoom}%`,
               top:'50%', left:'50%',
-              transform:'translate(-50%, -50%)',
+              transform:`translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px))`,
               pointerEvents:'none',
+              maxWidth:'none',
             }}
           />
           <div style={{ position:'absolute', inset:0, pointerEvents:'none',
@@ -96,7 +94,7 @@ function PhotoPositioner({ item, onClose, onSave }) {
             fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', whiteSpace:'nowrap' }}>
             Масштаб
           </span>
-          <input type="range" min={100} max={200} step={5} value={zoom}
+          <input type="range" min={50} max={200} step={5} value={zoom}
             onChange={e => setZoom(Number(e.target.value))}
             style={{ flex:1, accentColor:'var(--red)' }}
           />
@@ -106,7 +104,7 @@ function PhotoPositioner({ item, onClose, onSave }) {
         </div>
 
         <div style={{ color:'var(--gray-dim)', fontSize:'0.72rem', marginTop:8, textAlign:'center' }}>
-          X: {pos.x.toFixed(0)}%  Y: {pos.y.toFixed(0)}%
+          X: {tx.toFixed(0)}px  Y: {ty.toFixed(0)}px  /  {zoom}%
         </div>
         <div style={{ display:'flex', gap:10, marginTop:16 }}>
           <button className="btn-primary" style={{ flex:1, padding:'9px 0', fontSize:'13px' }} onClick={handleSave}>Сохранить</button>
@@ -117,8 +115,7 @@ function PhotoPositioner({ item, onClose, onSave }) {
   )
 }
 
-
-export default function HallOfFameAdmin({ token }) {
+export default function HallOfFameAdminexport default function HallOfFameAdmin({ token }) {
   const [items,     setItems]     = useState([])
   const [loading,   setLoading]   = useState(false)
   const [showForm,  setShowForm]  = useState(false)
@@ -316,10 +313,19 @@ export default function HallOfFameAdmin({ token }) {
             {/* Фото */}
             <div style={{position:'relative', height:220, background:'var(--dark)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden'}}>
               {item.photo_url
-                ? <img src={item.photo_url} alt={item.full_name} style={{
-                    width:'100%', height:'100%', objectFit:'cover',
-                    objectPosition: (() => { const raw=(item.photo_position||'50% 20%').split('/')[0].trim().split(' '); return `${raw[0]||'50%'} ${raw[1]||'20%'}` })()
-                  }}/>
+                ? (() => {
+                    const ps = item.photo_position || '0px 0px / 100%'
+                    const [posStr, zoomStr] = ps.split('/')
+                    const parts = posStr.trim().split(' ')
+                    const ptx = parseFloat(parts[0]) || 0
+                    const pty = parseFloat(parts[1]) || 0
+                    const pzoom = parseFloat(zoomStr) || 100
+                    return <img src={item.photo_url} alt={item.full_name} style={{
+                      position:'absolute', width:'auto', height:`${pzoom}%`,
+                      top:'50%', left:'50%', maxWidth:'none',
+                      transform:`translate(calc(-50% + ${ptx}px), calc(-50% + ${pty}px))`,
+                    }}/>
+                  })()
                 : <div style={{color:'var(--gray-dim)', fontFamily:'Bebas Neue', fontSize:'1rem', letterSpacing:'0.1em'}}>НЕТ ФОТО</div>
               }
               {/* Кнопка загрузки фото */}
