@@ -3,12 +3,9 @@ import { API } from './constants'
 import ConfirmModal from './ConfirmModal'
 
 function PhotoPositioner({ item, onClose, onSave }) {
-  // zoom реализован через width/height img (не через scale):
-  // zoom=1.0 → img 100%x100% контейнера (objectFit:cover, обрезает лишнее)
-  // zoom<1.0 → img меньше контейнера, фото видно целиком на чёрном фоне
-  // zoom>1.0 → img больше контейнера, края обрезаются, objectPosition выбирает видимую часть
-  //
-  // Формат хранения: "X% Y% zoom" где X,Y — objectPosition, zoom — коэффициент
+  // Подход: objectPosition управляет видимой областью (X,Y от 0 до 100%)
+  // zoom хранится отдельно и применяется через width/height на img
+  // Drag меняет objectPosition — работает только при zoom >= 1
 
   const parsePos = (str) => {
     const parts = (str || '50% 50% 1.00').split(' ')
@@ -27,17 +24,19 @@ function PhotoPositioner({ item, onClose, onSave }) {
   const dragging    = useRef(false)
   const startMouse  = useRef({ x: 0, y: 0 })
   const startPos    = useRef({ x: 50, y: 50 })
-  const containerRef = useRef(null)
 
   const posXRef = useRef(initial.x)
   const posYRef = useRef(initial.y)
   const zoomRef = useRef(initial.z)
+
+  const containerRef = useRef(null)
 
   const setPosXSync = (v) => { posXRef.current = v; setPosX(v) }
   const setPosYSync = (v) => { posYRef.current = v; setPosY(v) }
   const setZoomSync = (v) => { zoomRef.current = v; setZoom(v) }
 
   const startDrag = (clientX, clientY) => {
+    if (zoomRef.current < 1.0) return
     dragging.current   = true
     startMouse.current = { x: clientX, y: clientY }
     startPos.current   = { x: posXRef.current, y: posYRef.current }
@@ -47,14 +46,12 @@ function PhotoPositioner({ item, onClose, onSave }) {
     if (!dragging.current || !containerRef.current) return
     const rect = containerRef.current.getBoundingClientRect()
     const z = zoomRef.current
-    if (z <= 1.0) return  // при zoom≤1 фото меньше контейнера — двигать нечего
-    // Чем больше zoom, тем меньше нужно двигать objectPosition
-    // При zoom=2: img=200% контейнера, лишнее=100%, objectPosition 0→100% = сдвиг на 100%
-    const dx = (clientX - startMouse.current.x) / rect.width  * 100
-    const dy = (clientY - startMouse.current.y) / rect.height * 100
-    const sensitivity = 1 / (z - 1 + 0.001)  // чем больше zoom, тем плавнее
-    setPosXSync(Math.max(0, Math.min(100, startPos.current.x - dx * sensitivity * 0.5)))
-    setPosYSync(Math.max(0, Math.min(100, startPos.current.y - dy * sensitivity * 0.5)))
+    // objectPosition сдвиг: при z=1 чуть двигается, при z=2 двигается быстрее
+    // Движение мыши вправо → objectPosition X уменьшается (видна правая часть фото)
+    const dx = (clientX - startMouse.current.x) / rect.width  * 100 / z
+    const dy = (clientY - startMouse.current.y) / rect.height * 100 / z
+    setPosXSync(Math.max(0, Math.min(100, startPos.current.x - dx)))
+    setPosYSync(Math.max(0, Math.min(100, startPos.current.y - dy)))
   }
 
   const onMouseDown  = (e) => { e.preventDefault(); startDrag(e.clientX, e.clientY) }
@@ -68,26 +65,9 @@ function PhotoPositioner({ item, onClose, onSave }) {
   }
 
   const z = zoom
-  // При zoom<1: img меньше контейнера → центрируем через margin auto
-  // При zoom≥1: img заполняет или перекрывает контейнер
   const imgStyle = z >= 1.0
-    ? {
-        width:`${z * 100}%`,
-        height:`${z * 100}%`,
-        objectFit:'cover',
-        objectPosition:`${posX.toFixed(1)}% ${posY.toFixed(1)}%`,
-        display:'block',
-        pointerEvents:'none',
-        flexShrink: 0,
-      }
-    : {
-        width:`${z * 100}%`,
-        height:`${z * 100}%`,
-        objectFit:'contain',
-        display:'block',
-        pointerEvents:'none',
-        margin:'auto',
-      }
+    ? { width:`${z*100}%`, height:`${z*100}%`, objectFit:'cover', objectPosition:`${posX.toFixed(1)}% ${posY.toFixed(1)}%`, flexShrink:0, display:'block', pointerEvents:'none' }
+    : { width:`${z*100}%`, height:`${z*100}%`, objectFit:'contain', display:'block', pointerEvents:'none', margin:'auto' }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -97,7 +77,7 @@ function PhotoPositioner({ item, onClose, onSave }) {
         <div style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.06em',
           color:'var(--white)', marginBottom:4 }}>Кадрирование фото</div>
         <div style={{ color:'var(--gray)', fontSize:'0.82rem', marginBottom:16 }}>
-          {item.full_name} — {z > 1 ? 'перетащи для выбора области' : z < 1 ? 'фото целиком' : 'перемести или измени масштаб'}
+          {item.full_name} — {z >= 1 ? 'перетащи для выбора области' : 'фото целиком (уменьшено)'}
         </div>
 
         <div
@@ -107,7 +87,7 @@ function PhotoPositioner({ item, onClose, onSave }) {
           onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onMouseUp}
           style={{
             width:'100%', height:260, overflow:'hidden', position:'relative',
-            cursor: z > 1 ? 'grab' : 'default',
+            cursor: z >= 1 ? 'grab' : 'default',
             borderRadius:8, border:'2px solid var(--red)',
             background:'var(--dark)', userSelect:'none',
             display:'flex', alignItems:'center', justifyContent:'center',
@@ -183,8 +163,8 @@ export default function HallOfFameAdmin({ token }) {
       const r = await fetch(url, { method, headers: hj, body: JSON.stringify({
         full_name:    editing.full_name.trim(),
         achievements: editing.achievements || null,
-        gup:          editing.gup !== '' ? Number(editing.gup) : null,
-        dan:          editing.dan !== '' ? Number(editing.dan) : null,
+        gup:          (editing.gup !== '' && !isNaN(Number(editing.gup))) ? Number(editing.gup) : null,
+        dan:          (editing.dan !== '' && !isNaN(Number(editing.dan))) ? Number(editing.dan) : null,
         sort_order:   Number(editing.sort_order) || 0,
         is_featured:  !!editing.is_featured,
       })})
