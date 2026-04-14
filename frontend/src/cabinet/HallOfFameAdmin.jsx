@@ -3,79 +3,80 @@ import { API } from './constants'
 import ConfirmModal from './ConfirmModal'
 
 function PhotoPositioner({ item, onClose, onSave }) {
+  // ТОЛЬКО objectPosition X% Y% — никакого zoom, никаких трюков с width/height
+  // img = width:100% height:100% objectFit:cover — точно как .champion-img в CSS
+  // drag меняет objectPosition напрямую через DOM ref
+
   const parsePos = (str) => {
-    const parts = (str || '50% 20% 1.00').split(' ')
-    return { x: parseFloat(parts[0]) || 50, y: parseFloat(parts[1]) || 20, z: parseFloat(parts[2]) || 1.0 }
+    const parts = (str || '50% 20%').split(' ')
+    return { x: parseFloat(parts[0]) || 50, y: parseFloat(parts[1]) || 20 }
   }
   const initial = parsePos(item.photo_position)
 
-  const posX   = useRef(initial.x)
-  const posY   = useRef(initial.y)
-  const zoom   = useRef(initial.z)
-  const drag   = useRef(false)
-  const start  = useRef({ mx:0, my:0, px:0, py:0 })
   const imgRef = useRef(null)
-  const [, forceRender] = useState(0)
-  const tick = () => forceRender(n => n + 1)
+  const drag   = useRef(false)
+  const start  = useRef({ mx:0, my:0, px:initial.x, py:initial.y })
+  const cur    = useRef({ x:initial.x, y:initial.y })
+  const [display, setDisplay] = useState({ x:initial.x, y:initial.y })
 
-  const applyToImg = () => {
-    if (!imgRef.current) return
-    const pct = Math.max(zoom.current, 1.0) * 100 + 5
-    imgRef.current.style.width  = `${pct}%`
-    imgRef.current.style.height = `${pct}%`
-    imgRef.current.style.objectPosition = `${posX.current.toFixed(1)}% ${posY.current.toFixed(1)}%`
+  // Применяем objectPosition напрямую к DOM — без ре-рендера
+  const apply = (x, y) => {
+    cur.current = { x, y }
+    if (imgRef.current) {
+      imgRef.current.style.objectPosition = `${x.toFixed(1)}% ${y.toFixed(1)}%`
+    }
+    setDisplay({ x, y })
   }
 
-  useEffect(() => { applyToImg() })
-
-  const onMouseDown  = (e) => { e.preventDefault(); drag.current = true; start.current = { mx:e.clientX, my:e.clientY, px:posX.current, py:posY.current } }
-  const onTouchStart = (e) => { e.preventDefault(); drag.current = true; const t=e.touches[0]; start.current = { mx:t.clientX, my:t.clientY, px:posX.current, py:posY.current } }
-  const onMouseUp    = () => { drag.current = false }
+  const onMouseDown  = (e) => { e.preventDefault(); drag.current = true; start.current = { mx:e.clientX, my:e.clientY, px:cur.current.x, py:cur.current.y } }
+  const onTouchStart = (e) => { e.preventDefault(); drag.current = true; const t=e.touches[0]; start.current = { mx:t.clientX, my:t.clientY, px:cur.current.x, py:cur.current.y } }
+  const onUp         = () => { drag.current = false }
 
   const move = (clientX, clientY) => {
     if (!drag.current) return
-    const dx = (clientX - start.current.mx) * 0.25
-    const dy = (clientY - start.current.my) * 0.25
-    posX.current = Math.max(0, Math.min(100, start.current.px + dx))
-    posY.current = Math.max(0, Math.min(100, start.current.py + dy))
-    applyToImg()
+    // 1px мыши = 0.2% objectPosition
+    const newX = Math.max(0, Math.min(100, start.current.px + (clientX - start.current.mx) * 0.2))
+    const newY = Math.max(0, Math.min(100, start.current.py + (clientY - start.current.my) * 0.2))
+    apply(newX, newY)
   }
+
   const onMouseMove  = (e) => move(e.clientX, e.clientY)
   const onTouchMove  = (e) => { e.preventDefault(); move(e.touches[0].clientX, e.touches[0].clientY) }
 
-  const handleZoom = (v) => { zoom.current = v; applyToImg(); tick() }
-  const handleSave = () => onSave(`${posX.current.toFixed(1)}% ${posY.current.toFixed(1)}% ${zoom.current.toFixed(2)}`)
-
-  const pct = Math.max(zoom.current, 1.0) * 100 + 5
+  const handleSave = () => onSave(`${cur.current.x.toFixed(1)}% ${cur.current.y.toFixed(1)}%`)
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={e => e.stopPropagation()}
         style={{ maxWidth:460, width:'92vw', boxSizing:'border-box', padding:24 }}>
-        <div style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.06em', color:'var(--white)', marginBottom:4 }}>Кадрирование фото</div>
-        <div style={{ color:'var(--gray)', fontSize:'0.82rem', marginBottom:16 }}>{item.full_name} — перетащи фото, настрой масштаб</div>
+        <div style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.06em', color:'var(--white)', marginBottom:4 }}>
+          Кадрирование фото
+        </div>
+        <div style={{ color:'var(--gray)', fontSize:'0.82rem', marginBottom:16 }}>
+          {item.full_name} — перетащи фото чтобы выбрать нужную область
+        </div>
+
+        {/* Контейнер = точная копия .champion-img-wrap */}
         <div
-          onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
-          onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onMouseUp}
-          style={{ position:'relative', height:260, overflow:'hidden', cursor:'grab', borderRadius:8, border:'2px solid var(--red)', background:'var(--dark)', userSelect:'none' }}>
+          onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onUp} onMouseLeave={onUp}
+          onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onUp}
+          style={{ position:'relative', height:260, overflow:'hidden', cursor:'grab',
+            borderRadius:8, border:'2px solid var(--red)', background:'var(--dark)', userSelect:'none' }}>
+          {/* img = точная копия .champion-img */}
           <img ref={imgRef} src={item.photo_url} alt="" draggable={false}
-            style={{ width:`${pct}%`, height:`${pct}%`, objectFit:'cover', objectPosition:`${posX.current.toFixed(1)}% ${posY.current.toFixed(1)}%`, display:'block', flexShrink:0, pointerEvents:'none' }}
+            style={{ width:'100%', height:'100%', objectFit:'cover',
+              objectPosition:`${display.x.toFixed(1)}% ${display.y.toFixed(1)}%`,
+              display:'block', pointerEvents:'none' }}
           />
           <div style={{ position:'absolute', inset:0, pointerEvents:'none',
             backgroundImage:'linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px)',
             backgroundSize:'33.33% 33.33%' }}/>
         </div>
-        <div style={{ marginTop:16, display:'flex', alignItems:'center', gap:12 }}>
-          <span style={{ color:'var(--gray)', fontSize:'0.78rem', fontFamily:'Barlow Condensed', fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', whiteSpace:'nowrap' }}>Масштаб</span>
-          <input type="range" min={0.5} max={2.0} step={0.05} value={zoom.current}
-            onChange={e => handleZoom(Number(e.target.value))}
-            style={{ flex:1, accentColor:'var(--red)' }}/>
-          <span style={{ color:'var(--white)', fontSize:'0.85rem', minWidth:42, textAlign:'right' }}>{Math.round(zoom.current*100)}%</span>
+
+        <div style={{ color:'var(--gray-dim)', fontSize:'0.72rem', marginTop:10, textAlign:'center' }}>
+          X: {display.x.toFixed(0)}%  Y: {display.y.toFixed(0)}%
         </div>
-        <div style={{ color:'var(--gray-dim)', fontSize:'0.72rem', marginTop:6, textAlign:'center' }}>
-          X: {posX.current.toFixed(0)}%  Y: {posY.current.toFixed(0)}%  масштаб: {Math.round(zoom.current*100)}%
-        </div>
-        <div style={{ display:'flex', gap:10, marginTop:20 }}>
+        <div style={{ display:'flex', gap:10, marginTop:16 }}>
           <button className="btn-primary" style={{ flex:1, padding:'9px 0', fontSize:'13px' }} onClick={handleSave}>Сохранить</button>
           <button className="btn-outline"  style={{ flex:1, padding:'9px 0', fontSize:'13px' }} onClick={onClose}>Отмена</button>
         </div>
@@ -83,7 +84,6 @@ function PhotoPositioner({ item, onClose, onSave }) {
     </div>
   )
 }
-
 
 export default function HallOfFameAdmin({ token }) {
   const [items,     setItems]     = useState([])
@@ -283,13 +283,10 @@ export default function HallOfFameAdmin({ token }) {
             {/* Фото */}
             <div style={{position:'relative', height:220, background:'var(--dark)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden'}}>
               {item.photo_url
-                ? <img src={item.photo_url} alt={item.full_name} style={(() => {
-                    const p = (item.photo_position||'50% 50% 1.00').split(' ')
-                    const px = p[0]||'50%', py = p[1]||'50%', z = parseFloat(p[2])||1.0
-                    return z >= 1.0
-                      ? {width:`${z*100}%`,height:`${z*100}%`,objectFit:'cover',objectPosition:`${px} ${py}`,flexShrink:0}
-                      : {width:`${z*100}%`,height:`${z*100}%`,objectFit:'contain',margin:'auto',display:'block'}
-                  })()}/>
+                ? <img src={item.photo_url} alt={item.full_name} style={{
+                    width:'100%', height:'100%', objectFit:'cover',
+                    objectPosition: (() => { const p=(item.photo_position||'50% 20%').split(' '); return `${p[0]||'50%'} ${p[1]||'20%'}` })()
+                  }}/>
                 : <div style={{color:'var(--gray-dim)', fontFamily:'Bebas Neue', fontSize:'1rem', letterSpacing:'0.1em'}}>НЕТ ФОТО</div>
               }
               {/* Кнопка загрузки фото */}
