@@ -83,9 +83,10 @@ export default function Champions() {
                             const px = p[0] || '50%'
                             const py = p[1] || '50%'
                             const z  = parseFloat(p[2]) || 1.0
+                            const pct = z >= 1.0 ? z * 100 + 10 : z * 100
                             return z >= 1.0
-                              ? { width:`${z*100}%`, height:`${z*100}%`, objectFit:'cover', objectPosition:`${px} ${py}`, flexShrink:0 }
-                              : { width:`${z*100}%`, height:`${z*100}%`, objectFit:'contain', margin:'auto', display:'block' }
+                              ? { width:`${pct}%`, height:`${pct}%`, objectFit:'cover', objectPosition:`${px} ${py}`, flexShrink:0 }
+                              : { width:`${pct}%`, height:`${pct}%`, objectFit:'contain', margin:'auto', display:'block' }
                           })()}
                         />
                       ) : (

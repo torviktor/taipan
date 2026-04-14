@@ -36,7 +36,6 @@ function PhotoPositioner({ item, onClose, onSave }) {
   const setZoomSync = (v) => { zoomRef.current = v; setZoom(v) }
 
   const startDrag = (clientX, clientY) => {
-    if (zoomRef.current < 1.0) return
     dragging.current   = true
     startMouse.current = { x: clientX, y: clientY }
     startPos.current   = { x: posXRef.current, y: posYRef.current }
@@ -46,10 +45,14 @@ function PhotoPositioner({ item, onClose, onSave }) {
     if (!dragging.current || !containerRef.current) return
     const rect = containerRef.current.getBoundingClientRect()
     const z = zoomRef.current
-    // objectPosition сдвиг: при z=1 чуть двигается, при z=2 двигается быстрее
-    // Движение мыши вправо → objectPosition X уменьшается (видна правая часть фото)
-    const dx = (clientX - startMouse.current.x) / rect.width  * 100 / z
-    const dy = (clientY - startMouse.current.y) / rect.height * 100 / z
+    // imgSize в % от контейнера — реальный размер img
+    const imgPct = Math.max(z, 1.0) * 100 + 10  // минимум 110% чтобы objectPosition работал
+    // Сколько пикселей "лишнего" пространства по каждой оси
+    const excessX = rect.width  * (imgPct / 100 - 1)
+    const excessY = rect.height * (imgPct / 100 - 1)
+    // Смещение мыши → изменение objectPosition
+    const dx = (clientX - startMouse.current.x) / excessX * 100
+    const dy = (clientY - startMouse.current.y) / excessY * 100
     setPosXSync(Math.max(0, Math.min(100, startPos.current.x - dx)))
     setPosYSync(Math.max(0, Math.min(100, startPos.current.y - dy)))
   }
@@ -65,9 +68,11 @@ function PhotoPositioner({ item, onClose, onSave }) {
   }
 
   const z = zoom
+  // img всегда минимум 110% контейнера чтобы objectPosition имел эффект
+  const imgPct = z >= 1.0 ? z * 100 + 10 : z * 100
   const imgStyle = z >= 1.0
-    ? { width:`${z*100}%`, height:`${z*100}%`, objectFit:'cover', objectPosition:`${posX.toFixed(1)}% ${posY.toFixed(1)}%`, flexShrink:0, display:'block', pointerEvents:'none' }
-    : { width:`${z*100}%`, height:`${z*100}%`, objectFit:'contain', display:'block', pointerEvents:'none', margin:'auto' }
+    ? { width:`${imgPct}%`, height:`${imgPct}%`, objectFit:'cover', objectPosition:`${posX.toFixed(1)}% ${posY.toFixed(1)}%`, flexShrink:0, display:'block', pointerEvents:'none' }
+    : { width:`${imgPct}%`, height:`${imgPct}%`, objectFit:'contain', display:'block', pointerEvents:'none', margin:'auto' }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -331,9 +336,10 @@ export default function HallOfFameAdmin({ token }) {
                 ? <img src={item.photo_url} alt={item.full_name} style={(() => {
                     const p = (item.photo_position||'50% 50% 1.00').split(' ')
                     const px = p[0]||'50%', py = p[1]||'50%', z = parseFloat(p[2])||1.0
+                    const pct = z >= 1.0 ? z * 100 + 10 : z * 100
                     return z >= 1.0
-                      ? {width:`${z*100}%`,height:`${z*100}%`,objectFit:'cover',objectPosition:`${px} ${py}`,flexShrink:0}
-                      : {width:`${z*100}%`,height:`${z*100}%`,objectFit:'contain',margin:'auto',display:'block'}
+                      ? {width:`${pct}%`,height:`${pct}%`,objectFit:'cover',objectPosition:`${px} ${py}`,flexShrink:0}
+                      : {width:`${pct}%`,height:`${pct}%`,objectFit:'contain',margin:'auto',display:'block'}
                   })()}/>
                 : <div style={{color:'var(--gray-dim)', fontFamily:'Bebas Neue', fontSize:'1rem', letterSpacing:'0.1em'}}>НЕТ ФОТО</div>
               }
