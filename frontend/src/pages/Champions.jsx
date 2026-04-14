@@ -79,13 +79,13 @@ export default function Champions() {
                       {item.photo_url ? (
                         <img src={item.photo_url} alt={item.full_name} className="champion-img"
                           style={(() => {
-                            const parts = (item.photo_position || '50% 50% 1.00').split(' ')
-                            const px   = parts[0] || '50%'
-                            const py   = parts[1] || '50%'
-                            const zoom = parseFloat(parts[2]) || 1.0
+                            const p = (item.photo_position || '50% 50% 1.00').split(' ')
+                            const px = p[0] || '50%'
+                            const py = p[1] || '50%'
+                            const z  = parseFloat(p[2]) || 1.0
                             return {
                               objectPosition: `${px} ${py}`,
-                              transform: `scale(${zoom})`,
+                              transform: `scale(${z})`,
                               transformOrigin: `${px} ${py}`,
                             }
                           })()}

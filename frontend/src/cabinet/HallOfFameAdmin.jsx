@@ -3,57 +3,56 @@ import { API } from './constants'
 import ConfirmModal from './ConfirmModal'
 
 function PhotoPositioner({ item, onClose, onSave }) {
-  const [offset, setOffset] = useState({ x: 0, y: 0 })
-  const [zoom,   setZoom]   = useState(1.0)
+  // Используем ТОЛЬКО objectPosition: "X% Y%" + отдельный zoom
+  // X: 0%=левый край, 100%=правый. Y: 0%=верх, 100%=низ
+  // Это тот же формат что использует CSS objectPosition — никаких конвертаций
 
-  // Refs для актуальных значений в момент сохранения (избегаем stale closure)
-  const offsetRef    = useRef({ x: 0, y: 0 })
-  const zoomRef      = useRef(1.0)
-  const dragging     = useRef(false)
-  const startMouse   = useRef({ x: 0, y: 0 })
-  const startOff     = useRef({ x: 0, y: 0 })
+  const parsePos = (str) => {
+    const parts = (str || '50% 50% 1.00').split(' ')
+    return {
+      x: parseFloat(parts[0]) || 50,
+      y: parseFloat(parts[1]) || 50,
+      z: parseFloat(parts[2]) || 1.0,
+    }
+  }
+
+  const initial = parsePos(item.photo_position)
+  const [posX, setPosX] = useState(initial.x)
+  const [posY, setPosY] = useState(initial.y)
+  const [zoom, setZoom] = useState(initial.z)
+
+  // Refs для drag
+  const dragging    = useRef(false)
+  const startMouse  = useRef({ x: 0, y: 0 })
+  const startPos    = useRef({ x: 50, y: 50 })
   const containerRef = useRef(null)
 
-  const setOffsetSync = (val) => {
-    offsetRef.current = val
-    setOffset(val)
-  }
-  const setZoomSync = (val) => {
-    zoomRef.current = val
-    setZoom(val)
-  }
+  // Refs для актуальных значений при сохранении
+  const posXRef = useRef(initial.x)
+  const posYRef = useRef(initial.y)
+  const zoomRef = useRef(initial.z)
 
-  // Восстанавливаем сохранённое состояние
-  useEffect(() => {
-    const parts = (item.photo_position || '50% 50% 1.00').split(' ')
-    const savedPx   = parseFloat(parts[0]) || 50
-    const savedPy   = parseFloat(parts[1]) || 50
-    const savedZoom = parseFloat(parts[2]) || 1.0
-    // Конвертируем % → px (диапазон ±300px)
-    const MAX = 300
-    const ox = ((savedPx - 50) / 50) * MAX
-    const oy = ((savedPy - 50) / 50) * MAX
-    setOffsetSync({ x: ox, y: oy })
-    setZoomSync(savedZoom)
-  }, [])
-
-  const MAX_DRAG = 300
+  const setPosXSync = (v) => { posXRef.current = v; setPosX(v) }
+  const setPosYSync = (v) => { posYRef.current = v; setPosY(v) }
+  const setZoomSync = (v) => { zoomRef.current = v; setZoom(v) }
 
   const startDrag = (clientX, clientY) => {
     dragging.current   = true
     startMouse.current = { x: clientX, y: clientY }
-    startOff.current   = { ...offsetRef.current }
+    startPos.current   = { x: posXRef.current, y: posYRef.current }
   }
 
   const moveDrag = (clientX, clientY) => {
-    if (!dragging.current) return
-    const dx = clientX - startMouse.current.x
-    const dy = clientY - startMouse.current.y
-    const newVal = {
-      x: Math.max(-MAX_DRAG, Math.min(MAX_DRAG, startOff.current.x + dx)),
-      y: Math.max(-MAX_DRAG, Math.min(MAX_DRAG, startOff.current.y + dy)),
-    }
-    setOffsetSync(newVal)
+    if (!dragging.current || !containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    // Смещение мыши в % от размера контейнера
+    // При objectPosition: двигаем мышь вправо → фото сдвигается вправо → X уменьшается
+    const dx = (clientX - startMouse.current.x) / rect.width  * 100
+    const dy = (clientY - startMouse.current.y) / rect.height * 100
+    // Чувствительность зависит от масштаба: при zoom=2 нужно двигать вдвое меньше
+    const sensitivity = 1 / zoomRef.current
+    setPosXSync(Math.max(0, Math.min(100, startPos.current.x - dx * sensitivity)))
+    setPosYSync(Math.max(0, Math.min(100, startPos.current.y - dy * sensitivity)))
   }
 
   const onMouseDown  = (e) => { e.preventDefault(); startDrag(e.clientX, e.clientY) }
@@ -62,14 +61,8 @@ function PhotoPositioner({ item, onClose, onSave }) {
   const onTouchStart = (e) => { e.preventDefault(); const t = e.touches[0]; startDrag(t.clientX, t.clientY) }
   const onTouchMove  = (e) => { e.preventDefault(); const t = e.touches[0]; moveDrag(t.clientX, t.clientY) }
 
-  // Читаем из refs — всегда актуальные значения
   const handleSave = () => {
-    const ox = offsetRef.current.x
-    const oy = offsetRef.current.y
-    const z  = zoomRef.current
-    const px = Math.round(50 + (ox / MAX_DRAG) * 50)
-    const py = Math.round(50 + (oy / MAX_DRAG) * 50)
-    onSave(`${px}% ${py}% ${z.toFixed(2)}`)
+    onSave(`${posXRef.current.toFixed(1)}% ${posYRef.current.toFixed(1)}% ${zoomRef.current.toFixed(2)}`)
   }
 
   return (
@@ -83,40 +76,35 @@ function PhotoPositioner({ item, onClose, onSave }) {
           {item.full_name} — перетащи фото, настрой масштаб
         </div>
 
-        {/* Превью — overflow:hidden только для визуала рамки, фото свободно трансформируется */}
-        <div style={{ position:'relative', borderRadius:8, border:'2px solid var(--red)', overflow:'hidden' }}>
-          <div
-            ref={containerRef}
-            onMouseDown={onMouseDown} onMouseMove={onMouseMove}
-            onMouseUp={onMouseUp}    onMouseLeave={onMouseUp}
-            onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onMouseUp}
+        {/* Превью — точно такой же рендер как на сайте */}
+        <div
+          ref={containerRef}
+          onMouseDown={onMouseDown} onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}    onMouseLeave={onMouseUp}
+          onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onMouseUp}
+          style={{
+            width:'100%', height:260, overflow:'hidden', position:'relative',
+            cursor:'grab', borderRadius:8, border:'2px solid var(--red)',
+            background:'var(--dark)', userSelect:'none',
+          }}>
+          <img
+            src={item.photo_url} alt="" draggable={false}
             style={{
-              width:'100%', height:260,
-              position:'relative', overflow:'hidden',
-              cursor:'grab', background:'var(--dark)', userSelect:'none',
-            }}>
-            <img
-              src={item.photo_url} alt="" draggable={false}
-              style={{
-                position:'absolute',
-                top:'50%', left:'50%',
-                // Фото занимает 100% контейнера как базу, scale управляет размером
-                width:'100%', height:'100%',
-                objectFit:'cover',
-                objectPosition:'center center',
-                transform:`translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px)) scale(${zoom})`,
-                transformOrigin:'center center',
-                pointerEvents:'none',
-                userSelect:'none',
-              }}
-            />
-            {/* Сетка */}
-            <div style={{
-              position:'absolute', inset:0, pointerEvents:'none',
-              backgroundImage:'linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px)',
-              backgroundSize:'33.33% 33.33%',
-            }}/>
-          </div>
+              width:'100%', height:'100%',
+              objectFit:'cover',
+              objectPosition:`${posX.toFixed(1)}% ${posY.toFixed(1)}%`,
+              transform:`scale(${zoom})`,
+              transformOrigin:`${posX.toFixed(1)}% ${posY.toFixed(1)}%`,
+              display:'block',
+              pointerEvents:'none',
+            }}
+          />
+          {/* Сетка */}
+          <div style={{
+            position:'absolute', inset:0, pointerEvents:'none',
+            backgroundImage:'linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px)',
+            backgroundSize:'33.33% 33.33%',
+          }}/>
         </div>
 
         {/* Ползунок масштаба — от 0.3 до 2.0 */}
@@ -134,7 +122,7 @@ function PhotoPositioner({ item, onClose, onSave }) {
         </div>
 
         <div style={{ color:'var(--gray-dim)', fontSize:'0.72rem', marginTop:6, textAlign:'center' }}>
-          смещение: {offset.x.toFixed(0)}px / {offset.y.toFixed(0)}px · масштаб: {Math.round(zoom*100)}%
+          X: {posX.toFixed(0)}%  Y: {posY.toFixed(0)}%  масштаб: {Math.round(zoom*100)}%
         </div>
 
         <div style={{ display:'flex', gap:10, marginTop:20 }}>
@@ -352,7 +340,7 @@ export default function HallOfFameAdmin({ token }) {
             {/* Фото */}
             <div style={{position:'relative', height:220, background:'var(--dark)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden'}}>
               {item.photo_url
-                ? <img src={item.photo_url} alt={item.full_name} style={{width:'100%', height:'100%', objectFit:'cover', objectPosition: item.photo_position || '50% 20%'}}/>
+                ? <img src={item.photo_url} alt={item.full_name} style={{width:'100%', height:'100%', objectFit:'cover', objectPosition: (() => { const p=(item.photo_position||'50% 50%').split(' '); return `${p[0]||'50%'} ${p[1]||'50%'}` })(), transform: `scale(${parseFloat((item.photo_position||'').split(' ')[2])||1})`, transformOrigin: (() => { const p=(item.photo_position||'50% 50%').split(' '); return `${p[0]||'50%'} ${p[1]||'50%'}` })()}}/>
                 : <div style={{color:'var(--gray-dim)', fontFamily:'Bebas Neue', fontSize:'1rem', letterSpacing:'0.1em'}}>НЕТ ФОТО</div>
               }
               {/* Кнопка загрузки фото */}
