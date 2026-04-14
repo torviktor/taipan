@@ -76,8 +76,7 @@ export default function Champions() {
                       {item.is_featured && (
                         <div style={{position:'absolute', top:10, left:10, zIndex:2, background:'#c8962a', borderRadius:'50%', width:28, height:28, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', boxShadow:'0 2px 8px rgba(0,0,0,0.5)'}}>★</div>
                       )}
-                      {item.photo_url ? (
-                        {(() => {
+                      {item.photo_url ? (() => {
                           const ps = item.photo_position || '0px 0px / 100%'
                           const [posStr, zoomStr] = ps.split('/')
                           const parts = posStr.trim().split(' ')
@@ -91,8 +90,7 @@ export default function Champions() {
                               transform:`translate(calc(-50% + ${ptx}px), calc(-50% + ${pty}px))`,
                             }}
                           />
-                        })()}
-                      ) : (
+                        })() : (
                         <div className="champion-img-placeholder">
                           <span>Фото</span>
                         </div>
