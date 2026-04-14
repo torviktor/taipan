@@ -34,9 +34,8 @@ function PhotoPositioner({ item, onClose, onSave }) {
 
   const move = (clientX, clientY) => {
     if (!drag.current) return
-    // 1px мыши = 0.2% objectPosition
-    const newX = Math.max(0, Math.min(100, start.current.px + (clientX - start.current.mx) * 0.2))
-    const newY = Math.max(0, Math.min(100, start.current.py + (clientY - start.current.my) * 0.2))
+    const newX = Math.max(0, Math.min(100, start.current.px - (clientX - start.current.mx) * 0.2))
+    const newY = Math.max(0, Math.min(100, start.current.py - (clientY - start.current.my) * 0.2))
     apply(newX, newY)
   }
 
@@ -281,7 +280,7 @@ export default function HallOfFameAdmin({ token }) {
             boxShadow: item.is_featured ? '0 0 16px rgba(200,150,42,0.3)' : 'none'
           }}>
             {/* Фото */}
-            <div style={{position:'relative', height:220, background:'var(--dark)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden'}}>
+            <div style={{position:'relative', height:260, background:'var(--dark)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden'}}>
               {item.photo_url
                 ? <img src={item.photo_url} alt={item.full_name} style={{
                     width:'100%', height:'100%', objectFit:'cover',
