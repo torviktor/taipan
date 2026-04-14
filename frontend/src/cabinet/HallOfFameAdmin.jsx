@@ -148,8 +148,8 @@ export default function HallOfFameAdmin({ token }) {
       const r = await fetch(url, { method, headers: hj, body: JSON.stringify({
         full_name:    editing.full_name.trim(),
         achievements: editing.achievements || null,
-        gup:          (editing.gup !== '' && !isNaN(Number(editing.gup))) ? Number(editing.gup) : null,
-        dan:          (editing.dan !== '' && !isNaN(Number(editing.dan))) ? Number(editing.dan) : null,
+        gup:          (editing.gup !== '' && !isNaN(Number(editing.gup)) && Number(editing.gup) > 0) ? Number(editing.gup) : 0,
+        dan:          (editing.dan !== '' && !isNaN(Number(editing.dan)) && Number(editing.dan) > 0) ? Number(editing.dan) : 0,
         sort_order:   Number(editing.sort_order) || 0,
         is_featured:  !!editing.is_featured,
       })})
