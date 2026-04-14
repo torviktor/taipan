@@ -77,7 +77,19 @@ export default function Champions() {
                         <div style={{position:'absolute', top:10, left:10, zIndex:2, background:'#c8962a', borderRadius:'50%', width:28, height:28, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', boxShadow:'0 2px 8px rgba(0,0,0,0.5)'}}>★</div>
                       )}
                       {item.photo_url ? (
-                        <img src={item.photo_url} alt={item.full_name} className="champion-img"/>
+                        <img src={item.photo_url} alt={item.full_name} className="champion-img"
+                          style={(() => {
+                            const parts = (item.photo_position || '50% 50% 1.00').split(' ')
+                            const px   = parts[0] || '50%'
+                            const py   = parts[1] || '50%'
+                            const zoom = parseFloat(parts[2]) || 1.0
+                            return {
+                              objectPosition: `${px} ${py}`,
+                              transform: `scale(${zoom})`,
+                              transformOrigin: `${px} ${py}`,
+                            }
+                          })()}
+                        />
                       ) : (
                         <div className="champion-img-placeholder">
                           <span>Фото</span>

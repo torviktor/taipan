@@ -3,29 +3,41 @@ import { API } from './constants'
 import ConfirmModal from './ConfirmModal'
 
 function PhotoPositioner({ item, onClose, onSave }) {
-  // offsetX/offsetY: смещение в пикселях от центра
-  // zoom: масштаб 1.0 .. 2.0
-  const [offset, setOffset] = useState({ x: 0, y: 0 })
-  const [zoom,   setZoom]   = useState(1.0)
-  const dragging   = useRef(false)
-  const startMouse = useRef({ x: 0, y: 0 })
-  const startOff   = useRef({ x: 0, y: 0 })
-  const containerRef = useRef(null)
-
-  // Максимальное смещение = половина "лишнего" пространства в px
-  const clamp = (val, z) => {
-    if (!containerRef.current) return val
-    const rect  = containerRef.current.getBoundingClientRect()
-    const maxX  = (rect.width  * (z - 1)) / 2
-    const maxY  = (rect.height * (z - 1)) / 2
-    return {
-      x: Math.max(-maxX, Math.min(maxX, val.x)),
-      y: Math.max(-maxY, Math.min(maxY, val.y)),
-    }
+  // Сохраняем offset (px от центра) и zoom (0.5..2.0)
+  // При открытии восстанавливаем из item.photo_position формата "X% Y% Z"
+  const parseState = () => {
+    const parts = (item.photo_position || '50% 50% 1.00').split(' ')
+    const savedZoom = parseFloat(parts[2]) || 1.0
+    return { zoom: savedZoom, ox: 0, oy: 0 }
   }
 
+  const initial = parseState()
+  const [offset, setOffset] = useState({ x: initial.ox, y: initial.oy })
+  const [zoom,   setZoom]   = useState(initial.zoom)
+  const dragging    = useRef(false)
+  const startMouse  = useRef({ x: 0, y: 0 })
+  const startOff    = useRef({ x: 0, y: 0 })
+  const containerRef = useRef(null)
+
+  // Восстанавливаем px-offset из сохранённых % после mount (когда знаем размер контейнера)
+  useEffect(() => {
+    if (!containerRef.current) return
+    const parts = (item.photo_position || '50% 50% 1.00').split(' ')
+    const savedPx   = parseFloat(parts[0]) || 50
+    const savedPy   = parseFloat(parts[1]) || 50
+    const savedZoom = parseFloat(parts[2]) || 1.0
+    const rect  = containerRef.current.getBoundingClientRect()
+    const rangeX = rect.width  * 0.5
+    const rangeY = rect.height * 0.5
+    const ox = ((savedPx - 50) / 50) * rangeX
+    const oy = ((savedPy - 50) / 50) * rangeY
+    setOffset({ x: ox, y: oy })
+    setZoom(savedZoom)
+  }, [])
+
+  const MAX_DRAG = 300  // px — максимальное смещение в любую сторону
+
   const startDrag = (clientX, clientY) => {
-    if (zoom <= 1.0) return
     dragging.current   = true
     startMouse.current = { x: clientX, y: clientY }
     startOff.current   = { ...offset }
@@ -35,30 +47,23 @@ function PhotoPositioner({ item, onClose, onSave }) {
     if (!dragging.current) return
     const dx = clientX - startMouse.current.x
     const dy = clientY - startMouse.current.y
-    setOffset(clamp({ x: startOff.current.x + dx, y: startOff.current.y + dy }, zoom))
+    setOffset({
+      x: Math.max(-MAX_DRAG, Math.min(MAX_DRAG, startOff.current.x + dx)),
+      y: Math.max(-MAX_DRAG, Math.min(MAX_DRAG, startOff.current.y + dy)),
+    })
   }
 
   const onMouseDown  = (e) => { e.preventDefault(); startDrag(e.clientX, e.clientY) }
   const onMouseMove  = (e) => moveDrag(e.clientX, e.clientY)
   const onMouseUp    = () => { dragging.current = false }
-  const onTouchStart = (e) => { const t = e.touches[0]; startDrag(t.clientX, t.clientY) }
+  const onTouchStart = (e) => { e.preventDefault(); const t = e.touches[0]; startDrag(t.clientX, t.clientY) }
   const onTouchMove  = (e) => { e.preventDefault(); const t = e.touches[0]; moveDrag(t.clientX, t.clientY) }
 
-  const handleZoom = (newZoom) => {
-    setZoom(newZoom)
-    // При уменьшении масштаба подгоняем смещение чтобы не вылезало за границы
-    setOffset(prev => clamp(prev, newZoom))
-  }
-
-  // Конвертируем px-offset в % для сохранения (objectPosition формат "X% Y%")
-  const toPercent = () => {
-    if (!containerRef.current) return '50% 50%'
-    const rect = containerRef.current.getBoundingClientRect()
-    const maxX = (rect.width  * (zoom - 1)) / 2 || 1
-    const maxY = (rect.height * (zoom - 1)) / 2 || 1
-    const px = 50 - (offset.x / maxX) * 50
-    const py = 50 - (offset.y / maxY) * 50
-    return `${Math.round(Math.max(0, Math.min(100, px)))}% ${Math.round(Math.max(0, Math.min(100, py)))}%`
+  // Сохраняем: "X% Y% zoom" — X,Y нормализованы от -MAX_DRAG до MAX_DRAG → 0..100
+  const toSaveString = () => {
+    const px = 50 + (offset.x / MAX_DRAG) * 50
+    const py = 50 + (offset.y / MAX_DRAG) * 50
+    return `${Math.round(px)}% ${Math.round(py)}% ${zoom.toFixed(2)}`
   }
 
   return (
@@ -69,7 +74,7 @@ function PhotoPositioner({ item, onClose, onSave }) {
         <div style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.06em',
           color:'var(--white)', marginBottom:4 }}>Кадрирование фото</div>
         <div style={{ color:'var(--gray)', fontSize:'0.82rem', marginBottom:16 }}>
-          {item.full_name} — {zoom > 1 ? 'перетащи фото мышью' : 'увеличь масштаб чтобы двигать'}
+          {item.full_name} — перетащи фото, настрой масштаб
         </div>
 
         {/* Превью */}
@@ -81,7 +86,7 @@ function PhotoPositioner({ item, onClose, onSave }) {
           style={{
             width:'100%', height:260,
             overflow:'hidden', position:'relative',
-            cursor: zoom > 1 ? 'grab' : 'default',
+            cursor:'grab',
             borderRadius:8, border:'2px solid var(--red)',
             background:'var(--dark)', userSelect:'none',
           }}>
@@ -98,7 +103,6 @@ function PhotoPositioner({ item, onClose, onSave }) {
               userSelect:'none',
             }}
           />
-          {/* Сетка правил третей */}
           <div style={{
             position:'absolute', inset:0, pointerEvents:'none',
             backgroundImage:'linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px)',
@@ -106,14 +110,14 @@ function PhotoPositioner({ item, onClose, onSave }) {
           }}/>
         </div>
 
-        {/* Ползунок масштаба */}
+        {/* Ползунок масштаба — от 0.5 до 2.0 */}
         <div style={{ marginTop:16, display:'flex', alignItems:'center', gap:12 }}>
           <span style={{ color:'var(--gray)', fontSize:'0.78rem', fontFamily:'Barlow Condensed',
             fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', whiteSpace:'nowrap' }}>
             Масштаб
           </span>
-          <input type="range" min={1.0} max={2.0} step={0.05} value={zoom}
-            onChange={e => handleZoom(Number(e.target.value))}
+          <input type="range" min={0.5} max={2.0} step={0.05} value={zoom}
+            onChange={e => setZoom(Number(e.target.value))}
             style={{ flex:1, accentColor:'var(--red)' }}/>
           <span style={{ color:'var(--white)', fontSize:'0.85rem', minWidth:42, textAlign:'right' }}>
             {Math.round(zoom * 100)}%
@@ -121,13 +125,13 @@ function PhotoPositioner({ item, onClose, onSave }) {
         </div>
 
         <div style={{ color:'var(--gray-dim)', fontSize:'0.72rem', marginTop:6, textAlign:'center' }}>
-          смещение: {offset.x.toFixed(0)}px / {offset.y.toFixed(0)}px
+          смещение: {offset.x.toFixed(0)}px / {offset.y.toFixed(0)}px · масштаб: {Math.round(zoom*100)}%
         </div>
 
         <div style={{ display:'flex', gap:10, marginTop:20 }}>
           <button className="btn-primary"
             style={{ flex:1, padding:'9px 0', fontSize:'13px' }}
-            onClick={() => onSave(toPercent())}>
+            onClick={() => onSave(toSaveString())}>
             Сохранить
           </button>
           <button className="btn-outline"
