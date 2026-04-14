@@ -115,7 +115,7 @@ function PhotoPositioner({ item, onClose, onSave }) {
   )
 }
 
-export default function HallOfFameAdminexport default function HallOfFameAdmin({ token }) {
+export default function HallOfFameAdmin({ token }) {
   const [items,     setItems]     = useState([])
   const [loading,   setLoading]   = useState(false)
   const [showForm,  setShowForm]  = useState(false)
