@@ -83,10 +83,16 @@ export default function Champions() {
                             const px = p[0] || '50%'
                             const py = p[1] || '50%'
                             const z  = parseFloat(p[2]) || 1.0
-                            return {
-                              objectPosition: `${px} ${py}`,
-                              transform: `scale(${z})`,
-                              transformOrigin: `${px} ${py}`,
+                            if (z >= 1.0) {
+                              return {
+                                width:`${z*100}%`, height:`${z*100}%`,
+                                objectFit:'cover', objectPosition:`${px} ${py}`,
+                              }
+                            } else {
+                              return {
+                                width:`${z*100}%`, height:`${z*100}%`,
+                                objectFit:'contain', margin:'auto', display:'block',
+                              }
                             }
                           })()}
                         />
