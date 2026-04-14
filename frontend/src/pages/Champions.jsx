@@ -79,14 +79,12 @@ export default function Champions() {
                       {item.photo_url ? (
                         <img src={item.photo_url} alt={item.full_name} className="champion-img"
                           style={(() => {
-                            const p = (item.photo_position || '50% 50% 1.00').split(' ')
-                            const px = p[0] || '50%'
-                            const py = p[1] || '50%'
-                            const z  = parseFloat(p[2]) || 1.0
-                            const pct = z >= 1.0 ? z * 100 + 10 : z * 100
-                            return z >= 1.0
-                              ? { width:`${pct}%`, height:`${pct}%`, objectFit:'cover', objectPosition:`${px} ${py}`, flexShrink:0 }
-                              : { width:`${pct}%`, height:`${pct}%`, objectFit:'contain', margin:'auto', display:'block' }
+                            const p = (item.photo_position || '50% 20% 1.00').split(' ')
+                            const px  = parseFloat(p[0]) || 50
+                            const py  = parseFloat(p[1]) || 20
+                            const z   = parseFloat(p[2]) || 1.0
+                            const pct = Math.max(z, 1.0) * 100 + 5
+                            return { width:`${pct}%`, height:`${pct}%`, objectFit:'cover', objectPosition:`${px}% ${py}%`, flexShrink:0 }
                           })()}
                         />
                       ) : (

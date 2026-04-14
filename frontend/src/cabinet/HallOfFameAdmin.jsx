@@ -3,137 +3,87 @@ import { API } from './constants'
 import ConfirmModal from './ConfirmModal'
 
 function PhotoPositioner({ item, onClose, onSave }) {
-  // Подход: objectPosition управляет видимой областью (X,Y от 0 до 100%)
-  // zoom хранится отдельно и применяется через width/height на img
-  // Drag меняет objectPosition — работает только при zoom >= 1
-
   const parsePos = (str) => {
-    const parts = (str || '50% 50% 1.00').split(' ')
-    return {
-      x: parseFloat(parts[0]) || 50,
-      y: parseFloat(parts[1]) || 50,
-      z: parseFloat(parts[2]) || 1.0,
-    }
+    const parts = (str || '50% 20% 1.00').split(' ')
+    return { x: parseFloat(parts[0]) || 50, y: parseFloat(parts[1]) || 20, z: parseFloat(parts[2]) || 1.0 }
+  }
+  const initial = parsePos(item.photo_position)
+
+  const posX   = useRef(initial.x)
+  const posY   = useRef(initial.y)
+  const zoom   = useRef(initial.z)
+  const drag   = useRef(false)
+  const start  = useRef({ mx:0, my:0, px:0, py:0 })
+  const imgRef = useRef(null)
+  const [, forceRender] = useState(0)
+  const tick = () => forceRender(n => n + 1)
+
+  const applyToImg = () => {
+    if (!imgRef.current) return
+    const pct = Math.max(zoom.current, 1.0) * 100 + 5
+    imgRef.current.style.width  = `${pct}%`
+    imgRef.current.style.height = `${pct}%`
+    imgRef.current.style.objectPosition = `${posX.current.toFixed(1)}% ${posY.current.toFixed(1)}%`
   }
 
-  const initial  = parsePos(item.photo_position)
-  const [posX, setPosX] = useState(initial.x)
-  const [posY, setPosY] = useState(initial.y)
-  const [zoom, setZoom] = useState(initial.z)
+  useEffect(() => { applyToImg() })
 
-  const dragging    = useRef(false)
-  const startMouse  = useRef({ x: 0, y: 0 })
-  const startPos    = useRef({ x: 50, y: 50 })
+  const onMouseDown  = (e) => { e.preventDefault(); drag.current = true; start.current = { mx:e.clientX, my:e.clientY, px:posX.current, py:posY.current } }
+  const onTouchStart = (e) => { e.preventDefault(); drag.current = true; const t=e.touches[0]; start.current = { mx:t.clientX, my:t.clientY, px:posX.current, py:posY.current } }
+  const onMouseUp    = () => { drag.current = false }
 
-  const posXRef = useRef(initial.x)
-  const posYRef = useRef(initial.y)
-  const zoomRef = useRef(initial.z)
-
-  const containerRef = useRef(null)
-
-  const setPosXSync = (v) => { posXRef.current = v; setPosX(v) }
-  const setPosYSync = (v) => { posYRef.current = v; setPosY(v) }
-  const setZoomSync = (v) => { zoomRef.current = v; setZoom(v) }
-
-  const startDrag = (clientX, clientY) => {
-    dragging.current   = true
-    startMouse.current = { x: clientX, y: clientY }
-    startPos.current   = { x: posXRef.current, y: posYRef.current }
+  const move = (clientX, clientY) => {
+    if (!drag.current) return
+    const dx = (clientX - start.current.mx) * 0.25
+    const dy = (clientY - start.current.my) * 0.25
+    posX.current = Math.max(0, Math.min(100, start.current.px + dx))
+    posY.current = Math.max(0, Math.min(100, start.current.py + dy))
+    applyToImg()
   }
+  const onMouseMove  = (e) => move(e.clientX, e.clientY)
+  const onTouchMove  = (e) => { e.preventDefault(); move(e.touches[0].clientX, e.touches[0].clientY) }
 
-  const moveDrag = (clientX, clientY) => {
-    if (!dragging.current || !containerRef.current) return
-    const rect = containerRef.current.getBoundingClientRect()
-    const z = zoomRef.current
-    // imgSize в % от контейнера — реальный размер img
-    const imgPct = Math.max(z, 1.0) * 100 + 10  // минимум 110% чтобы objectPosition работал
-    // Сколько пикселей "лишнего" пространства по каждой оси
-    const excessX = rect.width  * (imgPct / 100 - 1)
-    const excessY = rect.height * (imgPct / 100 - 1)
-    // Смещение мыши → изменение objectPosition
-    const dx = (clientX - startMouse.current.x) / excessX * 100
-    const dy = (clientY - startMouse.current.y) / excessY * 100
-    setPosXSync(Math.max(0, Math.min(100, startPos.current.x - dx)))
-    setPosYSync(Math.max(0, Math.min(100, startPos.current.y - dy)))
-  }
+  const handleZoom = (v) => { zoom.current = v; applyToImg(); tick() }
+  const handleSave = () => onSave(`${posX.current.toFixed(1)}% ${posY.current.toFixed(1)}% ${zoom.current.toFixed(2)}`)
 
-  const onMouseDown  = (e) => { e.preventDefault(); startDrag(e.clientX, e.clientY) }
-  const onMouseMove  = (e) => moveDrag(e.clientX, e.clientY)
-  const onMouseUp    = () => { dragging.current = false }
-  const onTouchStart = (e) => { e.preventDefault(); const t = e.touches[0]; startDrag(t.clientX, t.clientY) }
-  const onTouchMove  = (e) => { e.preventDefault(); const t = e.touches[0]; moveDrag(t.clientX, t.clientY) }
-
-  const handleSave = () => {
-    onSave(`${posXRef.current.toFixed(1)}% ${posYRef.current.toFixed(1)}% ${zoomRef.current.toFixed(2)}`)
-  }
-
-  const z = zoom
-  // img всегда минимум 110% контейнера чтобы objectPosition имел эффект
-  const imgPct = z >= 1.0 ? z * 100 + 10 : z * 100
-  const imgStyle = z >= 1.0
-    ? { width:`${imgPct}%`, height:`${imgPct}%`, objectFit:'cover', objectPosition:`${posX.toFixed(1)}% ${posY.toFixed(1)}%`, flexShrink:0, display:'block', pointerEvents:'none' }
-    : { width:`${imgPct}%`, height:`${imgPct}%`, objectFit:'contain', display:'block', pointerEvents:'none', margin:'auto' }
+  const pct = Math.max(zoom.current, 1.0) * 100 + 5
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={e => e.stopPropagation()}
         style={{ maxWidth:460, width:'92vw', boxSizing:'border-box', padding:24 }}>
-
-        <div style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.06em',
-          color:'var(--white)', marginBottom:4 }}>Кадрирование фото</div>
-        <div style={{ color:'var(--gray)', fontSize:'0.82rem', marginBottom:16 }}>
-          {item.full_name} — {z >= 1 ? 'перетащи для выбора области' : 'фото целиком (уменьшено)'}
-        </div>
-
+        <div style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.06em', color:'var(--white)', marginBottom:4 }}>Кадрирование фото</div>
+        <div style={{ color:'var(--gray)', fontSize:'0.82rem', marginBottom:16 }}>{item.full_name} — перетащи фото, настрой масштаб</div>
         <div
-          ref={containerRef}
-          onMouseDown={onMouseDown} onMouseMove={onMouseMove}
-          onMouseUp={onMouseUp}    onMouseLeave={onMouseUp}
+          onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
           onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onMouseUp}
-          style={{
-            width:'100%', height:260, overflow:'hidden', position:'relative',
-            cursor: z >= 1 ? 'grab' : 'default',
-            borderRadius:8, border:'2px solid var(--red)',
-            background:'var(--dark)', userSelect:'none',
-            display:'flex', alignItems:'center', justifyContent:'center',
-          }}>
-          <img src={item.photo_url} alt="" draggable={false} style={imgStyle} />
-          <div style={{
-            position:'absolute', inset:0, pointerEvents:'none',
+          style={{ position:'relative', height:260, overflow:'hidden', cursor:'grab', borderRadius:8, border:'2px solid var(--red)', background:'var(--dark)', userSelect:'none' }}>
+          <img ref={imgRef} src={item.photo_url} alt="" draggable={false}
+            style={{ width:`${pct}%`, height:`${pct}%`, objectFit:'cover', objectPosition:`${posX.current.toFixed(1)}% ${posY.current.toFixed(1)}%`, display:'block', flexShrink:0, pointerEvents:'none' }}
+          />
+          <div style={{ position:'absolute', inset:0, pointerEvents:'none',
             backgroundImage:'linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px)',
-            backgroundSize:'33.33% 33.33%',
-          }}/>
+            backgroundSize:'33.33% 33.33%' }}/>
         </div>
-
         <div style={{ marginTop:16, display:'flex', alignItems:'center', gap:12 }}>
-          <span style={{ color:'var(--gray)', fontSize:'0.78rem', fontFamily:'Barlow Condensed',
-            fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', whiteSpace:'nowrap' }}>
-            Масштаб
-          </span>
-          <input type="range" min={0.3} max={2.0} step={0.05} value={zoom}
-            onChange={e => setZoomSync(Number(e.target.value))}
+          <span style={{ color:'var(--gray)', fontSize:'0.78rem', fontFamily:'Barlow Condensed', fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', whiteSpace:'nowrap' }}>Масштаб</span>
+          <input type="range" min={0.5} max={2.0} step={0.05} value={zoom.current}
+            onChange={e => handleZoom(Number(e.target.value))}
             style={{ flex:1, accentColor:'var(--red)' }}/>
-          <span style={{ color:'var(--white)', fontSize:'0.85rem', minWidth:42, textAlign:'right' }}>
-            {Math.round(zoom * 100)}%
-          </span>
+          <span style={{ color:'var(--white)', fontSize:'0.85rem', minWidth:42, textAlign:'right' }}>{Math.round(zoom.current*100)}%</span>
         </div>
-
         <div style={{ color:'var(--gray-dim)', fontSize:'0.72rem', marginTop:6, textAlign:'center' }}>
-          X: {posX.toFixed(0)}%  Y: {posY.toFixed(0)}%  масштаб: {Math.round(zoom*100)}%
+          X: {posX.current.toFixed(0)}%  Y: {posY.current.toFixed(0)}%  масштаб: {Math.round(zoom.current*100)}%
         </div>
-
         <div style={{ display:'flex', gap:10, marginTop:20 }}>
-          <button className="btn-primary" style={{ flex:1, padding:'9px 0', fontSize:'13px' }} onClick={handleSave}>
-            Сохранить
-          </button>
-          <button className="btn-outline" style={{ flex:1, padding:'9px 0', fontSize:'13px' }} onClick={onClose}>
-            Отмена
-          </button>
+          <button className="btn-primary" style={{ flex:1, padding:'9px 0', fontSize:'13px' }} onClick={handleSave}>Сохранить</button>
+          <button className="btn-outline"  style={{ flex:1, padding:'9px 0', fontSize:'13px' }} onClick={onClose}>Отмена</button>
         </div>
       </div>
     </div>
   )
 }
+
 
 export default function HallOfFameAdmin({ token }) {
   const [items,     setItems]     = useState([])
@@ -336,10 +286,9 @@ export default function HallOfFameAdmin({ token }) {
                 ? <img src={item.photo_url} alt={item.full_name} style={(() => {
                     const p = (item.photo_position||'50% 50% 1.00').split(' ')
                     const px = p[0]||'50%', py = p[1]||'50%', z = parseFloat(p[2])||1.0
-                    const pct = z >= 1.0 ? z * 100 + 10 : z * 100
                     return z >= 1.0
-                      ? {width:`${pct}%`,height:`${pct}%`,objectFit:'cover',objectPosition:`${px} ${py}`,flexShrink:0}
-                      : {width:`${pct}%`,height:`${pct}%`,objectFit:'contain',margin:'auto',display:'block'}
+                      ? {width:`${z*100}%`,height:`${z*100}%`,objectFit:'cover',objectPosition:`${px} ${py}`,flexShrink:0}
+                      : {width:`${z*100}%`,height:`${z*100}%`,objectFit:'contain',margin:'auto',display:'block'}
                   })()}/>
                 : <div style={{color:'var(--gray-dim)', fontFamily:'Bebas Neue', fontSize:'1rem', letterSpacing:'0.1em'}}>НЕТ ФОТО</div>
               }
