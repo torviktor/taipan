@@ -278,12 +278,8 @@ structure: (
 attestation: (
   <div className="about-body">
 
-    {/* ── 4 фото аттестации ── */}
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:32 }}>
-      <img src="/attest1.webp" alt="Аттестация" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
-      <img src="/attest2.webp" alt="Аттестация" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
-      <img src="/attest3.webp" alt="Аттестация" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
-      <img src="/attest4.webp" alt="Аттестация" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+    <div style={{ width:'100%', marginBottom:32 }}>
+      <img src="/photo13.jpg" alt="" style={{ width:'100%', height:'auto', display:'block' }} />
     </div>
 
     <div className="about-lead">
@@ -359,10 +355,14 @@ attestation: (
 camps: (
   <div className="about-body">
 
-    <div className="about-photo-grid" style={{ display:'grid', gap:4, marginBottom:32 }}>
-      <img src="/photo14.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
-      <img src="/photo15.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
-      <img src="/photo16.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+    {/* ── Верхние фото сборов: 3 в первом ряду + 1 широкое во втором ── */}
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:4 }}>
+      <img src="/camps1.webp" alt="Сборы" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+      <img src="/camps2.webp" alt="Сборы" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+      <img src="/camps3.webp" alt="Сборы" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+    </div>
+    <div style={{ marginBottom:32 }}>
+      <img src="/camps4.webp" alt="Сборы" style={{ width:'100%', height:260, objectFit:'cover', objectPosition:'center 30%', display:'block' }} />
     </div>
 
     <div className="about-lead">
