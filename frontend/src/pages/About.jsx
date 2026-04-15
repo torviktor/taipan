@@ -366,7 +366,7 @@ camps: (
       <img src="/camps3.webp" alt="Сборы" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
     </div>
     <div style={{ marginBottom:32 }}>
-      <img src="/camps4.webp" alt="Сборы" style={{ width:'100%', height:260, objectFit:'cover', objectPosition:'center 60%', display:'block' }} />
+      <img src="/camps4.webp" alt="Сборы" style={{ width:'100%', height:260, objectFit:'cover', objectPosition:'center 40%', display:'block' }} />
     </div>
 
     <div className="about-lead">
