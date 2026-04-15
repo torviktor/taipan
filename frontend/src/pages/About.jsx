@@ -402,12 +402,6 @@ camps: (
       <li>развитие самостоятельности, дисциплины и ответственности у детей</li>
     </ul>
 
-    <div className="about-photo-grid" style={{ display:'grid', gap:4, margin:'32px 0' }}>
-      <img src="/photo17.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
-      <img src="/photo18.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
-      <img src="/photo19.jpg" alt="" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
-    </div>
-
     <h3>Поддержка родителями</h3>
     <p>Родители играют очень важную роль в подготовке детей к сборам:</p>
     <ul>
@@ -480,7 +474,14 @@ competitions: (
     <p>Хёнг (в ГТФ также называемые «туль») — это заранее установленные последовательности техник, которые спортсмен выполняет в одиночку перед судейской комиссией. Каждый туль имеет своё название, символику и строго регламентированную последовательность движений — всего в системе ГТФ 24 туля, каждый из которых связан с историей и философией тхэквондо.</p>
     <p>На соревнованиях оценивается точность техники, ритм, сила, баланс и понимание смысла движений. Это дисциплина, в которой нет прямого контакта с соперником — только диалог спортсмена с собственным мастерством.</p>
 
-    {/* ── 6 фото хёнг — появятся после деплоя ── */}
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, margin:'24px 0 32px' }}>
+      <img src="/hyong1.webp" alt="Хёнг" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+      <img src="/hyong2.webp" alt="Хёнг" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+      <img src="/hyong3.webp" alt="Хёнг" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+      <img src="/hyong4.webp" alt="Хёнг" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+      <img src="/hyong5.webp" alt="Хёнг" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+      <img src="/hyong6.webp" alt="Хёнг" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+    </div>
 
     <h3>Спарринг (массоги) — поединок</h3>
     <p>Массоги — контактный поединок двух спортсменов в полной защитной экипировке. В тхэквондо ГТФ спарринг проводится по правилам, разработанным генералом Чой Хон Хи: акцент делается на технике ударов ногами, скорости и тактическом мышлении.</p>
