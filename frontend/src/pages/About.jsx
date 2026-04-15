@@ -434,9 +434,9 @@ competitions: (
 
     {/* ── Три фото вверху: медали, кубки, командный зачёт ── */}
     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:16 }}>
-      <div style={{ background:'var(--dark2)', height:220, border:'1px dashed var(--gray-dim)' }} />
-      <div style={{ background:'var(--dark2)', height:220, border:'1px dashed var(--gray-dim)' }} />
-      <div style={{ background:'var(--dark2)', height:220, border:'1px dashed var(--gray-dim)' }} />
+      <img src="/comp_cups.webp" alt="Кубки" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
+      <img src="/comp_team.webp" alt="Тренеры с кубком" style={{ width:'100%', height:220, objectFit:'cover', objectPosition:'center top', display:'block' }} />
+      <img src="/comp_medals.webp" alt="Медали" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
     </div>
 
     <div className="about-lead">
