@@ -278,8 +278,12 @@ structure: (
 attestation: (
   <div className="about-body">
 
-    <div style={{ width:'100%', marginBottom:32 }}>
-      <img src="/photo13.jpg" alt="" style={{ width:'100%', height:'auto', display:'block' }} />
+    {/* ── 4 фото аттестации ── */}
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:32 }}>
+      <img src="/attest1.webp" alt="Аттестация" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+      <img src="/attest2.webp" alt="Аттестация" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+      <img src="/attest3.webp" alt="Аттестация" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+      <img src="/attest4.webp" alt="Аттестация" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
     </div>
 
     <div className="about-lead">
