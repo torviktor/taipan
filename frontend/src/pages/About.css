@@ -353,3 +353,15 @@
     height: 280px;
   }
 }
+
+@media (max-width: 640px) {
+  .photo-grid-3,
+  .photo-grid-6 {
+    grid-template-columns: 1fr !important;
+  }
+
+  .photo-grid-6 img:nth-child(5),
+  .photo-grid-6 img:nth-child(6) {
+    display: none !important;
+  }
+}

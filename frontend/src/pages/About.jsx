@@ -279,7 +279,7 @@ structure: (
 attestation: (
   <div className="about-body">
 
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:32 }}>
+    <div className="photo-grid-3" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:32 }}>
       <img src="/attest1.webp" alt="Аттестация" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
       <img src="/attest2.webp" alt="Аттестация" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
       <img src="/attest3.webp" alt="Аттестация" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
@@ -359,7 +359,7 @@ attestation: (
 camps: (
   <div className="about-body">
 
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:4 }}>
+    <div className="photo-grid-3" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:4 }}>
       <img src="/camps1.webp" alt="Сборы" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/camps2.webp" alt="Сборы" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/camps3.webp" alt="Сборы" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
@@ -427,7 +427,7 @@ competitions: (
   <div className="about-body">
 
     {/* ── Три фото вверху: медали, кубки, командный зачёт ── */}
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:16 }}>
+    <div className="photo-grid-3" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:16 }}>
       <img src="/comp_cups.webp" alt="Кубки" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/comp_team.webp" alt="Тренеры с кубком" style={{ width:'100%', height:220, objectFit:'cover', objectPosition:'center top', display:'block' }} />
       <img src="/comp_medals.webp" alt="Медали" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
@@ -470,7 +470,7 @@ competitions: (
     <h3>Соревновательные дисциплины</h3>
     <p>Тхэквондо ГТФ включает несколько соревновательных дисциплин. Тренер помогает каждому спортсмену выбрать ту, которая соответствует его уровню, возрасту и индивидуальным особенностям.</p>
 
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, margin:'24px 0 32px' }}>
+    <div className="photo-grid-6" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, margin:'24px 0 32px' }}>
       <img src="/hyong1.webp" alt="Хёнг" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/hyong2.webp" alt="Хёнг" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/hyong3.webp" alt="Хёнг" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
@@ -488,7 +488,7 @@ competitions: (
     <p>Спортсмены разделяются по возрасту, весовым категориям и уровню пояса. Количество раундов определяется возрастом спортсмена, его квалификацией и уровнем соревнований — от одного до трёх раундов, победитель определяется по очкам или нокдауну. Судьи оценивают чистоту техники, а не грубую силу — это принципиальное отличие тхэквондо от других единоборств.</p>
     <p>Спарринг развивает реакцию, выносливость, смелость и умение принимать решения в условиях стресса — качества, которые пригодятся далеко за пределами спортивного зала.</p>
 
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, margin:'24px 0 32px' }}>
+    <div className="photo-grid-6" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, margin:'24px 0 32px' }}>
       <img src="/sparring1.webp" alt="Спарринг" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/sparring2.webp" alt="Спарринг" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
       <img src="/sparring3.webp" alt="Спарринг" style={{ width:'100%', height:220, objectFit:'cover', display:'block' }} />
