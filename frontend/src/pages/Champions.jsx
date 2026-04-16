@@ -137,7 +137,7 @@ export default function Champions() {
             return (
               <div className="champions-wrap">
                 {seasonBestItems.length > 0 && (
-                  <div className="champions-grid season-best-row">
+                  <div className="champions-grid champions-grid--season-best season-best-row">
                     {seasonBestItems.map(renderCard)}
                   </div>
                 )}

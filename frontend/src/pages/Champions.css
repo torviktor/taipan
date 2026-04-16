@@ -179,6 +179,10 @@
   border-bottom: 1px solid var(--gray-dim);
 }
 
+.champions-grid--season-best {
+  justify-content: center;
+}
+
 .season-best-label {
   position: absolute; top: 8px; left: 0; right: 0;
   text-align: center; background: var(--red); color: #fff;
