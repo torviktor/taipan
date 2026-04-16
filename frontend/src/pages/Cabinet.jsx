@@ -484,7 +484,7 @@ export default function Cabinet() {
         {view === 'analytics'     && <AnalyticsAdminTab token={token} athletes={athletes} />}
         {view === 'insurance_admin' && <InsuranceAdminTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'hof'           && <HallOfFameAdmin token={token} />}
-        {view === 'fees'          && <FeesTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
+        {view === 'fees'          && <FeesTab token={token} role={role} />}
         {view === 'archive'       && (
           <div>
             <div style={{ marginBottom:16, color:'var(--gray)', fontSize:'0.9rem' }}>

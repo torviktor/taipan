@@ -1,9 +1,9 @@
 import io
 from datetime import datetime, date as date_type
-from typing import Optional
+from typing import Optional, List
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User, Athlete
-from app.models.fees import FeeDeadline, MonthlyFee, FeeStatus
+from app.models.fees import FeeDeadline, MonthlyFee, FeeStatus, FeeConfig, AthleteFeePeriod
 from app.models.certification import Notification
 
 router = APIRouter()
@@ -576,3 +576,260 @@ def overdue_count(
         .count()
     )
     return {"count": count}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Новый модуль взносов — FeeConfig + AthleteFeePeriod
+# ══════════════════════════════════════════════════════════════════════════════
+
+MONTHS_RU_LIST = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
+
+
+class FeeConfigBody(BaseModel):
+    payment_day: int
+    fee_amount:  int
+
+
+class PeriodPatchBody(BaseModel):
+    is_budget: Optional[bool] = None
+    paid:      Optional[bool] = None
+
+
+class BulkItem(BaseModel):
+    athlete_id: int
+    is_budget:  bool
+
+
+def _period_out(p: AthleteFeePeriod) -> dict:
+    a = p.athlete
+    return {
+        "id":           p.id,
+        "athlete_id":   p.athlete_id,
+        "full_name":    a.full_name if a else "",
+        "group":        (a.group or a.auto_group or "") if a else "",
+        "is_budget":    bool(p.is_budget),
+        "paid":         bool(p.paid),
+        "paid_at":      p.paid_at.isoformat() if p.paid_at else None,
+        "debt":         p.debt or 0,
+        "period_year":  p.period_year,
+        "period_month": p.period_month,
+    }
+
+
+# ── GET /fees/config ──────────────────────────────────────────────────────────
+
+@router.get("/config")
+def get_fee_config(db: Session = Depends(get_db)):
+    cfg = db.query(FeeConfig).first()
+    if not cfg:
+        return {"payment_day": 1, "fee_amount": 2000}
+    return {"payment_day": cfg.payment_day, "fee_amount": cfg.fee_amount}
+
+
+# ── POST /fees/config ─────────────────────────────────────────────────────────
+
+@router.post("/config")
+def save_fee_config(
+    body: FeeConfigBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manager),
+):
+    cfg = db.query(FeeConfig).first()
+    if cfg:
+        cfg.payment_day = body.payment_day
+        cfg.fee_amount  = body.fee_amount
+        cfg.updated_by  = current_user.id
+    else:
+        cfg = FeeConfig(
+            payment_day=body.payment_day,
+            fee_amount=body.fee_amount,
+            updated_by=current_user.id,
+        )
+        db.add(cfg)
+    db.commit()
+    return {"payment_day": cfg.payment_day, "fee_amount": cfg.fee_amount}
+
+
+# ── GET /fees/periods ─────────────────────────────────────────────────────────
+
+@router.get("/periods")
+def list_periods(
+    year:  int = Query(...),
+    month: int = Query(...),
+    db:    Session = Depends(get_db),
+    _:     User = Depends(require_manager),
+):
+    items = (
+        db.query(AthleteFeePeriod)
+        .options(joinedload(AthleteFeePeriod.athlete))
+        .filter(
+            AthleteFeePeriod.period_year  == year,
+            AthleteFeePeriod.period_month == month,
+        )
+        .order_by(AthleteFeePeriod.is_budget.asc())
+        .all()
+    )
+    return [_period_out(p) for p in items]
+
+
+# ── POST /fees/periods/init ───────────────────────────────────────────────────
+
+@router.post("/periods/init")
+def init_periods(
+    year:  int = Query(...),
+    month: int = Query(...),
+    db:    Session = Depends(get_db),
+    _:     User = Depends(require_manager),
+):
+    cfg = db.query(FeeConfig).first()
+    fee_amount = cfg.fee_amount if cfg else 2000
+
+    prev_year  = year if month > 1 else year - 1
+    prev_month = month - 1 if month > 1 else 12
+
+    athletes = db.query(Athlete).filter(Athlete.is_archived == False).all()
+
+    created = 0
+    skipped = 0
+    for athlete in athletes:
+        exists = db.query(AthleteFeePeriod).filter(
+            AthleteFeePeriod.athlete_id   == athlete.id,
+            AthleteFeePeriod.period_year  == year,
+            AthleteFeePeriod.period_month == month,
+        ).first()
+        if exists:
+            skipped += 1
+            continue
+
+        prev = db.query(AthleteFeePeriod).filter(
+            AthleteFeePeriod.athlete_id   == athlete.id,
+            AthleteFeePeriod.period_year  == prev_year,
+            AthleteFeePeriod.period_month == prev_month,
+        ).first()
+
+        debt = fee_amount if (prev and not prev.paid and not prev.is_budget) else 0
+
+        db.add(AthleteFeePeriod(
+            athlete_id=athlete.id,
+            period_year=year,
+            period_month=month,
+            debt=debt,
+        ))
+        created += 1
+
+    db.commit()
+    return {"created": created, "skipped": skipped}
+
+
+# ── PATCH /fees/periods/{period_id} ──────────────────────────────────────────
+
+@router.patch("/periods/{period_id}")
+def patch_period(
+    period_id: int,
+    body:      PeriodPatchBody,
+    db:        Session = Depends(get_db),
+    _:         User = Depends(require_manager),
+):
+    p = db.query(AthleteFeePeriod).options(joinedload(AthleteFeePeriod.athlete)).filter(
+        AthleteFeePeriod.id == period_id
+    ).first()
+    if not p:
+        raise HTTPException(404, "Период не найден")
+    if body.is_budget is not None:
+        p.is_budget = body.is_budget
+    if body.paid is not None:
+        p.paid = body.paid
+        if body.paid:
+            p.paid_at = datetime.utcnow()
+            p.debt    = 0
+        else:
+            p.paid_at = None
+    db.commit()
+    db.refresh(p)
+    return _period_out(p)
+
+
+# ── POST /fees/periods/save-and-notify ───────────────────────────────────────
+
+@router.post("/periods/save-and-notify")
+def save_and_notify(
+    year:   int = Query(...),
+    month:  int = Query(...),
+    notify: bool = Query(True),
+    items:  List[BulkItem] = Body(...),
+    db:     Session = Depends(get_db),
+    _:      User = Depends(require_manager),
+):
+    cfg = db.query(FeeConfig).first()
+    fee_amount = cfg.fee_amount if cfg else 2000
+
+    saved    = 0
+    notified = 0
+
+    for item in items:
+        p = db.query(AthleteFeePeriod).filter(
+            AthleteFeePeriod.athlete_id   == item.athlete_id,
+            AthleteFeePeriod.period_year  == year,
+            AthleteFeePeriod.period_month == month,
+        ).first()
+        if not p:
+            continue
+        p.is_budget = item.is_budget
+        saved += 1
+
+    db.commit()
+
+    if notify:
+        month_label = MONTHS_RU_LIST[month] if 1 <= month <= 12 else str(month)
+        periods = (
+            db.query(AthleteFeePeriod)
+            .options(joinedload(AthleteFeePeriod.athlete))
+            .filter(
+                AthleteFeePeriod.period_year  == year,
+                AthleteFeePeriod.period_month == month,
+                AthleteFeePeriod.is_budget    == False,
+                AthleteFeePeriod.paid         == False,
+            )
+            .all()
+        )
+        for p in periods:
+            athlete = p.athlete
+            if not athlete or not athlete.user_id:
+                continue
+            body_text = (
+                f"Напоминаем об оплате членского взноса за {month_label} {year} — {fee_amount} руб."
+            )
+            if p.debt > 0:
+                body_text += (
+                    f" Задолженность за прошлые периоды: {p.debt} руб."
+                    f" Итого: {fee_amount + p.debt} руб."
+                )
+            db.add(Notification(
+                user_id=athlete.user_id,
+                type="fee",
+                title=f"Оплата взноса — {month_label} {year}",
+                body=body_text,
+            ))
+            notified += 1
+        db.commit()
+
+    return {"saved": saved, "notified": notified}
+
+
+# ── GET /fees/periods/athlete/{athlete_id} ────────────────────────────────────
+
+@router.get("/periods/athlete/{athlete_id}")
+def get_athlete_periods(
+    athlete_id: int,
+    db:         Session = Depends(get_db),
+    _:          User = Depends(require_manager),
+):
+    items = (
+        db.query(AthleteFeePeriod)
+        .options(joinedload(AthleteFeePeriod.athlete))
+        .filter(AthleteFeePeriod.athlete_id == athlete_id)
+        .order_by(AthleteFeePeriod.period_year.desc(), AthleteFeePeriod.period_month.desc())
+        .all()
+    )
+    return [_period_out(p) for p in items]

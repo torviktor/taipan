@@ -5,6 +5,29 @@ from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 
+class FeeConfig(Base):
+    __tablename__ = "fee_config"
+    id          = Column(Integer, primary_key=True)
+    payment_day = Column(Integer, default=1)
+    fee_amount  = Column(Integer, default=2000)
+    updated_at  = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by  = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+
+class AthleteFeePeriod(Base):
+    __tablename__ = "athlete_fee_periods"
+    id           = Column(Integer, primary_key=True)
+    athlete_id   = Column(Integer, ForeignKey("athletes.id"))
+    period_year  = Column(Integer)
+    period_month = Column(Integer)
+    is_budget    = Column(Boolean, default=False)
+    paid         = Column(Boolean, default=False)
+    paid_at      = Column(DateTime, nullable=True)
+    debt         = Column(Integer, default=0)
+    created_at   = Column(DateTime, default=datetime.utcnow)
+    athlete      = relationship("Athlete", foreign_keys=[athlete_id])
+
+
 class FeeStatus(str, enum.Enum):
     pending = "pending"
     due = "due"
