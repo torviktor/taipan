@@ -126,15 +126,11 @@ export default function Champions() {
         <div className="container">
 
           {/* ── Лучшие сезона ── */}
-          {(seasonBest.senior || seasonBest.junior) && (
-            <>
-              <h2 className="season-best-title">Лучшие сезона</h2>
-              <div className="season-best-row">
-                <SeasonBestCard item={seasonBest.senior} label="Лучший спортсмен сезона — Старшая группа" />
-                <SeasonBestCard item={seasonBest.junior} label="Лучший спортсмен сезона — Младшая группа" />
-              </div>
-            </>
-          )}
+          <h2 className="season-best-title">Лучшие сезона</h2>
+          <div className="season-best-row">
+            <SeasonBestCard item={seasonBest.senior} label="Лучший спортсмен сезона — Старшая группа" />
+            <SeasonBestCard item={seasonBest.junior} label="Лучший спортсмен сезона — Младшая группа" />
+          </div>
 
           {loading && (
             <div style={{ textAlign:'center', color:'var(--gray)', padding:'60px 0' }}>
