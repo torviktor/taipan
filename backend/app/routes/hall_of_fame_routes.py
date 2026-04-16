@@ -38,6 +38,9 @@ class HofPosition(BaseModel):
 class HofSeasonBest(BaseModel):
     type: Optional[str] = None  # "senior" | "junior" | None
 
+class HofSeasonBestClear(BaseModel):
+    group: str  # "senior" | "junior"
+
 
 def _out(h: HallOfFame) -> dict:
     return {
@@ -109,6 +112,16 @@ def get_season_best(db: Session = Depends(get_db)):
         "senior": _out(senior) if senior else None,
         "junior": _out(junior) if junior else None,
     }
+
+@router.post("/season-best/clear")
+def clear_season_best(data: HofSeasonBestClear, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+    if data.group == "senior":
+        db.query(HallOfFame).filter(HallOfFame.season_best_senior == True).update({"season_best_senior": False})
+    elif data.group == "junior":
+        db.query(HallOfFame).filter(HallOfFame.season_best_junior == True).update({"season_best_junior": False})
+    db.commit()
+    return {"ok": True}
+
 
 @router.patch("/{hof_id}/season-best")
 def set_season_best(hof_id: int, data: HofSeasonBest, db: Session = Depends(get_db), _: User = Depends(require_manager)):

@@ -49,18 +49,22 @@ function ChampionImg({ item }) {
   )
 }
 
-function SeasonBestCard({ item, label }) {
+function SeasonBestCard({ item }) {
   const belt = item ? getBelt(item) : null
 
   return (
-    <div className="season-best-card">
-      <div className="season-best-label">{label}</div>
+    <div className="champion-card champion-card--dynamic" style={{ border: '2px solid var(--red)' }}>
       <div className="champion-img-wrap">
         {item ? (
-          <ChampionImg item={item} />
+          <>
+            {item.is_featured && (
+              <div style={{position:'absolute', top:10, left:10, zIndex:2, background:'#c8962a', borderRadius:'50%', width:28, height:28, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', boxShadow:'0 2px 8px rgba(0,0,0,0.5)'}}>★</div>
+            )}
+            <ChampionImg item={item} />
+          </>
         ) : (
           <div className="champion-img-placeholder">
-            <span>Будет объявлен по итогам сезона</span>
+            <span>БУДЕТ ОБЪЯВЛЕН</span>
           </div>
         )}
         {belt && (
@@ -128,8 +132,14 @@ export default function Champions() {
           {/* ── Лучшие сезона ── */}
           <h2 className="season-best-title">Лучшие сезона</h2>
           <div className="season-best-row">
-            <SeasonBestCard item={seasonBest.senior} label="Лучший спортсмен сезона — Старшая группа" />
-            <SeasonBestCard item={seasonBest.junior} label="Лучший спортсмен сезона — Младшая группа" />
+            <div className="season-best-item">
+              <SeasonBestCard item={seasonBest.senior} />
+              <div className="season-best-caption">Лучший спортсмен сезона — Старшая группа</div>
+            </div>
+            <div className="season-best-item">
+              <SeasonBestCard item={seasonBest.junior} />
+              <div className="season-best-caption">Лучший спортсмен сезона — Младшая группа</div>
+            </div>
           </div>
 
           {loading && (
