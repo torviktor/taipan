@@ -53,6 +53,10 @@ services:
       DATABASE_URL:       postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       REDIS_URL:          redis://redis:6379/0
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     restart: always
 
   celery_beat:
@@ -62,6 +66,10 @@ services:
       - redis
     environment:
       REDIS_URL: redis://redis:6379/0
+    deploy:
+      resources:
+        limits:
+          memory: 128M
     restart: always
 
   frontend:
