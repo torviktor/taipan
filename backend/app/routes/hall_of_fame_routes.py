@@ -35,11 +35,6 @@ class HofUpdate(BaseModel):
 class HofPosition(BaseModel):
     photo_position: str
 
-class HofSeasonBest(BaseModel):
-    type: Optional[str] = None  # "senior" | "junior" | None
-
-class HofSeasonBestClear(BaseModel):
-    group: str  # "senior" | "junior"
 
 
 def _out(h: HallOfFame) -> dict:
@@ -62,7 +57,7 @@ def _out(h: HallOfFame) -> dict:
 
 @router.get("")
 def list_hof(db: Session = Depends(get_db)):
-    items = db.query(HallOfFame).order_by(HallOfFame.sort_order, HallOfFame.id).all()
+    items = db.query(HallOfFame).order_by(HallOfFame.sort_order.asc(), HallOfFame.id.asc()).all()
     return [_out(h) for h in items]
 
 
@@ -97,46 +92,6 @@ def update_hof(hof_id: int, data: HofUpdate, db: Session = Depends(get_db), _: U
     if data.dan          is not None: h.dan          = data.dan if data.dan > 0 else None
     if data.sort_order   is not None: h.sort_order   = data.sort_order
     if data.is_featured  is not None: h.is_featured  = data.is_featured
-    db.commit()
-    db.refresh(h)
-    return _out(h)
-
-
-# ── Лучшие сезона ────────────────────────────────────────────────────────────
-
-@router.get("/season-best")
-def get_season_best(db: Session = Depends(get_db)):
-    senior = db.query(HallOfFame).filter(HallOfFame.season_best_senior == True).first()
-    junior = db.query(HallOfFame).filter(HallOfFame.season_best_junior == True).first()
-    return {
-        "senior": _out(senior) if senior else None,
-        "junior": _out(junior) if junior else None,
-    }
-
-@router.post("/season-best/clear")
-def clear_season_best(data: HofSeasonBestClear, db: Session = Depends(get_db), _: User = Depends(require_manager)):
-    if data.group == "senior":
-        db.query(HallOfFame).filter(HallOfFame.season_best_senior == True).update({"season_best_senior": False})
-    elif data.group == "junior":
-        db.query(HallOfFame).filter(HallOfFame.season_best_junior == True).update({"season_best_junior": False})
-    db.commit()
-    return {"ok": True}
-
-
-@router.patch("/{hof_id}/season-best")
-def set_season_best(hof_id: int, data: HofSeasonBest, db: Session = Depends(get_db), _: User = Depends(require_manager)):
-    h = db.query(HallOfFame).filter(HallOfFame.id == hof_id).first()
-    if not h:
-        raise HTTPException(404, "Не найдено")
-    if data.type == "senior":
-        db.query(HallOfFame).filter(HallOfFame.season_best_senior == True).update({"season_best_senior": False})
-        h.season_best_senior = True
-    elif data.type == "junior":
-        db.query(HallOfFame).filter(HallOfFame.season_best_junior == True).update({"season_best_junior": False})
-        h.season_best_junior = True
-    elif data.type is None:
-        h.season_best_senior = False
-        h.season_best_junior = False
     db.commit()
     db.refresh(h)
     return _out(h)
@@ -192,6 +147,8 @@ def delete_hof(hof_id: int, db: Session = Depends(get_db), _: User = Depends(req
     h = db.query(HallOfFame).filter(HallOfFame.id == hof_id).first()
     if not h:
         raise HTTPException(404, "Не найдено")
+    if h.season_best_senior or h.season_best_junior:
+        raise HTTPException(403, detail="Этот слот нельзя удалить")
     if h.photo_url:
         old_path = f"/app/static{h.photo_url.replace('/static', '')}"
         if os.path.exists(old_path):

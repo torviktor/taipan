@@ -124,26 +124,16 @@ export default function HallOfFameAdmin({ token }) {
   const [uploading,   setUploading]   = useState(null)
   const [confirm,     setConfirm]     = useState(null)
   const [posEditor,   setPosEditor]   = useState(null)
-  const [seasonBest,  setSeasonBest]  = useState({ senior: null, junior: null })
-  const [seasonModal, setSeasonModal] = useState(null)   // null | 'senior' | 'junior'
-
   const h  = { Authorization: `Bearer ${token}` }
   const hj = { ...h, 'Content-Type': 'application/json' }
   const emptyForm = { full_name:'', achievements:'', gup:'', dan:'', sort_order:0, is_featured:false }
 
-  useEffect(() => { load(); loadSeasonBest() }, [])
+  useEffect(() => { load() }, [])
 
   const load = async () => {
     setLoading(true)
     try { const r = await fetch(`${API}/hall-of-fame`, { headers: h }); if (r.ok) setItems(await r.json()) } catch {}
     setLoading(false)
-  }
-
-  const loadSeasonBest = async () => {
-    try {
-      const r = await fetch(`${API}/hall-of-fame/season-best`, { headers: h })
-      if (r.ok) setSeasonBest(await r.json())
-    } catch {}
   }
 
   const openNew  = () => { setEditing({ ...emptyForm }); setShowForm(true); setMsg('') }
@@ -190,28 +180,6 @@ export default function HallOfFameAdmin({ token }) {
       if (r.ok) await load()
     } catch {}
     setUploading(null)
-  }
-
-  const saveSeasonBest = async (id, type) => {
-    try {
-      await fetch(`${API}/hall-of-fame/${id}/season-best`, {
-        method: 'PATCH',
-        headers: hj,
-        body: JSON.stringify({ type })
-      })
-    } catch {}
-  }
-
-  const clearSeasonBest = async (group) => {
-    try {
-      await fetch(`${API}/hall-of-fame/season-best/clear`, {
-        method: 'POST',
-        headers: hj,
-        body: JSON.stringify({ group })
-      })
-      await loadSeasonBest()
-      await load()
-    } catch {}
   }
 
   const savePosition = async (id, position) => {
@@ -323,90 +291,6 @@ export default function HallOfFameAdmin({ token }) {
         </div>
       )}
 
-      {/* Модал выбора лучшего сезона */}
-      {seasonModal && (
-        <div className="modal-overlay" onClick={() => setSeasonModal(null)}>
-          <div className="modal-box" onClick={e => e.stopPropagation()}
-            style={{maxWidth:480, width:'90vw', boxSizing:'border-box', maxHeight:'80vh', overflowY:'auto'}}>
-            <h3 style={{marginBottom:16}}>
-              Лучший спортсмен — {seasonModal === 'senior' ? 'Старшая группа' : 'Младшая группа'}
-            </h3>
-            <div style={{display:'flex', flexDirection:'column', gap:8}}>
-              {items.map(item => {
-                const isSelected = seasonModal === 'senior' ? item.season_best_senior : item.season_best_junior
-                return (
-                  <div key={item.id}
-                    style={{
-                      display:'flex', alignItems:'center', gap:12, padding:'10px 12px', borderRadius:8, cursor:'pointer',
-                      background: isSelected ? 'rgba(204,0,0,0.15)' : 'var(--dark)',
-                      border: isSelected ? '1px solid var(--red)' : '1px solid var(--gray-dim)',
-                    }}
-                    onClick={async () => {
-                      await saveSeasonBest(item.id, seasonModal)
-                      await loadSeasonBest()
-                      await load()
-                      setSeasonModal(null)
-                    }}>
-                    <div style={{width:36, height:36, borderRadius:'50%', overflow:'hidden', background:'var(--dark2)', flexShrink:0}}>
-                      {item.photo_url
-                        ? <img src={item.photo_url} alt="" style={{width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top'}}/>
-                        : <div style={{width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--gray-dim)', fontSize:'0.6rem'}}>?</div>
-                      }
-                    </div>
-                    <div style={{flex:1, minWidth:0}}>
-                      <div style={{fontFamily:'Bebas Neue', fontSize:'0.95rem', letterSpacing:'0.04em', color:'var(--white)'}}>{item.full_name}</div>
-                      <div style={{fontSize:'0.72rem', color:'var(--gray)', fontFamily:'Barlow Condensed'}}>{belt(item.gup, item.dan)}</div>
-                    </div>
-                    {isSelected && (
-                      <span style={{color:'var(--red)', fontSize:'0.75rem', fontFamily:'Barlow Condensed', fontWeight:700, flexShrink:0}}>✓ Выбран</span>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-            <div style={{marginTop:16}}>
-              <button className="btn-outline" style={{width:'100%', padding:'9px 0', fontSize:'13px'}} onClick={() => setSeasonModal(null)}>Закрыть</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Лучшие спортсмены сезона */}
-      <div style={{background:'var(--dark)', border:'1px solid var(--gray-dim)', borderRadius:10, padding:16, marginBottom:24}}>
-        <div style={{fontFamily:'Bebas Neue', fontSize:'1.15rem', letterSpacing:'0.08em', color:'var(--white)', marginBottom:14}}>
-          Лучшие спортсмены сезона
-        </div>
-        {(['senior', 'junior']).map(group => {
-          const winner = seasonBest[group]
-          return (
-            <div key={group} style={{display:'flex', alignItems:'center', gap:12, marginBottom: group === 'senior' ? 10 : 0}}>
-              <div style={{width:48, height:48, borderRadius:'50%', overflow:'hidden', background:'var(--dark2)', flexShrink:0, border:'2px solid var(--gray-dim)', position:'relative'}}>
-                {winner?.photo_url
-                  ? <img src={winner.photo_url} alt="" style={{width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top'}}/>
-                  : <div style={{width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--gray-dim)', fontSize:'0.7rem'}}>?</div>
-                }
-              </div>
-              <div style={{flex:1, minWidth:0}}>
-                <div style={{fontSize:'0.7rem', color:'var(--gray)', fontFamily:'Barlow Condensed', fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', marginBottom:2}}>
-                  {group === 'senior' ? 'Старшая группа' : 'Младшая группа'}
-                </div>
-                <div style={{fontFamily:'Bebas Neue', fontSize:'1rem', color: winner ? 'var(--white)' : 'var(--gray)', letterSpacing:'0.04em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
-                  {winner ? winner.full_name : 'Не назначен'}
-                </div>
-              </div>
-              <button className="btn-outline" style={{padding:'5px 12px', fontSize:'0.78rem', flexShrink:0}} onClick={() => setSeasonModal(group)}>
-                Изменить
-              </button>
-              {winner && (
-                <button className="td-btn td-btn-del" style={{padding:'5px 10px', fontSize:'0.78rem', flexShrink:0}} onClick={() => clearSeasonBest(group)}>
-                  Сбросить
-                </button>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20}}>
         <span style={{color:'var(--gray)', fontSize:'0.9rem'}}>Записей в Зале Славы: {items.length}</span>
         <button className="btn-primary" style={{padding:'8px 18px', fontSize:'14px'}} onClick={openNew}>
@@ -423,9 +307,12 @@ export default function HallOfFameAdmin({ token }) {
         {items.map(item => (
           <div key={item.id} style={{
             background:'var(--dark2)',
-            border: item.is_featured ? '2px solid #c8962a' : '1px solid var(--gray-dim)',
+            border: (item.season_best_senior || item.season_best_junior)
+              ? '2px solid var(--red)'
+              : item.is_featured ? '2px solid #c8962a' : '1px solid var(--gray-dim)',
             borderRadius:10, overflow:'hidden',
-            boxShadow: item.is_featured ? '0 0 16px rgba(200,150,42,0.3)' : 'none'
+            boxShadow: item.is_featured && !item.season_best_senior && !item.season_best_junior
+              ? '0 0 16px rgba(200,150,42,0.3)' : 'none'
           }}>
             {/* Фото */}
             <div style={{position:'relative', height:220, background:'var(--dark)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden'}}>
@@ -471,6 +358,11 @@ export default function HallOfFameAdmin({ token }) {
             </div>
             {/* Данные */}
             <div style={{padding:'14px 16px'}}>
+              {(item.season_best_senior || item.season_best_junior) && (
+                <div style={{display:'inline-block', background:'var(--red)', color:'#fff', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.68rem', letterSpacing:'0.08em', textTransform:'uppercase', padding:'2px 8px', borderRadius:3, marginBottom:6}}>
+                  {item.season_best_senior ? 'Лучший сезона — Старшая' : 'Лучший сезона — Младшая'}
+                </div>
+              )}
               <div style={{fontFamily:'Bebas Neue', fontSize:'1.2rem', letterSpacing:'0.05em', color:'var(--white)', marginBottom:2}}>
                 {item.full_name}
               </div>
@@ -484,7 +376,9 @@ export default function HallOfFameAdmin({ token }) {
               )}
               <div style={{display:'flex', gap:8}}>
                 <button className="td-btn td-btn-edit" onClick={() => openEdit(item)}>Ред.</button>
-                <button className="td-btn td-btn-del" onClick={() => remove(item)}>Удал.</button>
+                {!item.season_best_senior && !item.season_best_junior && (
+                  <button className="td-btn td-btn-del" onClick={() => remove(item)}>Удал.</button>
+                )}
               </div>
             </div>
           </div>

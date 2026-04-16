@@ -173,34 +173,12 @@
 }
 
 /* ── Лучшие сезона ───────────────────────────────────────────────────── */
-.season-best-title {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 2rem;
-  color: var(--white);
-  letter-spacing: 0.05em;
-  margin-bottom: 24px;
-}
-.season-best-row {
-  display: flex;
-  gap: 24px;
-  margin-bottom: 48px;
-  flex-wrap: wrap;
-}
-.season-best-item {
-  flex: 1;
-  min-width: 280px;
-  display: flex;
-  flex-direction: column;
-}
-.season-best-caption {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-weight: 700;
-  font-size: 0.78rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--gray);
-  text-align: center;
-  margin-top: 8px;
+.season-best-label {
+  position: absolute; top: 8px; left: 0; right: 0;
+  text-align: center; background: var(--red); color: #fff;
+  font-size: 0.65rem; font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700; letter-spacing: 0.08em; padding: 3px 8px;
+  text-transform: uppercase; z-index: 2;
 }
 
 .champion-belt-badge {

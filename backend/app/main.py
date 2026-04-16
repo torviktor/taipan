@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from app.core.database import engine, Base
+from app.core.database import engine, Base, SessionLocal
 from app.routes import auth, applications, schedule, users, payments
 from app.routes import events, telegram
 from app.routes.ai import router as ai_router
@@ -69,6 +69,36 @@ app.include_router(news_router,       prefix="/api", tags=["Новости"])
 app.include_router(news_admin_router,  prefix="/api", tags=["Новости Admin"])
 app.include_router(hof_router,               prefix="/api",              tags=["Зал Славы"])
 app.include_router(fees_router,              prefix="/api/fees",         tags=["fees"])
+
+@app.on_event("startup")
+async def ensure_season_best_slots():
+    db = SessionLocal()
+    try:
+        from app.models.hall_of_fame import HallOfFame
+        senior = db.query(HallOfFame).filter(HallOfFame.season_best_senior == True).first()
+        if not senior:
+            db.add(HallOfFame(
+                full_name="Лучший спортсмен сезона",
+                achievements="Старшая группа",
+                sort_order=-2,
+                season_best_senior=True,
+                is_featured=False,
+            ))
+        junior = db.query(HallOfFame).filter(HallOfFame.season_best_junior == True).first()
+        if not junior:
+            db.add(HallOfFame(
+                full_name="Лучший спортсмен сезона",
+                achievements="Младшая группа",
+                sort_order=-1,
+                season_best_junior=True,
+                is_featured=False,
+            ))
+        db.commit()
+    except Exception as e:
+        print(f"Season best slots error: {e}")
+    finally:
+        db.close()
+
 
 @app.get("/health")
 def health():

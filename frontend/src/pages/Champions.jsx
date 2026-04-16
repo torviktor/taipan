@@ -49,67 +49,15 @@ function ChampionImg({ item }) {
   )
 }
 
-function SeasonBestCard({ item }) {
-  const belt = item ? getBelt(item) : null
-
-  return (
-    <div className="champion-card champion-card--dynamic" style={{ border: '2px solid var(--red)' }}>
-      <div className="champion-img-wrap">
-        {item ? (
-          <>
-            {item.is_featured && (
-              <div style={{position:'absolute', top:10, left:10, zIndex:2, background:'#c8962a', borderRadius:'50%', width:28, height:28, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', boxShadow:'0 2px 8px rgba(0,0,0,0.5)'}}>★</div>
-            )}
-            <ChampionImg item={item} />
-          </>
-        ) : (
-          <div className="champion-img-placeholder">
-            <span>БУДЕТ ОБЪЯВЛЕН</span>
-          </div>
-        )}
-        {belt && (
-          <div className="champion-belt-badge" style={{ background: belt.bg, color: belt.text }}>
-            {belt.label}
-          </div>
-        )}
-      </div>
-      <div className="champion-info">
-        {item ? (
-          <>
-            <div className="champion-name">{item.full_name}</div>
-            {item.achievements && (
-              <ul className="champion-achievements">
-                {item.achievements.split('\n').filter(Boolean).map((line, i) => (
-                  <li key={i}>{line}</li>
-                ))}
-              </ul>
-            )}
-          </>
-        ) : (
-          <div style={{ color:'var(--gray)', fontStyle:'italic', fontSize:'0.9rem' }}>
-            Лучший спортсмен будет объявлен по итогам сезона
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 export default function Champions() {
-  const [items,      setItems]      = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [seasonBest, setSeasonBest] = useState({ senior: null, junior: null })
+  const [items,   setItems]   = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetch(`${API}/hall-of-fame`)
       .then(r => r.ok ? r.json() : [])
       .then(d => { setItems(d); setLoading(false) })
       .catch(() => setLoading(false))
-
-    fetch(`${API}/hall-of-fame/season-best`)
-      .then(r => r.ok ? r.json() : { senior: null, junior: null })
-      .then(d => setSeasonBest(d))
-      .catch(() => {})
   }, [])
 
   return (
@@ -129,19 +77,6 @@ export default function Champions() {
       <section className="champions-grid-section">
         <div className="container">
 
-          {/* ── Лучшие сезона ── */}
-          <h2 className="season-best-title">Лучшие сезона</h2>
-          <div className="season-best-row">
-            <div className="season-best-item">
-              <SeasonBestCard item={seasonBest.senior} />
-              <div className="season-best-caption">Лучший спортсмен сезона — Старшая группа</div>
-            </div>
-            <div className="season-best-item">
-              <SeasonBestCard item={seasonBest.junior} />
-              <div className="season-best-caption">Лучший спортсмен сезона — Младшая группа</div>
-            </div>
-          </div>
-
           {loading && (
             <div style={{ textAlign:'center', color:'var(--gray)', padding:'60px 0' }}>
               Загрузка...
@@ -158,14 +93,23 @@ export default function Champions() {
             <div className="champions-grid">
               {items.map(item => {
                 const belt = getBelt(item)
+                const isSeasonSlot = item.season_best_senior || item.season_best_junior
 
                 return (
-                  <div key={item.id} className={`champion-card champion-card--dynamic`} style={{
-                    border: item.is_featured ? '2px solid #c8962a' : undefined,
-                    boxShadow: item.is_featured ? '0 0 20px rgba(200,150,42,0.35)' : undefined,
+                  <div key={item.id} className="champion-card champion-card--dynamic" style={{
+                    border: isSeasonSlot
+                      ? '2px solid var(--red)'
+                      : item.is_featured ? '2px solid #c8962a' : undefined,
+                    boxShadow: item.is_featured && !isSeasonSlot
+                      ? '0 0 20px rgba(200,150,42,0.35)' : undefined,
                   }}>
                     <div className="champion-img-wrap">
-                      {item.is_featured && (
+                      {isSeasonSlot && (
+                        <div className="season-best-label">
+                          {item.season_best_senior ? 'Лучший сезона — Старшая' : 'Лучший сезона — Младшая'}
+                        </div>
+                      )}
+                      {!isSeasonSlot && item.is_featured && (
                         <div style={{position:'absolute', top:10, left:10, zIndex:2, background:'#c8962a', borderRadius:'50%', width:28, height:28, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', boxShadow:'0 2px 8px rgba(0,0,0,0.5)'}}>★</div>
                       )}
                       <ChampionImg item={item} />
