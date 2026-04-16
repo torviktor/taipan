@@ -173,6 +173,12 @@
 }
 
 /* ── Лучшие сезона ───────────────────────────────────────────────────── */
+.season-best-row {
+  margin-bottom: 32px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--gray-dim);
+}
+
 .season-best-label {
   position: absolute; top: 8px; left: 0; right: 0;
   text-align: center; background: var(--red); color: #fff;
