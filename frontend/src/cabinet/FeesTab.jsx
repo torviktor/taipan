@@ -23,6 +23,7 @@ export default function FeesTab({ token, role }) {
   const [month,       setMonth]       = useState(now.getMonth() + 1)
   const [periods,     setPeriods]     = useState([])
   const [localBudget, setLocalBudget] = useState({})
+  const [groupFilter, setGroupFilter] = useState('all')
   const [loading,     setLoading]     = useState(false)
   const [saving,      setSaving]      = useState(false)
   const [notifying,   setNotifying]   = useState(false)
@@ -95,7 +96,11 @@ export default function FeesTab({ token, role }) {
     } catch {}
   }
 
-  const getBody = () => periods.map(p => ({
+  const filteredPeriods = groupFilter === 'all'
+    ? periods
+    : periods.filter(p => p.group === groupFilter)
+
+  const getBody = () => filteredPeriods.map(p => ({
     athlete_id: p.athlete_id,
     is_budget:  localBudget[p.athlete_id] ?? p.is_budget,
   }))
@@ -131,9 +136,9 @@ export default function FeesTab({ token, role }) {
     setNotifying(false)
   }
 
-  const countNonBudget = periods.filter(p => !(localBudget[p.athlete_id] ?? p.is_budget)).length
-  const countPaid      = periods.filter(p => !(localBudget[p.athlete_id] ?? p.is_budget) && p.paid).length
-  const countDebt      = periods.filter(p => !(localBudget[p.athlete_id] ?? p.is_budget) && !p.paid && p.debt > 0).length
+  const countNonBudget = filteredPeriods.filter(p => !(localBudget[p.athlete_id] ?? p.is_budget)).length
+  const countPaid      = filteredPeriods.filter(p => !(localBudget[p.athlete_id] ?? p.is_budget) && p.paid).length
+  const countDebt      = filteredPeriods.filter(p => !(localBudget[p.athlete_id] ?? p.is_budget) && !p.paid && p.debt > 0).length
 
   return (
     <div>
@@ -156,6 +161,29 @@ export default function FeesTab({ token, role }) {
         ) : (
           <span style={{color:'#6cba6c', fontSize:'0.82rem'}}>✓ Сохранено</span>
         )}
+      </div>
+
+      {/* Фильтр по группе */}
+      <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' }}>
+        {[
+          { id:'all',    label:'Все группы' },
+          { id:'junior', label:'Младшая' },
+          { id:'senior', label:'Старшая' },
+          { id:'adults', label:'Взрослые' },
+        ].map(g => (
+          <button key={g.id}
+            onClick={() => setGroupFilter(g.id)}
+            style={{
+              fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.85rem',
+              letterSpacing:'0.06em', textTransform:'uppercase',
+              padding:'7px 16px', borderRadius:6, cursor:'pointer',
+              background: groupFilter === g.id ? 'var(--red)' : 'transparent',
+              color: groupFilter === g.id ? 'var(--white)' : 'var(--gray)',
+              border: groupFilter === g.id ? '1px solid var(--red)' : '1px solid var(--gray-dim)',
+            }}>
+            {g.label}
+          </button>
+        ))}
       </div>
 
       {/* Переключатель месяца */}
@@ -212,7 +240,7 @@ export default function FeesTab({ token, role }) {
                 </tr>
               </thead>
               <tbody>
-                {periods.map(p => {
+                {filteredPeriods.map(p => {
                   const isBudget = localBudget[p.athlete_id] ?? p.is_budget
                   return (
                     <tr key={p.id} style={{
