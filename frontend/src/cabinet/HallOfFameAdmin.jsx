@@ -153,7 +153,12 @@ export default function HallOfFameAdmin({ token }) {
         sort_order:   Number(editing.sort_order) || 0,
         is_featured:  !!editing.is_featured,
       })})
-      if (r.ok) { setShowForm(false); setEditing(null); setMsg(''); await load() }
+      if (r.ok) {
+        const saved = await r.json()
+        if (editing.season_best_senior) await saveSeasonBest(saved.id, 'senior')
+        else if (editing.season_best_junior) await saveSeasonBest(saved.id, 'junior')
+        setShowForm(false); setEditing(null); setMsg(''); await load()
+      }
       else setMsg('Ошибка сохранения')
     } catch { setMsg('Ошибка') }
   }
@@ -179,6 +184,16 @@ export default function HallOfFameAdmin({ token }) {
       if (r.ok) await load()
     } catch {}
     setUploading(null)
+  }
+
+  const saveSeasonBest = async (id, type) => {
+    try {
+      await fetch(`${API}/hall-of-fame/${id}/season-best`, {
+        method: 'PATCH',
+        headers: hj,
+        body: JSON.stringify({ type })
+      })
+    } catch {}
   }
 
   const savePosition = async (id, position) => {
@@ -269,12 +284,30 @@ export default function HallOfFameAdmin({ token }) {
 
             {msg && <div style={{color:'var(--red)', marginBottom:12, fontSize:'0.88rem'}}>{msg}</div>}
 
-            <div style={{marginBottom:18, display:'flex', alignItems:'center', gap:10}}>
+            <div style={{marginBottom:10, display:'flex', alignItems:'center', gap:10}}>
               <input type="checkbox" id="hof-featured" checked={!!editing.is_featured}
                 onChange={e => setEditing(p=>({...p, is_featured: e.target.checked}))}
                 style={{width:16, height:16, accentColor:'#c8962a', cursor:'pointer'}}/>
               <label htmlFor="hof-featured" style={{cursor:'pointer', fontSize:'0.9rem', color:'var(--white)'}}>
                 Золотая рамка <span style={{color:'#c8962a', fontSize:'0.8rem'}}>(чемпионы мира и Европы)</span>
+              </label>
+            </div>
+
+            <div style={{marginBottom:10, display:'flex', alignItems:'center', gap:10}}>
+              <input type="checkbox" id="hof-season-senior" checked={!!editing.season_best_senior}
+                onChange={e => setEditing(p=>({...p, season_best_senior: e.target.checked, season_best_junior: e.target.checked ? false : p.season_best_junior}))}
+                style={{width:16, height:16, accentColor:'var(--red)', cursor:'pointer'}}/>
+              <label htmlFor="hof-season-senior" style={{cursor:'pointer', fontSize:'0.9rem', color:'var(--white)'}}>
+                Лучший сезона <span style={{color:'var(--red)', fontSize:'0.8rem'}}>(старшая группа)</span>
+              </label>
+            </div>
+
+            <div style={{marginBottom:18, display:'flex', alignItems:'center', gap:10}}>
+              <input type="checkbox" id="hof-season-junior" checked={!!editing.season_best_junior}
+                onChange={e => setEditing(p=>({...p, season_best_junior: e.target.checked, season_best_senior: e.target.checked ? false : p.season_best_senior}))}
+                style={{width:16, height:16, accentColor:'var(--red)', cursor:'pointer'}}/>
+              <label htmlFor="hof-season-junior" style={{cursor:'pointer', fontSize:'0.9rem', color:'var(--white)'}}>
+                Лучший сезона <span style={{color:'var(--red)', fontSize:'0.8rem'}}>(младшая группа)</span>
               </label>
             </div>
 

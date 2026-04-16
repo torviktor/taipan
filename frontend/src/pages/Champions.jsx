@@ -18,15 +18,94 @@ const BELT_COLORS = {
   1:  { bg: '#CC0000', text: '#fff' },
 }
 
+function getBelt(item) {
+  if (item.dan)  return { bg: '#111', text: '#FFD700', label: `${item.dan} дан` }
+  if (item.gup)  return { ...(BELT_COLORS[item.gup] || { bg:'var(--gray)', text:'#fff' }), label: `${item.gup} гып` }
+  return null
+}
+
+function ChampionImg({ item }) {
+  if (!item.photo_url) {
+    return (
+      <div className="champion-img-placeholder">
+        <span>Фото</span>
+      </div>
+    )
+  }
+  const ps = item.photo_position || '0px 0px / 100%'
+  const [posStr, zoomStr] = ps.split('/')
+  const parts = posStr.trim().split(' ')
+  const ptx   = parseFloat(parts[0]) || 0
+  const pty   = parseFloat(parts[1]) || 0
+  const pzoom = parseFloat(zoomStr) || 100
+  return (
+    <img src={item.photo_url} alt={item.full_name} className="champion-img"
+      style={{
+        width:'auto', height:`${pzoom}%`,
+        position:'absolute', top:'50%', left:'50%', maxWidth:'none',
+        transform:`translate(calc(-50% + ${ptx}px), calc(-50% + ${pty}px))`,
+      }}
+    />
+  )
+}
+
+function SeasonBestCard({ item, label }) {
+  const belt = item ? getBelt(item) : null
+
+  return (
+    <div className="season-best-card">
+      <div className="season-best-label">{label}</div>
+      <div className="champion-img-wrap">
+        {item ? (
+          <ChampionImg item={item} />
+        ) : (
+          <div className="champion-img-placeholder">
+            <span>Будет объявлен по итогам сезона</span>
+          </div>
+        )}
+        {belt && (
+          <div className="champion-belt-badge" style={{ background: belt.bg, color: belt.text }}>
+            {belt.label}
+          </div>
+        )}
+      </div>
+      <div className="champion-info">
+        {item ? (
+          <>
+            <div className="champion-name">{item.full_name}</div>
+            {item.achievements && (
+              <ul className="champion-achievements">
+                {item.achievements.split('\n').filter(Boolean).map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            )}
+          </>
+        ) : (
+          <div style={{ color:'var(--gray)', fontStyle:'italic', fontSize:'0.9rem' }}>
+            Лучший спортсмен будет объявлен по итогам сезона
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function Champions() {
-  const [items,   setItems]   = useState([])
-  const [loading, setLoading] = useState(true)
+  const [items,      setItems]      = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [seasonBest, setSeasonBest] = useState({ senior: null, junior: null })
 
   useEffect(() => {
     fetch(`${API}/hall-of-fame`)
       .then(r => r.ok ? r.json() : [])
       .then(d => { setItems(d); setLoading(false) })
       .catch(() => setLoading(false))
+
+    fetch(`${API}/hall-of-fame/season-best`)
+      .then(r => r.ok ? r.json() : { senior: null, junior: null })
+      .then(d => setSeasonBest(d))
+      .catch(() => {})
   }, [])
 
   return (
@@ -46,6 +125,17 @@ export default function Champions() {
       <section className="champions-grid-section">
         <div className="container">
 
+          {/* ── Лучшие сезона ── */}
+          {(seasonBest.senior || seasonBest.junior) && (
+            <>
+              <h2 className="season-best-title">Лучшие сезона</h2>
+              <div className="season-best-row">
+                <SeasonBestCard item={seasonBest.senior} label="Лучший спортсмен сезона — Старшая группа" />
+                <SeasonBestCard item={seasonBest.junior} label="Лучший спортсмен сезона — Младшая группа" />
+              </div>
+            </>
+          )}
+
           {loading && (
             <div style={{ textAlign:'center', color:'var(--gray)', padding:'60px 0' }}>
               Загрузка...
@@ -61,11 +151,7 @@ export default function Champions() {
           {!loading && items.length > 0 && (
             <div className="champions-grid">
               {items.map(item => {
-                const belt = item.dan
-                  ? { bg: '#111', text: '#FFD700', label: `${item.dan} дан` }
-                  : item.gup
-                    ? { ...(BELT_COLORS[item.gup] || { bg:'var(--gray)', text:'#fff' }), label: `${item.gup} гып` }
-                    : null
+                const belt = getBelt(item)
 
                 return (
                   <div key={item.id} className={`champion-card champion-card--dynamic`} style={{
@@ -76,25 +162,7 @@ export default function Champions() {
                       {item.is_featured && (
                         <div style={{position:'absolute', top:10, left:10, zIndex:2, background:'#c8962a', borderRadius:'50%', width:28, height:28, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', boxShadow:'0 2px 8px rgba(0,0,0,0.5)'}}>★</div>
                       )}
-                      {item.photo_url ? (() => {
-                          const ps = item.photo_position || '0px 0px / 100%'
-                          const [posStr, zoomStr] = ps.split('/')
-                          const parts = posStr.trim().split(' ')
-                          const ptx = parseFloat(parts[0]) || 0
-                          const pty = parseFloat(parts[1]) || 0
-                          const pzoom = parseFloat(zoomStr) || 100
-                          return <img src={item.photo_url} alt={item.full_name} className="champion-img"
-                            style={{
-                              width:'auto', height:`${pzoom}%`,
-                              position:'absolute', top:'50%', left:'50%', maxWidth:'none',
-                              transform:`translate(calc(-50% + ${ptx}px), calc(-50% + ${pty}px))`,
-                            }}
-                          />
-                        })() : (
-                        <div className="champion-img-placeholder">
-                          <span>Фото</span>
-                        </div>
-                      )}
+                      <ChampionImg item={item} />
                       {belt && (
                         <div className="champion-belt-badge" style={{ background: belt.bg, color: belt.text }}>
                           {belt.label}

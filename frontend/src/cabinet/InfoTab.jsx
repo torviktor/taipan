@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import InsuranceTab from '../pages/InsuranceTab'
-import StrategyTab from '../pages/StrategyTab'
 
 export default function InfoTab({ isAdmin, isManager = false, token }) {
   const [section, setSection] = useState('rating')
@@ -46,7 +45,6 @@ export default function InfoTab({ isAdmin, isManager = false, token }) {
         <SectionBtn id="seasons"      label="Сезоны"/>
         <SectionBtn id="equipment"    label="Экипировка"/>
         <SectionBtn id="antidoping"   label="Антидопинг"/>
-        {isAdmin && <SectionBtn id="strategy"   label="Стратегия"/>}
         {isManager && <SectionBtn id="fees"     label="Взносы"/>}
         {isAdmin && <SectionBtn id="admin"      label="Памятка тренера"/>}
       </div>
@@ -270,7 +268,6 @@ export default function InfoTab({ isAdmin, isManager = false, token }) {
 
             {section === 'insurance' && isAdmin && (<InsuranceTab token={token} />)}
 
-      {section === 'strategy' && isAdmin && (<StrategyTab token={token} />)}
 
 
       {/* ── СТРАХОВАНИЕ ── */}

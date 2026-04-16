@@ -172,6 +172,45 @@
   transform: scale(1.04);
 }
 
+/* ── Лучшие сезона ───────────────────────────────────────────────────── */
+.season-best-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2rem;
+  color: var(--white);
+  letter-spacing: 0.05em;
+  margin-bottom: 24px;
+}
+.season-best-row {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 48px;
+  flex-wrap: wrap;
+}
+.season-best-card {
+  flex: 1;
+  min-width: 280px;
+  border: 2px solid var(--red) !important;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: default;
+  transition: transform 0.2s;
+  background: var(--dark2);
+  display: flex;
+  flex-direction: column;
+}
+.season-best-card:hover { transform: scale(1.03); }
+.season-best-label {
+  background: var(--red);
+  color: var(--white);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 7px 16px;
+  text-align: center;
+}
+
 .champion-belt-badge {
   position: absolute;
   bottom: 10px;
