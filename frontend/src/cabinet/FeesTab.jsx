@@ -82,25 +82,22 @@ export default function FeesTab({ token, role }) {
   }
 
   const initPeriods = async () => {
-    setLoading(true)
     try {
-      const r = await fetch(`${API}/fees/periods/init?year=${year}&month=${month}`, {
-        method: 'POST', headers: h,
+      const res = await fetch(`${API}/fees/periods/init?year=${year}&month=${month}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
       })
-      if (r.ok) {
-        const d = await r.json()
-        console.log('[initPeriods] created:', d.created, 'skipped:', d.skipped)
+      const data = await res.json()
+      console.log('initPeriods response:', res.status, data)
+      if (res.ok) {
         await loadPeriods()
       } else {
-        const err = await r.json().catch(() => ({}))
-        console.error('[initPeriods] error:', r.status, err)
-        setMsg(`Ошибка: ${err.detail || r.status}`)
-        setLoading(false)
+        console.error('initPeriods error:', data)
+        setMsg('Ошибка: ' + (data.detail || JSON.stringify(data)))
       }
     } catch (e) {
-      console.error('[initPeriods] exception:', e)
-      setMsg('Ошибка сети при формировании списка')
-      setLoading(false)
+      console.error('initPeriods exception:', e)
+      setMsg('Ошибка запроса')
     }
   }
 
@@ -216,40 +213,12 @@ export default function FeesTab({ token, role }) {
 
       {/* Фильтр по группе */}
       {role === 'manager' ? (
-        <div style={{ display:'flex', gap:12, marginBottom:16, alignItems:'center', flexWrap:'wrap' }}>
+        <div style={{ marginBottom:16 }}>
           <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>
-            Ваша группа: <strong style={{color:'var(--white)'}}>{GROUP_LABELS[groupFilter] ?? groupFilter}</strong>
+            Ваша группа: <strong style={{color:'var(--white)'}}>
+              {groupFilter === 'junior' ? 'Младшая' : groupFilter === 'senior' ? 'Старшая + Взрослые' : groupFilter}
+            </strong>
           </span>
-          {!showGroupChange ? (
-            <button className="btn-outline" style={{padding:'5px 14px', fontSize:'0.82rem'}}
-              onClick={() => setShowGroupChange(true)}>
-              Сменить
-            </button>
-          ) : (
-            <>
-              {['junior', 'senior'].map(gid => (
-                <button key={gid}
-                  onClick={() => { changeGroup(gid); setShowGroupChange(false) }}
-                  disabled={groupSaving}
-                  style={{
-                    fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.85rem',
-                    letterSpacing:'0.06em', textTransform:'uppercase',
-                    padding:'6px 14px', borderRadius:6, cursor: groupSaving ? 'default' : 'pointer',
-                    background: groupFilter === gid ? 'var(--red)' : 'transparent',
-                    color: groupFilter === gid ? 'var(--white)' : 'var(--gray)',
-                    border: groupFilter === gid ? '1px solid var(--red)' : '1px solid var(--gray-dim)',
-                    opacity: groupSaving ? 0.6 : 1,
-                  }}>
-                  {GROUP_LABELS[gid]}
-                </button>
-              ))}
-              <button className="btn-outline" style={{padding:'5px 12px', fontSize:'0.82rem'}}
-                onClick={() => setShowGroupChange(false)}>
-                Отмена
-              </button>
-            </>
-          )}
-          {groupSaving && <span style={{color:'var(--gray)', fontSize:'0.78rem'}}>сохранение...</span>}
         </div>
       ) : (
         <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap', alignItems:'center' }}>

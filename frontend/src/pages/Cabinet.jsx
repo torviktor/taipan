@@ -315,6 +315,26 @@ export default function Cabinet() {
   const activeFiltersCount = Object.values(cf).filter(Boolean).length + (search ? 1 : 0)
   const logout = () => { localStorage.clear(); navigate('/login') }
 
+  // ── КАБИНЕТ ТРЕНЕРА (только взносы) ─────────────────────────────────────────
+  if (role === 'manager') {
+    return (
+      <Suspense fallback={<div className="cabinet-loading">Загрузка...</div>}>
+      <main className="cabinet-page">
+        <div className="container cabinet-container">
+          <div className="cabinet-header">
+            <div className="cabinet-header-main">
+              <h1 className="cabinet-title">{name}</h1>
+              <span className="cabinet-role-badge">Тренер</span>
+            </div>
+            <button className="btn-outline cabinet-logout" onClick={logout}>Выйти</button>
+          </div>
+          <FeesTab token={token} role={role} />
+        </div>
+      </main>
+      </Suspense>
+    )
+  }
+
   // ── КАБИНЕТ РОДИТЕЛЯ ────────────────────────────────────────────────────────
   if (!isAdmin) {
     return (
@@ -322,13 +342,12 @@ export default function Cabinet() {
       <main className="cabinet-page">
         <div className="container cabinet-container">
           <div className="cabinet-header">
-            <div className="cabinet-header-main">
-              <p className="section-label">{role === 'manager' ? 'Панель тренера' : 'Личный кабинет'}</p>
+            <div>
+              <p className="section-label">Личный кабинет</p>
               <h1 className="cabinet-title">{name}</h1>
-              {role === 'manager' && <span className="cabinet-role-badge">Тренер</span>}
             </div>
             <div style={{ display:'flex', gap:'12px', alignItems:'center', flexWrap:'wrap' }}>
-              {role !== 'manager' && <a href="/register?add=1" className="btn-outline" style={{ fontSize:'13px', padding:'8px 16px' }}>+ Добавить ребёнка</a>}
+              <a href="/register?add=1" className="btn-outline" style={{ fontSize:'13px', padding:'8px 16px' }}>+ Добавить ребёнка</a>
               <button className="btn-outline cabinet-logout" onClick={logout}>Выйти</button>
             </div>
           </div>
@@ -386,7 +405,7 @@ export default function Cabinet() {
           {parentView === 'rating'        && !loading && <RatingTab token={token} myAthleteIds={myAthletes.map(a=>a.id)}/>}
           {parentView === 'notifications' && <NotificationsTab token={token}/>}
           {parentView === 'insurance'     && <ParentInsuranceTab token={token} athletes={myAthletes}/>}
-          {parentView === 'fees'          && (role === 'manager' ? <FeesTab token={token} role={role}/> : <MyFeesTab token={token}/>)}
+          {parentView === 'fees'          && <MyFeesTab token={token}/>}
           {parentView === 'info'          && <InfoTab isAdmin={false} isManager={false} token={token}/>}
           {parentView === 'analytics'     && !loading && <ParentAnalyticsTab token={token} athletes={myAthletes}/>}
         </div>
