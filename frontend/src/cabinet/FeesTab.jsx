@@ -91,18 +91,19 @@ export default function FeesTab({ token, role }) {
 
   const initPeriods = async () => {
     try {
-      const res = await fetch(`${API}/fees/periods/init?year=${year}&month=${month}`, {
+      const res = await fetch(`/api/fees/periods/init?year=${year}&month=${month}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       })
-      const data = await res.json()
-      console.log('initPeriods response:', res.status, data)
-      if (res.ok) {
-        await loadPeriods()
-      } else {
-        console.error('initPeriods error:', data)
-        setMsg('Ошибка: ' + (data.detail || JSON.stringify(data)))
+      if (!res.ok) {
+        const text = await res.text()
+        console.error('initPeriods raw response:', text)
+        setMsg('Ошибка: ' + text)
+        return
       }
+      const data = await res.json()
+      console.log('initPeriods ok:', data)
+      await loadPeriods()
     } catch (e) {
       console.error('initPeriods exception:', e)
       setMsg('Ошибка запроса')
