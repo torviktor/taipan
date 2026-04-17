@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { API } from './constants'
 
 const MONTHS_RU = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
                    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
+
+const GROUP_LABELS = { junior: 'Младшая', senior: 'Старшая' }
 
 const thStyle = {
   padding: '8px 12px',
@@ -24,7 +26,8 @@ export default function FeesTab({ token, role }) {
   const [periods,     setPeriods]     = useState([])
   const [localBudget, setLocalBudget] = useState({})
   const [groupFilter, setGroupFilter] = useState('all')
-  const [groupSaving, setGroupSaving] = useState(false)
+  const [groupSaving,       setGroupSaving]       = useState(false)
+  const [showGroupChange,   setShowGroupChange]   = useState(false)
   const [loading,     setLoading]     = useState(false)
   const [saving,      setSaving]      = useState(false)
   const [notifying,   setNotifying]   = useState(false)
@@ -79,12 +82,26 @@ export default function FeesTab({ token, role }) {
   }
 
   const initPeriods = async () => {
+    setLoading(true)
     try {
-      await fetch(`${API}/fees/periods/init?year=${year}&month=${month}`, {
+      const r = await fetch(`${API}/fees/periods/init?year=${year}&month=${month}`, {
         method: 'POST', headers: h,
       })
-      await loadPeriods()
-    } catch {}
+      if (r.ok) {
+        const d = await r.json()
+        console.log('[initPeriods] created:', d.created, 'skipped:', d.skipped)
+        await loadPeriods()
+      } else {
+        const err = await r.json().catch(() => ({}))
+        console.error('[initPeriods] error:', r.status, err)
+        setMsg(`Ошибка: ${err.detail || r.status}`)
+        setLoading(false)
+      }
+    } catch (e) {
+      console.error('[initPeriods] exception:', e)
+      setMsg('Ошибка сети при формировании списка')
+      setLoading(false)
+    }
   }
 
   const togglePaid = async (periodId, paid) => {
@@ -114,9 +131,25 @@ export default function FeesTab({ token, role }) {
     setGroupSaving(false)
   }
 
-  const filteredPeriods = groupFilter === 'all'
-    ? periods
-    : periods.filter(p => p.group === groupFilter)
+  const filteredPeriods = useMemo(() => {
+    if (groupFilter === 'all') return periods
+    if (groupFilter === 'junior') return periods.filter(p =>
+      p.group === 'junior' ||
+      p.group === 'Младшая группа (6–10 лет)' ||
+      p.group === 'Младшая группа (6-10 лет)'
+    )
+    if (groupFilter === 'senior') return periods.filter(p =>
+      p.group === 'senior' ||
+      p.group === 'Старшая группа (11+)' ||
+      p.group === 'Старшая группа (11–16 лет)'
+    )
+    if (groupFilter === 'adults') return periods.filter(p =>
+      p.group === 'adults' ||
+      p.group === 'Взрослые' ||
+      p.group === 'Взрослые (18+)'
+    )
+    return periods
+  }, [periods, groupFilter])
 
   const getBody = () => filteredPeriods.map(p => ({
     athlete_id: p.athlete_id,
@@ -182,33 +215,65 @@ export default function FeesTab({ token, role }) {
       </div>
 
       {/* Фильтр по группе */}
-      <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap', alignItems:'center' }}>
-        {[
-          { id:'all',    label:'Все группы', adminOnly: true },
-          { id:'junior', label:'Младшая' },
-          { id:'senior', label:'Старшая' },
-          { id:'adults', label:'Взрослые' },
-        ]
-          .filter(g => !g.adminOnly || role === 'admin')
-          .map(g => (
+      {role === 'manager' ? (
+        <div style={{ display:'flex', gap:12, marginBottom:16, alignItems:'center', flexWrap:'wrap' }}>
+          <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>
+            Ваша группа: <strong style={{color:'var(--white)'}}>{GROUP_LABELS[groupFilter] ?? groupFilter}</strong>
+          </span>
+          {!showGroupChange ? (
+            <button className="btn-outline" style={{padding:'5px 14px', fontSize:'0.82rem'}}
+              onClick={() => setShowGroupChange(true)}>
+              Сменить
+            </button>
+          ) : (
+            <>
+              {['junior', 'senior'].map(gid => (
+                <button key={gid}
+                  onClick={() => { changeGroup(gid); setShowGroupChange(false) }}
+                  disabled={groupSaving}
+                  style={{
+                    fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.85rem',
+                    letterSpacing:'0.06em', textTransform:'uppercase',
+                    padding:'6px 14px', borderRadius:6, cursor: groupSaving ? 'default' : 'pointer',
+                    background: groupFilter === gid ? 'var(--red)' : 'transparent',
+                    color: groupFilter === gid ? 'var(--white)' : 'var(--gray)',
+                    border: groupFilter === gid ? '1px solid var(--red)' : '1px solid var(--gray-dim)',
+                    opacity: groupSaving ? 0.6 : 1,
+                  }}>
+                  {GROUP_LABELS[gid]}
+                </button>
+              ))}
+              <button className="btn-outline" style={{padding:'5px 12px', fontSize:'0.82rem'}}
+                onClick={() => setShowGroupChange(false)}>
+                Отмена
+              </button>
+            </>
+          )}
+          {groupSaving && <span style={{color:'var(--gray)', fontSize:'0.78rem'}}>сохранение...</span>}
+        </div>
+      ) : (
+        <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap', alignItems:'center' }}>
+          {[
+            { id:'all',    label:'Все группы' },
+            { id:'junior', label:'Младшая' },
+            { id:'senior', label:'Старшая' },
+            { id:'adults', label:'Взрослые' },
+          ].map(g => (
             <button key={g.id}
-              onClick={() => changeGroup(g.id)}
-              disabled={groupSaving}
+              onClick={() => setGroupFilter(g.id)}
               style={{
                 fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.85rem',
                 letterSpacing:'0.06em', textTransform:'uppercase',
-                padding:'7px 16px', borderRadius:6, cursor: groupSaving ? 'default' : 'pointer',
+                padding:'7px 16px', borderRadius:6, cursor:'pointer',
                 background: groupFilter === g.id ? 'var(--red)' : 'transparent',
                 color: groupFilter === g.id ? 'var(--white)' : 'var(--gray)',
                 border: groupFilter === g.id ? '1px solid var(--red)' : '1px solid var(--gray-dim)',
-                opacity: groupSaving ? 0.6 : 1,
               }}>
               {g.label}
             </button>
-          ))
-        }
-        {groupSaving && <span style={{color:'var(--gray)', fontSize:'0.78rem'}}>сохранение...</span>}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Переключатель месяца */}
       <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>

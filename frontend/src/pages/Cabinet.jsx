@@ -52,7 +52,7 @@ export default function Cabinet() {
   const token    = localStorage.getItem('token')
   const role     = localStorage.getItem('role')
   const name     = localStorage.getItem('full_name')
-  const isAdmin  = ['admin', 'manager'].includes(role)
+  const isAdmin  = role === 'admin'
 
   const [athletes,     setAthletes]     = useState([])
   const [applications, setApplications] = useState([])
@@ -79,7 +79,7 @@ export default function Cabinet() {
   }, [])
 
   useEffect(() => {
-    if (!isAdmin) return
+    if (role !== 'admin' && role !== 'manager') return
     const load = async () => {
       try {
         const r = await fetch(`${API}/fees/overdue-count`, { headers: { Authorization: `Bearer ${token}` } })
@@ -322,12 +322,13 @@ export default function Cabinet() {
       <main className="cabinet-page">
         <div className="container cabinet-container">
           <div className="cabinet-header">
-            <div>
-              <p className="section-label">Личный кабинет</p>
+            <div className="cabinet-header-main">
+              <p className="section-label">{role === 'manager' ? 'Панель тренера' : 'Личный кабинет'}</p>
               <h1 className="cabinet-title">{name}</h1>
+              {role === 'manager' && <span className="cabinet-role-badge">Тренер</span>}
             </div>
             <div style={{ display:'flex', gap:'12px', alignItems:'center', flexWrap:'wrap' }}>
-              <a href="/register?add=1" className="btn-outline" style={{ fontSize:'13px', padding:'8px 16px' }}>+ Добавить ребёнка</a>
+              {role !== 'manager' && <a href="/register?add=1" className="btn-outline" style={{ fontSize:'13px', padding:'8px 16px' }}>+ Добавить ребёнка</a>}
               <button className="btn-outline cabinet-logout" onClick={logout}>Выйти</button>
             </div>
           </div>
@@ -385,7 +386,7 @@ export default function Cabinet() {
           {parentView === 'rating'        && !loading && <RatingTab token={token} myAthleteIds={myAthletes.map(a=>a.id)}/>}
           {parentView === 'notifications' && <NotificationsTab token={token}/>}
           {parentView === 'insurance'     && <ParentInsuranceTab token={token} athletes={myAthletes}/>}
-          {parentView === 'fees'          && <MyFeesTab token={token}/>}
+          {parentView === 'fees'          && (role === 'manager' ? <FeesTab token={token} role={role}/> : <MyFeesTab token={token}/>)}
           {parentView === 'info'          && <InfoTab isAdmin={false} isManager={false} token={token}/>}
           {parentView === 'analytics'     && !loading && <ParentAnalyticsTab token={token} athletes={myAthletes}/>}
         </div>
