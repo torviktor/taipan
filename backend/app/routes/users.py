@@ -11,14 +11,18 @@ router = APIRouter()
 
 # ─── Схемы ────────────────────────────────────────────────────────────────────
 class UserOut(BaseModel):
-    id:         int
-    full_name:  str
-    phone:      str
-    email:      Optional[str]
-    role:       str
-    created_at: datetime
+    id:            int
+    full_name:     str
+    phone:         str
+    email:         Optional[str]
+    role:          str
+    created_at:    datetime
+    manager_group: Optional[str] = None
     class Config:
         from_attributes = True
+
+class ManagerGroupBody(BaseModel):
+    manager_group: Optional[str] = None  # 'junior' | 'senior' | None
 
 class AthleteOut(BaseModel):
     id:           int
@@ -66,6 +70,20 @@ def build_athlete_out(a: Athlete) -> dict:
 @router.get("/me", response_model=UserOut)
 def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+# ─── Выбор своей группы менеджером ───────────────────────────────────────────
+@router.patch("/me/group")
+def set_manager_group(
+    body: ManagerGroupBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manager),
+):
+    if body.manager_group not in (None, 'junior', 'senior'):
+        raise HTTPException(400, "manager_group должен быть 'junior', 'senior' или null")
+    current_user.manager_group = body.manager_group
+    db.add(current_user)
+    db.commit()
+    return {"ok": True, "manager_group": current_user.manager_group}
 
 # ─── МОИ спортсмены — только свои дети текущего пользователя ─────────────────
 @router.get("/my-athletes")

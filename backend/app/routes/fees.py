@@ -653,12 +653,23 @@ def save_fee_config(
 
 # ── GET /fees/periods ─────────────────────────────────────────────────────────
 
+def _apply_group_filter(items, manager_group):
+    """Фильтрует список AthleteFeePeriod по manager_group пользователя."""
+    if not manager_group:
+        return items
+    if manager_group == 'junior':
+        return [i for i in items if i.athlete and i.athlete.group == 'junior']
+    if manager_group == 'senior':
+        return [i for i in items if i.athlete and i.athlete.group in ('senior', 'adults')]
+    return items
+
+
 @router.get("/periods")
 def list_periods(
-    year:  int = Query(...),
-    month: int = Query(...),
-    db:    Session = Depends(get_db),
-    _:     User = Depends(require_manager),
+    year:         int = Query(...),
+    month:        int = Query(...),
+    db:           Session = Depends(get_db),
+    current_user: User = Depends(require_manager),
 ):
     items = (
         db.query(AthleteFeePeriod)
@@ -670,6 +681,7 @@ def list_periods(
         .order_by(AthleteFeePeriod.is_budget.asc())
         .all()
     )
+    items = _apply_group_filter(items, current_user.manager_group)
     return [_period_out(p) for p in items]
 
 
@@ -677,10 +689,10 @@ def list_periods(
 
 @router.post("/periods/init")
 def init_periods(
-    year:  int = Query(...),
-    month: int = Query(...),
-    db:    Session = Depends(get_db),
-    _:     User = Depends(require_manager),
+    year:         int = Query(...),
+    month:        int = Query(...),
+    db:           Session = Depends(get_db),
+    current_user: User = Depends(require_manager),
 ):
     cfg = db.query(FeeConfig).first()
     fee_amount = cfg.fee_amount if cfg else 2000
@@ -689,6 +701,11 @@ def init_periods(
     prev_month = month - 1 if month > 1 else 12
 
     athletes = db.query(Athlete).filter(Athlete.is_archived == False).all()
+    mg = current_user.manager_group
+    if mg == 'junior':
+        athletes = [a for a in athletes if a.group == 'junior']
+    elif mg == 'senior':
+        athletes = [a for a in athletes if a.group in ('senior', 'adults')]
 
     created = 0
     skipped = 0
@@ -754,12 +771,12 @@ def patch_period(
 
 @router.post("/periods/save-and-notify")
 def save_and_notify(
-    year:   int = Query(...),
-    month:  int = Query(...),
-    notify: bool = Query(True),
-    items:  List[BulkItem] = Body(...),
-    db:     Session = Depends(get_db),
-    _:      User = Depends(require_manager),
+    year:         int = Query(...),
+    month:        int = Query(...),
+    notify:       bool = Query(True),
+    items:        List[BulkItem] = Body(...),
+    db:           Session = Depends(get_db),
+    current_user: User = Depends(require_manager),
 ):
     cfg = db.query(FeeConfig).first()
     fee_amount = cfg.fee_amount if cfg else 2000
@@ -782,7 +799,7 @@ def save_and_notify(
 
     if notify:
         month_label = MONTHS_RU_LIST[month] if 1 <= month <= 12 else str(month)
-        periods = (
+        notify_periods = (
             db.query(AthleteFeePeriod)
             .options(joinedload(AthleteFeePeriod.athlete))
             .filter(
@@ -793,7 +810,8 @@ def save_and_notify(
             )
             .all()
         )
-        for p in periods:
+        notify_periods = _apply_group_filter(notify_periods, current_user.manager_group)
+        for p in notify_periods:
             athlete = p.athlete
             if not athlete or not athlete.user_id:
                 continue
