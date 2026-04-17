@@ -47,18 +47,26 @@ export default function FeesTab({ token, role }) {
       .catch(() => {})
   }, [])
 
-  useEffect(() => { loadPeriods() }, [year, month])
+  useEffect(() => {
+    const run = async () => {
+      const data = await loadPeriods()
+      if (data.length === 0) await initPeriods()
+    }
+    run()
+  }, [year, month])
 
   const loadPeriods = async () => {
     setLoading(true)
     setLocalBudget({})
     setMsg('')
+    let data = []
     try {
       const r = await fetch(`${API}/fees/periods?year=${year}&month=${month}`, { headers: h })
-      if (r.ok) setPeriods(await r.json())
-      else setPeriods([])
+      data = r.ok ? await r.json() : []
+      setPeriods(data)
     } catch { setPeriods([]) }
     setLoading(false)
+    return data
   }
 
   const saveConfig = async () => {
@@ -257,17 +265,6 @@ export default function FeesTab({ token, role }) {
 
       {loading && <div className="cabinet-loading">Загрузка...</div>}
 
-      {!loading && periods.length === 0 && (
-        <div>
-          <button className="btn-primary" onClick={initPeriods}>
-            Сформировать список на {MONTHS_RU[month]} {year}
-          </button>
-          <p style={{color:'var(--gray)', fontSize:'0.85rem', marginTop:8}}>
-            Список ещё не сформирован. Нажмите чтобы автоматически добавить всех активных спортсменов.
-          </p>
-        </div>
-      )}
-
       {!loading && periods.length > 0 && (
         <>
           {/* Статистика */}
@@ -310,15 +307,27 @@ export default function FeesTab({ token, role }) {
                         {p.group || '—'}
                       </td>
                       <td style={{...tdStyle, textAlign:'center'}}>
-                        <input type="checkbox" checked={isBudget}
-                          onChange={e => setLocalBudget(prev => ({...prev, [p.athlete_id]: e.target.checked}))}
-                          style={{width:16, height:16, accentColor:'var(--red)', cursor:'pointer'}}/>
+                        {role === 'admin' ? (
+                          <span style={{fontSize:'0.82rem', color: isBudget ? 'var(--gray)' : 'var(--white)'}}>
+                            {isBudget ? 'Бюджетник' : 'Внебюджетник'}
+                          </span>
+                        ) : (
+                          <input type="checkbox" checked={isBudget}
+                            onChange={e => setLocalBudget(prev => ({...prev, [p.athlete_id]: e.target.checked}))}
+                            style={{width:16, height:16, accentColor:'var(--red)', cursor:'pointer'}}/>
+                        )}
                       </td>
                       <td style={{...tdStyle, textAlign:'center'}}>
                         {!isBudget && (
-                          <input type="checkbox" checked={p.paid}
-                            onChange={e => togglePaid(p.id, e.target.checked)}
-                            style={{width:16, height:16, accentColor:'#6cba6c', cursor:'pointer'}}/>
+                          role === 'admin' ? (
+                            <span style={{fontSize:'0.82rem', color: p.paid ? '#6cba6c' : 'var(--gray)'}}>
+                              {p.paid ? 'Оплачено' : 'Не оплачено'}
+                            </span>
+                          ) : (
+                            <input type="checkbox" checked={p.paid}
+                              onChange={e => togglePaid(p.id, e.target.checked)}
+                              style={{width:16, height:16, accentColor:'#6cba6c', cursor:'pointer'}}/>
+                          )
                         )}
                       </td>
                       <td style={{...tdStyle, textAlign:'center'}}>
@@ -336,16 +345,18 @@ export default function FeesTab({ token, role }) {
           </div>
 
           {/* Кнопки */}
-          <div style={{ display:'flex', gap:12, marginTop:20, flexWrap:'wrap' }}>
-            <button className="btn-outline" style={{padding:'9px 20px'}}
-              onClick={saveList} disabled={saving}>
-              {saving ? 'Сохранение...' : 'Сохранить список'}
-            </button>
-            <button className="btn-primary" style={{padding:'9px 20px'}}
-              onClick={saveAndNotify} disabled={notifying}>
-              {notifying ? 'Отправка...' : 'Сохранить и уведомить внебюджетников'}
-            </button>
-          </div>
+          {role !== 'admin' && (
+            <div style={{ display:'flex', gap:12, marginTop:20, flexWrap:'wrap' }}>
+              <button className="btn-outline" style={{padding:'9px 20px'}}
+                onClick={saveList} disabled={saving}>
+                {saving ? 'Сохранение...' : 'Сохранить список'}
+              </button>
+              <button className="btn-primary" style={{padding:'9px 20px'}}
+                onClick={saveAndNotify} disabled={notifying}>
+                {notifying ? 'Отправка...' : 'Сохранить и уведомить внебюджетников'}
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

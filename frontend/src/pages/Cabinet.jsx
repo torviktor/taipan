@@ -315,27 +315,7 @@ export default function Cabinet() {
   const activeFiltersCount = Object.values(cf).filter(Boolean).length + (search ? 1 : 0)
   const logout = () => { localStorage.clear(); navigate('/login') }
 
-  // ── КАБИНЕТ ТРЕНЕРА (только взносы) ─────────────────────────────────────────
-  if (role === 'manager') {
-    return (
-      <Suspense fallback={<div className="cabinet-loading">Загрузка...</div>}>
-      <main className="cabinet-page">
-        <div className="container cabinet-container">
-          <div className="cabinet-header">
-            <div className="cabinet-header-main">
-              <h1 className="cabinet-title">{name}</h1>
-              <span className="cabinet-role-badge">Тренер</span>
-            </div>
-            <button className="btn-outline cabinet-logout" onClick={logout}>Выйти</button>
-          </div>
-          <FeesTab token={token} role={role} />
-        </div>
-      </main>
-      </Suspense>
-    )
-  }
-
-  // ── КАБИНЕТ РОДИТЕЛЯ ────────────────────────────────────────────────────────
+  // ── КАБИНЕТ РОДИТЕЛЯ / ТРЕНЕРА ──────────────────────────────────────────────
   if (!isAdmin) {
     return (
       <Suspense fallback={<div className="cabinet-loading">Загрузка...</div>}>
@@ -405,7 +385,7 @@ export default function Cabinet() {
           {parentView === 'rating'        && !loading && <RatingTab token={token} myAthleteIds={myAthletes.map(a=>a.id)}/>}
           {parentView === 'notifications' && <NotificationsTab token={token}/>}
           {parentView === 'insurance'     && <ParentInsuranceTab token={token} athletes={myAthletes}/>}
-          {parentView === 'fees'          && <MyFeesTab token={token}/>}
+          {parentView === 'fees'          && (role === 'manager' ? <FeesTab token={token} role={role}/> : <MyFeesTab token={token}/>)}
           {parentView === 'info'          && <InfoTab isAdmin={false} isManager={false} token={token}/>}
           {parentView === 'analytics'     && !loading && <ParentAnalyticsTab token={token} athletes={myAthletes}/>}
         </div>
