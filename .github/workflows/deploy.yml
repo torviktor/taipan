@@ -42,7 +42,7 @@ jobs:
 
             # ── 3. Пересборка и запуск
             sudo docker compose build backend frontend
-            sudo docker compose up -d
+            sudo docker compose up -d --remove-orphans --force-recreate
             sudo docker image prune -f
 
             echo "Деплой завершён"
