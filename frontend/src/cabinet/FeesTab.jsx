@@ -47,27 +47,50 @@ export default function FeesTab({ token, role }) {
       .catch(() => {})
   }, [])
 
-  useEffect(() => {
-    const run = async () => {
-      const data = await loadPeriods()
-      if (data.length === 0) await initPeriods()
-    }
-    run()
-  }, [year, month])
-
-  const loadPeriods = async () => {
+  const loadAndInit = async () => {
     setLoading(true)
     setLocalBudget({})
     setMsg('')
-    let data = []
     try {
-      const r = await fetch(`${API}/fees/periods?year=${year}&month=${month}`, { headers: h })
-      data = r.ok ? await r.json() : []
-      setPeriods(data)
-    } catch { setPeriods([]) }
+      const res = await fetch(
+        `/api/fees/periods?year=${year}&month=${month}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (res.ok) {
+        const data = await res.json()
+        console.log('periods loaded:', data.length, data)
+        setPeriods(data)
+        if (data.length === 0) {
+          console.log('periods empty, calling init...')
+          const initRes = await fetch(
+            `/api/fees/periods/init?year=${year}&month=${month}`,
+            { method: 'POST', headers: { Authorization: `Bearer ${token}` } }
+          )
+          const initText = await initRes.text()
+          console.log('init response:', initRes.status, initText)
+          if (initRes.ok) {
+            const initData = JSON.parse(initText)
+            console.log('init ok:', initData)
+            const res2 = await fetch(
+              `/api/fees/periods?year=${year}&month=${month}`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            )
+            if (res2.ok) setPeriods(await res2.json())
+          } else {
+            setMsg('Ошибка инициализации: ' + initText)
+          }
+        }
+      } else {
+        setPeriods([])
+      }
+    } catch (e) {
+      console.error('loadAndInit error:', e)
+      setPeriods([])
+    }
     setLoading(false)
-    return data
   }
+
+  useEffect(() => { loadAndInit() }, [year, month])
 
   const saveConfig = async () => {
     try {
@@ -87,27 +110,6 @@ export default function FeesTab({ token, role }) {
   const nextMonth = () => {
     if (month === 12) { setYear(y => y + 1); setMonth(1) }
     else setMonth(m => m + 1)
-  }
-
-  const initPeriods = async () => {
-    try {
-      const res = await fetch(`/api/fees/periods/init?year=${year}&month=${month}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!res.ok) {
-        const text = await res.text()
-        console.error('initPeriods raw response:', text)
-        setMsg('Ошибка: ' + text)
-        return
-      }
-      const data = await res.json()
-      console.log('initPeriods ok:', data)
-      await loadPeriods()
-    } catch (e) {
-      console.error('initPeriods exception:', e)
-      setMsg('Ошибка запроса')
-    }
   }
 
   const togglePaid = async (periodId, paid) => {
@@ -170,7 +172,7 @@ export default function FeesTab({ token, role }) {
         headers: hj,
         body: JSON.stringify(getBody()),
       })
-      await loadPeriods()
+      await loadAndInit()
       setMsg('Список сохранён')
     } catch {}
     setSaving(false)
@@ -186,7 +188,7 @@ export default function FeesTab({ token, role }) {
       })
       if (r.ok) {
         const result = await r.json()
-        await loadPeriods()
+        await loadAndInit()
         setMsg(`Уведомлено: ${result.notified} чел.`)
       }
     } catch {}
