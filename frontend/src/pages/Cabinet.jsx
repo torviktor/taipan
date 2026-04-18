@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from 'react'
+import { useState, useEffect, useMemo, lazy, Suspense, Component } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import './Cabinet.css'
@@ -36,6 +36,23 @@ const FeesTab           = lazy(() => import('../cabinet/FeesTab'))
 const MyFeesTab         = lazy(() => import('../cabinet/MyFeesTab'))
 
 
+
+// ── ERROR BOUNDARY ─────────────────────────────────────────────────────────────
+class CabinetErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { hasError: false } }
+  static getDerivedStateFromError() { return { hasError: true } }
+  render() {
+    if (this.state.hasError) return (
+      <main className="cabinet-page">
+        <div className="container cabinet-container" style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <p style={{ color: 'var(--gray)', fontSize: '1rem', marginBottom: 16 }}>Произошла ошибка при загрузке страницы</p>
+          <button className="btn-outline" onClick={() => this.setState({ hasError: false })}>Обновить</button>
+        </div>
+      </main>
+    )
+    return this.props.children
+  }
+}
 
 // ── СТАТУСЫ ЗАЯВОК ─────────────────────────────────────────────────────────────
 const STATUS_LABELS = {
@@ -318,6 +335,7 @@ export default function Cabinet() {
   // ── КАБИНЕТ РОДИТЕЛЯ / ТРЕНЕРА ──────────────────────────────────────────────
   if (!isAdmin) {
     return (
+      <CabinetErrorBoundary>
       <Suspense fallback={<div className="cabinet-loading">Загрузка...</div>}>
       <main className="cabinet-page">
         <div className="container cabinet-container">
@@ -391,11 +409,13 @@ export default function Cabinet() {
         </div>
       </main>
       </Suspense>
+      </CabinetErrorBoundary>
     )
   }
 
   // ── КАБИНЕТ АДМИНА ──────────────────────────────────────────────────────────
   return (
+    <CabinetErrorBoundary>
     <Suspense fallback={<div className="cabinet-loading">Загрузка...</div>}>
     <main className="cabinet-page">
       {resetUser && <ResetPasswordModal user={resetUser} token={token} onClose={() => setResetUser(null)} />}
@@ -779,5 +799,6 @@ export default function Cabinet() {
     </div>
     </main>
     </Suspense>
+    </CabinetErrorBoundary>
   )
 }

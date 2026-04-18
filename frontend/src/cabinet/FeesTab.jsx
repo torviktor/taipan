@@ -21,11 +21,11 @@ export default function FeesTab({ token, role }) {
   const now = new Date()
   const currentYear  = now.getFullYear()
   const currentMonth = now.getMonth() + 1
-  const isPast = year < currentYear || (year === currentYear && month < currentMonth)
   const [config,      setConfig]      = useState({ payment_day: 1, fee_amount: 2000 })
   const [configDirty, setConfigDirty] = useState(false)
   const [year,        setYear]        = useState(now.getFullYear())
   const [month,       setMonth]       = useState(now.getMonth() + 1)
+  const isPast = year < currentYear || (year === currentYear && month < currentMonth)
   const [periods,     setPeriods]     = useState([])
   const [localBudget, setLocalBudget] = useState({})
   const [localNotes,  setLocalNotes]  = useState({})
@@ -188,26 +188,27 @@ export default function FeesTab({ token, role }) {
   }
 
   const filteredPeriods = useMemo(() => {
-    if (groupFilter === 'all') return periods
-    if (groupFilter === 'junior') return periods.filter(p =>
+    const list = periods || []
+    if (groupFilter === 'all') return list
+    if (groupFilter === 'junior') return list.filter(p =>
       p.group === 'junior' ||
       p.group === 'Младшая группа (6–10 лет)' ||
       p.group === 'Младшая группа (6-10 лет)'
     )
-    if (groupFilter === 'senior') return periods.filter(p =>
+    if (groupFilter === 'senior') return list.filter(p =>
       p.group === 'senior' ||
       p.group === 'Старшая группа (11+)' ||
       p.group === 'Старшая группа (11–16 лет)'
     )
-    if (groupFilter === 'adults') return periods.filter(p =>
+    if (groupFilter === 'adults') return list.filter(p =>
       p.group === 'adults' ||
       p.group === 'Взрослые' ||
       p.group === 'Взрослые (18+)'
     )
-    return periods
+    return list
   }, [periods, groupFilter])
 
-  const getBody = () => filteredPeriods.map(p => ({
+  const getBody = () => (filteredPeriods || []).map(p => ({
     athlete_id: p.athlete_id,
     is_budget:  localBudget[p.athlete_id] ?? p.is_budget,
   }))
@@ -243,9 +244,9 @@ export default function FeesTab({ token, role }) {
     setNotifying(false)
   }
 
-  const countNonBudget = filteredPeriods.filter(p => !(localBudget[p.athlete_id] ?? p.is_budget)).length
-  const countPaid      = filteredPeriods.filter(p => !(localBudget[p.athlete_id] ?? p.is_budget) && p.paid).length
-  const countDebt      = filteredPeriods.filter(p => !(localBudget[p.athlete_id] ?? p.is_budget) && !p.paid && p.debt > 0).length
+  const countNonBudget = (filteredPeriods || []).filter(p => !(localBudget[p.athlete_id] ?? p.is_budget)).length
+  const countPaid      = (filteredPeriods || []).filter(p => !(localBudget[p.athlete_id] ?? p.is_budget) && p.paid).length
+  const countDebt      = (filteredPeriods || []).filter(p => !(localBudget[p.athlete_id] ?? p.is_budget) && !p.paid && p.debt > 0).length
 
   return (
     <div>
@@ -365,7 +366,7 @@ export default function FeesTab({ token, role }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredPeriods.map(p => {
+                {(filteredPeriods || []).map(p => {
                   const isBudget = localBudget[p.athlete_id] ?? p.is_budget
                   return (
                     <tr key={p.id} style={{
