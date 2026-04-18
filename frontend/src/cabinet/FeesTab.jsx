@@ -25,6 +25,7 @@ export default function FeesTab({ token, role }) {
   const [month,       setMonth]       = useState(now.getMonth() + 1)
   const [periods,     setPeriods]     = useState([])
   const [localBudget, setLocalBudget] = useState({})
+  const [localNotes,  setLocalNotes]  = useState({})
   const [groupFilter, setGroupFilter] = useState('all')
   const [groupSaving,       setGroupSaving]       = useState(false)
   const [showGroupChange,   setShowGroupChange]   = useState(false)
@@ -140,6 +141,20 @@ export default function FeesTab({ token, role }) {
   const nextMonth = () => {
     if (month === 12) { setYear(y => y + 1); setMonth(1) }
     else setMonth(m => m + 1)
+  }
+
+  const saveNote = async (periodId, note) => {
+    try {
+      const r = await fetch(`${API}/fees/periods/${periodId}`, {
+        method: 'PATCH',
+        headers: hj,
+        body: JSON.stringify({ note }),
+      })
+      if (r.ok) {
+        const updated = await r.json()
+        setPeriods(prev => prev.map(p => p.id === periodId ? updated : p))
+      }
+    } catch {}
   }
 
   const togglePaid = async (periodId, paid) => {
@@ -325,6 +340,7 @@ export default function FeesTab({ token, role }) {
                   <th style={thStyle}>Бюджетник</th>
                   <th style={thStyle}>Оплачено</th>
                   <th style={thStyle}>Долг</th>
+                  <th style={{...thStyle, textAlign:'left'}}>Комментарий</th>
                 </tr>
               </thead>
               <tbody>
@@ -376,6 +392,23 @@ export default function FeesTab({ token, role }) {
                               <span>{config.fee_amount} руб.</span>
                             )}
                           </span>
+                        )}
+                      </td>
+                      <td style={tdStyle}>
+                        {role === 'admin' ? (
+                          <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>
+                            {p.note || ''}
+                          </span>
+                        ) : (
+                          <input
+                            type="text"
+                            className="td-input"
+                            placeholder="Комментарий..."
+                            value={localNotes[p.id] ?? p.note ?? ''}
+                            onChange={e => setLocalNotes(prev => ({...prev, [p.id]: e.target.value}))}
+                            onBlur={e => saveNote(p.id, e.target.value)}
+                            style={{width:'100%', minWidth:120}}
+                          />
                         )}
                       </td>
                     </tr>

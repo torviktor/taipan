@@ -595,6 +595,7 @@ class FeeConfigBody(BaseModel):
 class PeriodPatchBody(BaseModel):
     is_budget: Optional[bool] = None
     paid:      Optional[bool] = None
+    note:      Optional[str]  = None
 
 
 class BulkItem(BaseModel):
@@ -613,6 +614,7 @@ def _period_out(p: AthleteFeePeriod) -> dict:
         "paid":         bool(p.paid),
         "paid_at":      p.paid_at.isoformat() if p.paid_at else None,
         "debt":         p.debt or 0,
+        "note":         p.note or "",
         "period_year":  p.period_year,
         "period_month": p.period_month,
     }
@@ -767,11 +769,23 @@ def patch_period(
         raise HTTPException(404, "Период не найден")
     if body.is_budget is not None:
         p.is_budget = body.is_budget
+    if body.note is not None:
+        p.note = body.note
     if body.paid is not None:
         p.paid = body.paid
         if body.paid:
-            p.paid_at = datetime.utcnow()
+            now = datetime.utcnow()
+            p.paid_at = now
             p.debt    = 0
+            other_unpaid = db.query(AthleteFeePeriod).filter(
+                AthleteFeePeriod.athlete_id == p.athlete_id,
+                AthleteFeePeriod.id != p.id,
+                AthleteFeePeriod.paid == False,
+            ).all()
+            for op in other_unpaid:
+                op.paid    = True
+                op.paid_at = now
+                op.debt    = 0
         else:
             p.paid_at = None
     db.commit()
