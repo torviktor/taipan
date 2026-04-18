@@ -30,6 +30,7 @@ services:
       SECRET_KEY:          ${SECRET_KEY}
       REDIS_URL:           redis://redis:6379/0
       TELEGRAM_BOT_TOKEN:  ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHANNEL_ID: ${TELEGRAM_CHANNEL_ID}
       SITE_URL:            ${SITE_URL:-http://185.152.92.101}
       ANTHROPIC_API_KEY:   ${ANTHROPIC_API_KEY}
       YANDEX_API_KEY:      ${YANDEX_API_KEY}
@@ -53,6 +54,7 @@ services:
       DATABASE_URL:       postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       REDIS_URL:          redis://redis:6379/0
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHANNEL_ID: ${TELEGRAM_CHANNEL_ID}
     deploy:
       resources:
         limits:
