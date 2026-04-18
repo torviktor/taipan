@@ -2,7 +2,7 @@
 
 import os, requests
 from datetime import date as date_type
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -149,6 +149,7 @@ class CertNewsRequest(BaseModel):
 @router.post("/generate-cert-news")
 def generate_cert_news(
     data: CertNewsRequest,
+    background_tasks: BackgroundTasks,
     db:   Session = Depends(get_db),
     user: User    = Depends(require_manager),
 ):
@@ -226,6 +227,9 @@ def generate_cert_news(
     title = f"{cert.name} — {date_str}"
     n = News(title=title, body=body, certification_id=data.cert_id, created_by=user.id)
     db.add(n); db.commit(); db.refresh(n)
+    from app.services.notifications import notify_news_telegram
+    print(f"DEBUG: scheduling telegram notify for news: {n.title}")
+    background_tasks.add_task(notify_news_telegram, n.title, n.body, None)
     return {"ok": True, "message": "Новость сгенерирована и опубликована", "news": _out(n)}
 
 
@@ -238,6 +242,7 @@ class CampNewsRequest(BaseModel):
 @router.post("/generate-camp-news")
 def generate_camp_news(
     data: CampNewsRequest,
+    background_tasks: BackgroundTasks,
     db:   Session = Depends(get_db),
     user: User    = Depends(require_manager),
 ):
@@ -307,4 +312,7 @@ def generate_camp_news(
     title = f"{camp.name} — {date_range}"
     n = News(title=title, body=body, camp_id=data.camp_id, created_by=user.id)
     db.add(n); db.commit(); db.refresh(n)
+    from app.services.notifications import notify_news_telegram
+    print(f"DEBUG: scheduling telegram notify for news: {n.title}")
+    background_tasks.add_task(notify_news_telegram, n.title, n.body, None)
     return {"ok": True, "message": "Новость сгенерирована и опубликована", "news": _out(n)}
