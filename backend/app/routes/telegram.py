@@ -47,15 +47,18 @@ async def process_telegram_update(update: dict):
                 subscriber.subscribed = True
                 db.commit()
             reply = (
-                "🥋 <b>Добро пожаловать в клуб Тайпан г. Павловский Посад!</b>\n\n"
-                "Ты подписан на уведомления о событиях клуба.\n"
-                "Мы будем напоминать о тренировках, соревнованиях и иных мероприятиях.\n\n"
-                "Команды:\n"
-                "/start — подписаться\n"
+                "🥋 <b>Добро пожаловать в клуб Тайпан!</b>\n"
+                "г. Павловский Посад\n\n"
+                "Вы подписаны на уведомления клуба.\n\n"
+                "<b>Команды:</b>\n"
+                "/start — подписаться на уведомления\n"
                 "/stop — отписаться\n"
                 "/events — ближайшее событие\n"
                 "/week — события на неделю\n"
-                "/month — события на месяц"
+                "/month — события на месяц\n"
+                "/news — последние новости\n"
+                "/link НОМЕР — привязать аккаунт сайта\n\n"
+                "📢 Наш канал: t.me/taipan_tkd"
             )
             await send_telegram_message(chat_id, reply)
 
@@ -95,6 +98,21 @@ async def process_telegram_update(update: dict):
                     reply += f"• {date_str} — {e.title}\n"
                     if e.location:
                         reply += f"  📍 {e.location}\n"
+            await send_telegram_message(chat_id, reply)
+
+        elif text == "/news":
+            from app.models.news import News
+            news_list = db.query(News).filter(
+                News.is_published == True
+            ).order_by(News.published_at.desc()).limit(3).all()
+            if not news_list:
+                reply = "📰 Новостей пока нет."
+            else:
+                reply = "📰 <b>Последние новости клуба:</b>\n\n"
+                for n in news_list:
+                    date_str = n.published_at.strftime("%d.%m.%Y")
+                    reply += f"• {date_str} — {n.title}\n"
+                reply += "\n🔗 Все новости: https://taipan-tkd.ru/news"
             await send_telegram_message(chat_id, reply)
 
         elif text == "/month":

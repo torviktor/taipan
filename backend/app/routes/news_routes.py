@@ -2,7 +2,7 @@
 
 import os, uuid
 from datetime import date as date_type
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
@@ -107,7 +107,7 @@ def get_news(news_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", status_code=201)
-def create_news(data: NewsCreate, db: Session = Depends(get_db), user: User = Depends(require_manager)):
+def create_news(data: NewsCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), user: User = Depends(require_manager)):
     if data.competition_id:
         existing = db.query(News).filter(News.competition_id == data.competition_id, News.is_published == True).first()
         if existing: raise HTTPException(400, "Новость об этом соревновании уже опубликована")
@@ -126,6 +126,10 @@ def create_news(data: NewsCreate, db: Session = Depends(get_db), user: User = De
         created_by=user.id
     )
     db.add(n); db.commit(); db.refresh(n)
+
+    from app.services.notifications import notify_news_telegram
+    background_tasks.add_task(notify_news_telegram, n.title, n.body)
+
     return _out(n)
 
 

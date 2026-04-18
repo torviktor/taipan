@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
@@ -90,6 +90,7 @@ def get_events(
 @router.post("/", response_model=EventOut, summary="Создать событие")
 def create_event(
     data: EventCreate,
+    background_tasks: BackgroundTasks,
     db:   Session = Depends(get_db),
     current_user: User = Depends(require_manager)
 ):
@@ -109,8 +110,22 @@ def create_event(
     db.refresh(event)
 
     # Ставим задачи на отправку напоминаний
-    from app.services.notifications import schedule_reminders
+    from app.services.notifications import schedule_reminders, notify_channel
     schedule_reminders(event)
+
+    # Отправить анонс в Telegram-канал
+    date_str = event.event_date.strftime("%d.%m.%Y в %H:%M")
+    text = (
+        f"📅 <b>Новое событие</b>\n\n"
+        f"<b>{event.title}</b>\n"
+        f"🗓 {date_str}\n"
+    )
+    if event.location:
+        text += f"📍 {event.location}\n"
+    if event.description:
+        text += f"\n{event.description[:150]}"
+    text += "\n\n🔗 https://taipan-tkd.ru/calendar"
+    background_tasks.add_task(notify_channel, text)
 
     return event
 
