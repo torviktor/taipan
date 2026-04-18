@@ -653,14 +653,18 @@ def save_fee_config(
 
 # ── GET /fees/periods ─────────────────────────────────────────────────────────
 
+JUNIOR_GROUPS = ('Младшая группа (6–10 лет)',)
+SENIOR_GROUPS = ('Старшая группа (11+)', 'Взрослые (18+)')
+
+
 def _apply_group_filter(items, manager_group):
     """Фильтрует список AthleteFeePeriod по manager_group пользователя."""
     if not manager_group:
         return items
     if manager_group == 'junior':
-        return [i for i in items if i.athlete and i.athlete.group == 'junior']
+        return [i for i in items if i.athlete and i.athlete.group in JUNIOR_GROUPS]
     if manager_group == 'senior':
-        return [i for i in items if i.athlete and i.athlete.group in ('senior', 'adults')]
+        return [i for i in items if i.athlete and i.athlete.group in SENIOR_GROUPS]
     return items
 
 
@@ -703,9 +707,9 @@ def init_periods(
     athletes = db.query(Athlete).filter(Athlete.is_archived == False).all()
     mg = current_user.manager_group
     if mg == 'junior':
-        athletes = [a for a in athletes if a.group == 'junior']
+        athletes = [a for a in athletes if a.group in JUNIOR_GROUPS]
     elif mg == 'senior':
-        athletes = [a for a in athletes if a.group in ('senior', 'adults')]
+        athletes = [a for a in athletes if a.group in SENIOR_GROUPS]
 
     created = 0
     skipped = 0

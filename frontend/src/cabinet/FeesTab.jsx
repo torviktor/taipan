@@ -41,10 +41,40 @@ export default function FeesTab({ token, role }) {
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setConfig(d) })
       .catch(() => {})
-    fetch(`${API}/users/me`, { headers: h })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.manager_group) setGroupFilter(d.manager_group) })
-      .catch(() => {})
+
+    const initManagerGroup = async () => {
+      try {
+        const r = await fetch(`${API}/users/me`, { headers: h })
+        if (!r.ok) return
+        const d = await r.json()
+        if (d?.manager_group) {
+          setGroupFilter(d.manager_group)
+          return
+        }
+        // manager_group не задан — определяем по первому спортсмену
+        if (role === 'manager') {
+          const r2 = await fetch(`${API}/users/my-athletes`, { headers: h })
+          if (r2.ok) {
+            const athletes = await r2.json()
+            if (athletes.length > 0) {
+              const groupValue = (athletes[0].group || '').toLowerCase()
+              const autoGroup = (
+                groupValue.includes('младш') ||
+                groupValue.includes('6–10') ||
+                groupValue.includes('6-10')
+              ) ? 'junior' : 'senior'
+              setGroupFilter(autoGroup)
+              await fetch(`${API}/users/me/group`, {
+                method: 'PATCH',
+                headers: hj,
+                body: JSON.stringify({ manager_group: autoGroup }),
+              })
+            }
+          }
+        }
+      } catch {}
+    }
+    initManagerGroup()
   }, [])
 
   const loadAndInit = async () => {
