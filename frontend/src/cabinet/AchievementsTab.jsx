@@ -1,81 +1,9 @@
 import { useState, useEffect } from 'react'
 import { API, currentSeason, seasonRange, seasonLabel } from './constants'
+import AchievementBadge from '../components/AchievementBadge'
+import { CATEGORY_LABEL } from '../components/AchievementBadge'
 
-// SVG иконки убраны — используем только эмблему клуба
-
-const TIER_STYLES = {
-  common:    { border: '#555555', bg: '#111111', glow: 'none',                          label: 'Обычная' },
-  rare:      { border: '#CC0000', bg: '#180000', glow: '0 0 14px rgba(204,0,0,0.5)',    label: 'Редкая' },
-  legendary: { border: '#c8962a', bg: '#1a1200', glow: '0 0 18px rgba(200,150,42,0.6)', label: 'Легендарная' },
-}
-
-const TIER_LABEL = { common: 'Обычная', rare: 'Редкая', legendary: 'Легендарная' }
-
-const CATEGORY_LABEL = {
-  attendance:   'Посещаемость',
-  competition:  'Соревнования',
-  certification:'Аттестация',
-  camp:         'Сборы',
-}
-
-export function AchievementBadge({ ach, size = 'normal' }) {
-  const style = TIER_STYLES[ach.tier] || TIER_STYLES.common
-  const dim = size === 'small' ? 80 : 110
-  const opacity = ach.granted ? 1 : 0.2
-
-  return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6, opacity, transition:'opacity 0.2s', width: dim + 20 }}>
-      <div style={{
-        width: dim, height: dim,
-        border: `2px solid ${style.border}`,
-        borderRadius: 8,
-        background: style.bg,
-        boxShadow: ach.granted ? style.glow : 'none',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        position: 'relative', overflow: 'hidden'
-      }}>
-        {/* Эмблема клуба — яркая, во всю площадь */}
-        <img src="/logo.png" alt="" style={{
-          width: '82%', height: '82%',
-          objectFit: 'contain',
-          opacity: ach.granted ? 0.9 : 0.15,
-          filter: ach.granted
-            ? (ach.tier === 'legendary'
-                ? 'drop-shadow(0 0 8px rgba(200,150,42,0.8))'
-                : ach.tier === 'rare'
-                ? 'drop-shadow(0 0 6px rgba(204,0,0,0.8))'
-                : 'none')
-            : 'grayscale(1)',
-          transition: 'all 0.2s',
-          position: 'relative', zIndex: 1
-        }}/>
-        {/* Угловой индикатор редкости */}
-        {ach.granted && (
-          <div style={{
-            position: 'absolute', top: 0, right: 0,
-            width: 0, height: 0,
-            borderStyle: 'solid',
-            borderWidth: '0 22px 22px 0',
-            borderColor: `transparent ${style.border} transparent transparent`,
-          }}/>
-        )}
-      </div>
-      <div style={{
-        fontFamily: 'Bebas Neue, sans-serif',
-        fontSize: size === 'small' ? '0.7rem' : '0.78rem',
-        letterSpacing: '0.05em',
-        color: ach.granted ? style.border : '#333',
-        textAlign: 'center', lineHeight: 1.2,
-        maxWidth: dim + 10
-      }}>{ach.name}</div>
-      {ach.granted && (
-        <div style={{ fontSize: '0.65rem', color: 'var(--gray)', textAlign:'center' }}>
-          {TIER_LABEL[ach.tier]}
-        </div>
-      )}
-    </div>
-  )
-}
+export { AchievementBadge }
 
 export function AchievementsLeaderboard({ token }) {
   const [data,    setData]    = useState([])

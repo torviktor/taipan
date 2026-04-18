@@ -1,16 +1,17 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import './WhyTaipan.css'
+import AchievementBadge, { ACHIEVEMENTS_CATALOG } from '../components/AchievementBadge'
 
-const SHOWCASE_ACHIEVEMENTS = [
-  { code: 'attendance_10',     icon: '🥋', name: 'Первые 10',       desc: '10 тренировок посещено' },
-  { code: 'attendance_50',     icon: '⚡', name: 'Полсотни',        desc: '50 тренировок посещено' },
-  { code: 'attendance_100',    icon: '💎', name: 'Сотня',           desc: '100 тренировок посещено' },
-  { code: 'competition_first', icon: '🏆', name: 'Боевое крещение', desc: 'Первое соревнование' },
-  { code: 'competition_gold',  icon: '🥇', name: 'Золото',          desc: '1 место на турнире' },
-  { code: 'cert_advance',      icon: '🎽', name: 'Новый пояс',      desc: 'Аттестация пройдена' },
-  { code: 'loyalty_1year',     icon: '⭐', name: 'Год в клубе',     desc: '1 год тренировок' },
-  { code: 'camp_member',       icon: '🏕️', name: 'Боец сборов',    desc: 'Участие в сборах' },
+const SHOWCASE_CODES = [
+  'attendance_10',
+  'attendance_50',
+  'attendance_100',
+  'competition_first',
+  'competition_gold',
+  'cert_advance',
+  'loyalty_1year',
+  'camp_member',
 ]
 
 const RATING_MOCK = [
@@ -114,11 +115,10 @@ export default function WhyTaipan() {
             конкретный значок который навсегда остаётся в профиле.
           </p>
           <div className="why-achievements-grid">
-            {SHOWCASE_ACHIEVEMENTS.map(ach => (
-              <div key={ach.code} className="why-ach-card">
-                <div className="why-ach-icon">{ach.icon}</div>
-                <div className="why-ach-name">{ach.name}</div>
-                <div className="why-ach-desc">{ach.desc}</div>
+            {SHOWCASE_CODES.map(code => (
+              <div key={code} className="why-ach-card">
+                <AchievementBadge ach={{ code, granted: true }} size={80} />
+                <div className="why-ach-desc">{(ACHIEVEMENTS_CATALOG[code] || {}).desc}</div>
               </div>
             ))}
           </div>
