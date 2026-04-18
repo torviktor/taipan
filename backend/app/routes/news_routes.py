@@ -128,9 +128,8 @@ def create_news(data: NewsCreate, background_tasks: BackgroundTasks, db: Session
     db.add(n); db.commit(); db.refresh(n)
 
     from app.services.notifications import notify_news_telegram
-    photo_url = f"https://taipan-tkd.ru{n.photo_url}" if n.photo_url else None
     print(f"DEBUG: scheduling telegram notify for news: {n.title}")
-    background_tasks.add_task(notify_news_telegram, n.title, n.body, photo_url)
+    background_tasks.add_task(notify_news_telegram, n.title, n.body, None)
 
     return _out(n)
 
