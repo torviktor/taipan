@@ -380,12 +380,17 @@ def notify_competition(comp_id: int, db: Session = Depends(get_db), _: User = De
             type=NotificationType.competition,
             title=title,
             body=body,
-            link_id=comp_id
+            link_id=comp_id,
+            link_type="competition",
         )
         db.add(notif)
         sent += 1
 
     db.commit()
+
+    from app.services.notifications import send_telegram_to_user
+    for u in users:
+        send_telegram_to_user(u.id, title, body, db)
 
     return {"sent": sent}
 
