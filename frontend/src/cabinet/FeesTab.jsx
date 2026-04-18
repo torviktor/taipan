@@ -19,6 +19,8 @@ const tdStyle = { padding: '10px 12px' }
 
 export default function FeesTab({ token, role }) {
   const now = new Date()
+  const currentYear  = now.getFullYear()
+  const currentMonth = now.getMonth() + 1
   const [config,      setConfig]      = useState({ payment_day: 1, fee_amount: 2000 })
   const [configDirty, setConfigDirty] = useState(false)
   const [year,        setYear]        = useState(now.getFullYear())
@@ -306,7 +308,15 @@ export default function FeesTab({ token, role }) {
         <span style={{fontFamily:'Bebas Neue', fontSize:'1.3rem', color:'var(--white)', minWidth:160, textAlign:'center'}}>
           {MONTHS_RU[month]} {year}
         </span>
-        <button className="btn-outline" style={{padding:'6px 14px'}} onClick={nextMonth}>→</button>
+        <button
+          onClick={nextMonth}
+          disabled={year === currentYear && month === currentMonth}
+          className="btn-outline"
+          style={{
+            padding:'6px 14px',
+            opacity: year === currentYear && month === currentMonth ? 0.3 : 1,
+            cursor: year === currentYear && month === currentMonth ? 'not-allowed' : 'pointer',
+          }}>→</button>
       </div>
 
       {msg && <div style={{color:'#6cba6c', marginBottom:12, fontSize:'0.88rem'}}>{msg}</div>}
