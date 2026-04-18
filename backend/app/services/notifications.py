@@ -106,6 +106,43 @@ async def notify_all_subscribers(db, message: str):
     return sent
 
 
+def send_telegram_to_user(user_id: int, title: str, body: str, db) -> bool:
+    """
+    Отправить Telegram уведомление пользователю если у него привязан аккаунт.
+    Синхронная функция — работает в обычных sync роутах FastAPI.
+    """
+    try:
+        from app.models.event import TelegramSubscriber
+        sub = db.query(TelegramSubscriber).filter(
+            TelegramSubscriber.user_id == user_id,
+            TelegramSubscriber.subscribed == True
+        ).first()
+
+        if not sub:
+            return False
+
+        token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+        if not token:
+            return False
+
+        text = f"<b>{title}</b>\n\n{body}"
+
+        import httpx
+        httpx.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={
+                "chat_id": sub.telegram_id,
+                "text": text,
+                "parse_mode": "HTML",
+            },
+            timeout=5
+        )
+        return True
+    except Exception as e:
+        print(f"send_telegram_to_user error: {e}")
+        return False
+
+
 def build_reminder_message(event, days_before: int) -> str:
     """Сформировать текст напоминания."""
     date_str = event.event_date.strftime("%d.%m.%Y в %H:%M")

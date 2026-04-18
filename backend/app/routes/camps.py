@@ -181,6 +181,7 @@ def notify_camp(camp_id: int, db: Session = Depends(get_db), _: User = Depends(r
 
     price_str = f" Стоимость участия: {camp.price} руб." if camp.price else ""
     sent = 0
+    telegram_notifs = []
 
     for p in parts:
         if not p.athlete or not p.athlete.user:
@@ -212,10 +213,16 @@ def notify_camp(camp_id: int, db: Session = Depends(get_db), _: User = Depends(r
             link_id=camp_id
         )
         db.add(notif)
+        telegram_notifs.append((p.athlete.user_id, notif.title, body))
         sent += 1
 
     camp.notify_sent = True
     db.commit()
+
+    from app.services.notifications import send_telegram_to_user
+    for uid, tl, bd in telegram_notifs:
+        send_telegram_to_user(uid, tl, bd, db)
+
     return {"sent": sent}
 
 
@@ -290,8 +297,10 @@ def _part_out(p):
 def _notify_all_users(camp: Camp, db):
     """Уведомить всех активных пользователей о сборах."""
     from app.models.certification import Notification, NotificationType
+    from app.services.notifications import send_telegram_to_user
     users = db.query(User).filter(User.is_active == True).all()
     price_str = f" Стоимость: {camp.price} руб." if camp.price else ""
+    tg_notifs = []
     for u in users:
         user_role = getattr(u, 'role', 'parent')
         if user_role == 'athlete':
@@ -301,10 +310,14 @@ def _notify_all_users(camp: Camp, db):
         if camp.location: body += f" Место: {camp.location}."
         body += price_str
         body += " Укажите планируете ли участвовать."
+        title = f"Сборы — {camp.name}"
         db.add(Notification(
             user_id=u.id, type=NotificationType.camp,
-            title=f"Сборы — {camp.name}",
+            title=title,
             body=body, link_id=camp.id, link_type="camp"
         ))
+        tg_notifs.append((u.id, title, body))
     camp.notify_sent = True
     db.commit()
+    for uid, tl, bd in tg_notifs:
+        send_telegram_to_user(uid, tl, bd, db)

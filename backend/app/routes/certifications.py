@@ -240,6 +240,7 @@ def send_notifications(
     ).filter(CertificationResult.certification_id == cert_id).all()
 
     sent = 0
+    telegram_notifs = []
     for r in results:
         if not r.athlete or not r.athlete.user:
             continue
@@ -279,13 +280,15 @@ def send_notifications(
             link_id=cert_id
         )
         db.add(notif)
+        telegram_notifs.append((r.athlete.user_id, title, body))
         sent += 1
 
     cert.notify_sent = True
     db.commit()
 
-    # Отправка в Telegram если есть chat_id
-    _send_telegram_notifications(results, cert, db)
+    from app.services.notifications import send_telegram_to_user
+    for uid, tl, bd in telegram_notifs:
+        send_telegram_to_user(uid, tl, bd, db)
 
     return {"sent": sent}
 

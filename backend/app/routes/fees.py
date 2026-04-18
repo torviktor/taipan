@@ -150,15 +150,21 @@ def generate_monthly_fees(db: Session, notify: bool = True) -> int:
         plabel = period_label(period)
         amount_str = f"{float(config.amount_due):.0f}"
         new_ids_set = set(new_athlete_ids)
+        notif_title = f"Клубный взнос за {plabel}"
+        notif_body = f"Внесите оплату до {deadline_str}. Сумма: {amount_str} руб."
         for athlete in athletes:
             if athlete.id in new_ids_set and athlete.user_id:
                 db.add(Notification(
                     user_id=athlete.user_id,
                     type="fee",
-                    title=f"Клубный взнос за {plabel}",
-                    body=f"Внесите оплату до {deadline_str}. Сумма: {amount_str} руб.",
+                    title=notif_title,
+                    body=notif_body,
                 ))
         db.commit()
+        from app.services.notifications import send_telegram_to_user
+        for athlete in athletes:
+            if athlete.id in new_ids_set and athlete.user_id:
+                send_telegram_to_user(athlete.user_id, notif_title, notif_body, db)
 
     return len(new_athlete_ids)
 
@@ -270,17 +276,24 @@ def pay_fee(
         fee.paid_at = None
 
     athlete = fee.athlete
+    fee_notif_data = None
     if athlete and athlete.user_id:
         plabel = period_label(fee.period)
+        notif_title = f"Взнос за {plabel} принят"
+        notif_body = f"Получено: {body.amount_paid:.0f} руб. из {float(fee.amount_due):.0f} руб."
         db.add(Notification(
             user_id=athlete.user_id,
             type="fee",
-            title=f"Взнос за {plabel} принят",
-            body=f"Получено: {body.amount_paid:.0f} руб. из {float(fee.amount_due):.0f} руб.",
+            title=notif_title,
+            body=notif_body,
         ))
+        fee_notif_data = (athlete.user_id, notif_title, notif_body)
 
     db.commit()
     db.refresh(fee)
+    if fee_notif_data:
+        from app.services.notifications import send_telegram_to_user
+        send_telegram_to_user(*fee_notif_data, db)
     return fee_to_dict(fee)
 
 
@@ -485,22 +498,28 @@ def notify_overdue(db: Session) -> int:
     )
 
     sent = 0
+    tg_notifs = []
     for fee in fees:
         athlete = fee.athlete
         if not athlete or not athlete.user_id:
             continue
         month_label = period_label(fee.period)
         debt = float(fee.amount_due or 0) - float(fee.amount_paid or 0)
+        notif_body = f"Взнос за {month_label} не внесён. Долг: {debt:.0f} руб. Пожалуйста, свяжитесь с тренером."
         db.add(Notification(
             user_id=athlete.user_id,
             type="fee",
             title="Просрочен взнос",
-            body=f"Взнос за {month_label} не внесён. Долг: {debt:.0f} руб. Пожалуйста, свяжитесь с тренером.",
+            body=notif_body,
             link_id=fee.id,
         ))
+        tg_notifs.append((athlete.user_id, "Просрочен взнос", notif_body))
         sent += 1
 
     db.commit()
+    from app.services.notifications import send_telegram_to_user
+    for uid, tl, bd in tg_notifs:
+        send_telegram_to_user(uid, tl, bd, db)
     return sent
 
 
@@ -528,6 +547,7 @@ def notify_overdue_manual(
     )
 
     sent = 0
+    tg_notifs = []
     for fee in fees:
         athlete = fee.athlete
         if not athlete or not athlete.user_id:
@@ -549,9 +569,13 @@ def notify_overdue_manual(
             body=body,
             link_id=fee.id,
         ))
+        tg_notifs.append((athlete.user_id, "Напоминание о взносе", body))
         sent += 1
 
     db.commit()
+    from app.services.notifications import send_telegram_to_user
+    for uid, tl, bd in tg_notifs:
+        send_telegram_to_user(uid, tl, bd, db)
     return {"sent": sent}
 
 
@@ -836,6 +860,7 @@ def save_and_notify(
             .all()
         )
         notify_periods = _apply_group_filter(notify_periods, current_user.manager_group)
+        tg_notifs = []
         for p in notify_periods:
             athlete = p.athlete
             if not athlete or not athlete.user_id:
@@ -848,14 +873,19 @@ def save_and_notify(
                     f" Задолженность за прошлые периоды: {p.debt} руб."
                     f" Итого: {fee_amount + p.debt} руб."
                 )
+            notif_title = f"Оплата взноса — {month_label} {year}"
             db.add(Notification(
                 user_id=athlete.user_id,
                 type="fee",
-                title=f"Оплата взноса — {month_label} {year}",
+                title=notif_title,
                 body=body_text,
             ))
+            tg_notifs.append((athlete.user_id, notif_title, body_text))
             notified += 1
         db.commit()
+        from app.services.notifications import send_telegram_to_user
+        for uid, tl, bd in tg_notifs:
+            send_telegram_to_user(uid, tl, bd, db)
 
     return {"saved": saved, "notified": notified}
 
