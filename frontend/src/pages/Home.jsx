@@ -147,8 +147,9 @@ export default function Home() {
               Первое занятие — <strong>бесплатно.</strong>
             </p>
             <div className="hero-btns hero-stagger-3">
-              <Link to="/apply"    className="btn-primary btn-cta">Записаться</Link>
-              <Link to="/schedule" className="btn-outline btn-cta">Расписание</Link>
+              <Link to="/apply"     className="btn-primary btn-cta">Записаться</Link>
+              <Link to="/schedule"  className="btn-outline btn-cta">Расписание</Link>
+              <Link to="/about/why" className="btn-outline btn-cta">Почему мы</Link>
             </div>
           </div>
         </div>
