@@ -39,16 +39,22 @@ const MyFeesTab         = lazy(() => import('../cabinet/MyFeesTab'))
 
 // ── ERROR BOUNDARY ─────────────────────────────────────────────────────────────
 class CabinetErrorBoundary extends Component {
-  constructor(props) { super(props); this.state = { hasError: false } }
-  static getDerivedStateFromError() { return { hasError: true } }
+  constructor(props) { super(props); this.state = { hasError: false, error: null } }
+  static getDerivedStateFromError(error) { return { hasError: true, error } }
+  componentDidCatch(error, info) {
+    console.error('CabinetErrorBoundary caught:', error, info)
+  }
   render() {
     if (this.state.hasError) return (
-      <main className="cabinet-page">
-        <div className="container cabinet-container" style={{ padding: '60px 20px', textAlign: 'center' }}>
-          <p style={{ color: 'var(--gray)', fontSize: '1rem', marginBottom: 16 }}>Произошла ошибка при загрузке страницы</p>
-          <button className="btn-outline" onClick={() => this.setState({ hasError: false })}>Обновить</button>
-        </div>
-      </main>
+      <div style={{ padding: 40, color: 'var(--white)' }}>
+        <h2>Ошибка</h2>
+        <pre style={{ color: 'var(--red)', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
+          {this.state.error?.toString()}
+        </pre>
+        <button className="btn-outline" onClick={() => window.location.reload()}>
+          Обновить
+        </button>
+      </div>
     )
     return this.props.children
   }
