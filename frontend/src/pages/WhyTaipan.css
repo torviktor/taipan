@@ -137,11 +137,12 @@
   overflow-x: auto;
   max-width: 900px;
   margin-top: 24px;
+  column-gap: 8px;
 }
 .why-rating-header,
 .why-rating-row {
   display: grid;
-  grid-template-columns: 50px 1fr 70px 1fr 45px 55px 35px 70px 80px;
+  grid-template-columns: 50px minmax(120px,1fr) 70px minmax(120px,1fr) 45px 55px 35px 75px 85px;
   padding: 10px 16px;
   align-items: center;
   min-width: 620px;
