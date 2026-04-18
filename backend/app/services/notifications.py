@@ -12,17 +12,16 @@ import os
 
 logger = logging.getLogger(__name__)
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-CHANNEL_ID     = os.getenv("TELEGRAM_CHANNEL_ID", "")
-BOT_USERNAME   = "taipan_tkd_bot"
+BOT_USERNAME = "taipan_tkd_bot"
 
 # ─── Telegram Bot ─────────────────────────────────────────────────────────────
 
 async def send_telegram_message(chat_id: str, text: str) -> bool:
     """Отправить сообщение в Telegram."""
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "")
     try:
         import httpx
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
         async with httpx.AsyncClient() as client:
             r = await client.post(url, json={
                 "chat_id":    chat_id,
@@ -37,9 +36,10 @@ async def send_telegram_message(chat_id: str, text: str) -> bool:
 
 async def send_telegram_photo(chat_id: str, photo_url: str, caption: str) -> bool:
     """Отправить фото с подписью в Telegram."""
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "")
     try:
         import httpx
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
+        url = f"https://api.telegram.org/bot{token}/sendPhoto"
         async with httpx.AsyncClient() as client:
             r = await client.post(url, json={
                 "chat_id":    chat_id,
@@ -55,15 +55,17 @@ async def send_telegram_photo(chat_id: str, photo_url: str, caption: str) -> boo
 
 async def notify_channel(text: str) -> bool:
     """Отправить сообщение в Telegram-канал клуба."""
-    if not CHANNEL_ID:
+    channel_id = os.getenv("TELEGRAM_CHANNEL_ID", "")
+    if not channel_id:
+        print("DEBUG notify_channel: TELEGRAM_CHANNEL_ID not set")
         return False
-    return await send_telegram_message(CHANNEL_ID, text)
+    return await send_telegram_message(channel_id, text)
 
 
 async def notify_news_telegram(title: str, body: Optional[str] = None, photo_url: Optional[str] = None):
     """Отправить новость только в канал (без рассылки подписчикам)."""
-    print(f"DEBUG notify_news_telegram called: title={title}, photo_url={photo_url}")
-    print(f"DEBUG CHANNEL_ID={CHANNEL_ID}, TELEGRAM_TOKEN exists={bool(TELEGRAM_TOKEN)}")
+    channel_id = os.getenv("TELEGRAM_CHANNEL_ID", "")
+    print(f"DEBUG notify_news_telegram: CHANNEL_ID={channel_id}, TOKEN={bool(os.getenv('TELEGRAM_BOT_TOKEN'))}")
 
     caption = (
         f"📰 <b>Новость клуба Тайпан</b>\n\n"
@@ -74,16 +76,12 @@ async def notify_news_telegram(title: str, body: Optional[str] = None, photo_url
     if len(caption) > 1024:
         caption = caption[:1020] + "..."
 
-    print(f"DEBUG caption length={len(caption)}")
-
     try:
         if photo_url:
-            print(f"DEBUG sending photo to channel: {photo_url}")
-            result = await send_telegram_photo(CHANNEL_ID, photo_url, caption)
+            result = await send_telegram_photo(channel_id, photo_url, caption)
         else:
-            print(f"DEBUG sending text to channel: {CHANNEL_ID}")
-            result = await send_telegram_message(CHANNEL_ID, caption)
-        print(f"DEBUG notify result: {result}")
+            result = await send_telegram_message(channel_id, caption)
+        print(f"DEBUG notify_news_telegram result: {result}")
     except Exception as e:
         print(f"DEBUG notify_news_telegram ERROR: {e}")
         import traceback
