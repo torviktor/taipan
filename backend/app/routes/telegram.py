@@ -115,6 +115,69 @@ async def process_telegram_update(update: dict):
                 reply += "\n🔗 Все новости: https://taipan-tkd.ru/news"
             await send_telegram_message(chat_id, reply)
 
+        elif text == "/link":
+            await send_telegram_message(chat_id,
+                "📱 Введите номер телефона которым зарегистрированы на сайте.\n\n"
+                "Формат: <code>79998887766</code>\n"
+                "(11 цифр, начиная с 7, без пробелов и плюса)\n\n"
+                "Пример: <code>/link 79253653597</code>"
+            )
+
+        elif text.startswith("/link "):
+            parts = text.split(maxsplit=1)
+            if len(parts) < 2:
+                await send_telegram_message(chat_id,
+                    "Укажите номер телефона: /link 79998887766")
+            else:
+                phone = parts[1].strip().lstrip('+').lstrip('8')
+                if len(phone) == 10 and phone.startswith('9'):
+                    phone = '7' + phone
+
+                print(f"DEBUG /link: searching phone={phone}")
+
+                from app.models.user import User, Athlete
+                user = (
+                    db.query(User).filter(User.phone == phone).first() or
+                    db.query(User).filter(User.phone == '7' + phone).first() or
+                    db.query(User).filter(User.phone == '8' + phone).first()
+                )
+
+                print(f"DEBUG /link: user found={user is not None}, phone tried={phone}")
+
+                if not user:
+                    await send_telegram_message(chat_id,
+                        f"❌ Пользователь с номером <code>{phone}</code> не найден.\n\n"
+                        f"Проверьте номер — он должен совпадать с тем, "
+                        f"которым вы зарегистрированы на сайте taipan-tkd.ru"
+                    )
+                else:
+                    if subscriber:
+                        subscriber.user_id = user.id
+                        db.commit()
+
+                    athletes = db.query(Athlete).filter(
+                        Athlete.user_id == user.id,
+                        Athlete.is_archived == False
+                    ).all()
+
+                    if athletes:
+                        athletes_text = "\n".join([f"• {a.full_name}" for a in athletes])
+                        reply = (
+                            f"✅ Аккаунт успешно привязан!\n\n"
+                            f"👤 {user.full_name}\n\n"
+                            f"🥋 Ваши спортсмены:\n{athletes_text}\n\n"
+                            f"Теперь вы будете получать персональные уведомления "
+                            f"о соревнованиях, сборах и аттестациях."
+                        )
+                    else:
+                        reply = (
+                            f"✅ Аккаунт успешно привязан!\n\n"
+                            f"👤 {user.full_name}\n\n"
+                            f"Теперь вы будете получать персональные уведомления."
+                        )
+
+                    await send_telegram_message(chat_id, reply)
+
         elif text == "/month":
             now = datetime.utcnow()
             events = db.query(Event).filter(
