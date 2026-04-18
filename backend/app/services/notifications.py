@@ -35,6 +35,24 @@ async def send_telegram_message(chat_id: str, text: str) -> bool:
         return False
 
 
+async def send_telegram_photo(chat_id: str, photo_url: str, caption: str) -> bool:
+    """Отправить фото с подписью в Telegram."""
+    try:
+        import httpx
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
+        async with httpx.AsyncClient() as client:
+            r = await client.post(url, json={
+                "chat_id":    chat_id,
+                "photo":      photo_url,
+                "caption":    caption,
+                "parse_mode": "HTML",
+            })
+            return r.status_code == 200
+    except Exception as e:
+        logger.error(f"Telegram photo error: {e}")
+        return False
+
+
 async def notify_channel(text: str) -> bool:
     """Отправить сообщение в Telegram-канал клуба."""
     if not CHANNEL_ID:
@@ -42,42 +60,29 @@ async def notify_channel(text: str) -> bool:
     return await send_telegram_message(CHANNEL_ID, text)
 
 
-async def notify_news_telegram(title: str, body: Optional[str] = None):
-    """Отправить новость в канал и всем подписчикам."""
-    from app.core.database import SessionLocal
-    text = (
+async def notify_news_telegram(title: str, body: Optional[str] = None, photo_url: Optional[str] = None):
+    """Отправить новость только в канал (без рассылки подписчикам)."""
+    caption = (
         f"📰 <b>Новость клуба Тайпан</b>\n\n"
         f"<b>{title}</b>\n\n"
+        f"{body[:800] if body else ''}\n\n"
+        f"🔗 Читать полностью: https://taipan-tkd.ru/news"
     )
-    if body:
-        preview = body[:200].strip()
-        if len(body) > 200:
-            preview += "..."
-        text += f"{preview}\n\n"
-    text += "🔗 Читать полностью: https://taipan-tkd.ru/news"
+    if len(caption) > 1024:
+        caption = caption[:1020] + "..."
 
-    await notify_channel(text)
-
-    db = SessionLocal()
-    try:
-        from app.models.event import TelegramSubscriber
-        subscribers = db.query(TelegramSubscriber).filter(
-            TelegramSubscriber.subscribed == True
-        ).all()
-        for sub in subscribers:
-            try:
-                await send_telegram_message(sub.telegram_id, text)
-            except Exception as e:
-                logger.error(f"News notify error for {sub.telegram_id}: {e}")
-    finally:
-        db.close()
+    if photo_url:
+        await send_telegram_photo(CHANNEL_ID, photo_url, caption)
+    else:
+        await notify_channel(caption)
 
 
 async def notify_all_subscribers(db, message: str):
-    """Отправить сообщение всем подписчикам Telegram."""
+    """Отправить личное уведомление подписчикам с привязанным аккаунтом."""
     from app.models.event import TelegramSubscriber
     subscribers = db.query(TelegramSubscriber).filter(
-        TelegramSubscriber.subscribed == True
+        TelegramSubscriber.subscribed == True,
+        TelegramSubscriber.user_id    != None,
     ).all()
 
     sent = 0
