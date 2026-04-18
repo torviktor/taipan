@@ -387,9 +387,6 @@ def notify_competition(comp_id: int, db: Session = Depends(get_db), _: User = De
 
     db.commit()
 
-    # Telegram
-    _send_telegram_bulk(users, title, body, db)
-
     return {"sent": sent}
 
 
@@ -528,31 +525,3 @@ def _create_calendar_event(comp: Competition, user_id: int, db: Session, time_st
         print(f"Calendar sync error: {e}")
 
 
-def _send_telegram_bulk(users, title: str, body: str, db: Session):
-    """Отправка уведомлений в Telegram всем пользователям у кого есть chat_id."""
-    import os
-    try:
-        import httpx
-    except ImportError:
-        return
-
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    if not token:
-        return
-
-    from app.models.event import TelegramSubscriber
-    subscribers = db.query(TelegramSubscriber).filter(TelegramSubscriber.subscribed == True).all()
-    user_ids = {u.id for u in users}
-
-    text = f"*{title}*\n\n{body}"
-    for sub in subscribers:
-        if sub.user_id and sub.user_id not in user_ids:
-            continue
-        try:
-            httpx.post(
-                f"https://api.telegram.org/bot{token}/sendMessage",
-                json={"chat_id": sub.telegram_id, "text": text, "parse_mode": "Markdown"},
-                timeout=5
-            )
-        except Exception:
-            pass
