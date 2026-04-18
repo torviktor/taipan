@@ -62,6 +62,9 @@ async def notify_channel(text: str) -> bool:
 
 async def notify_news_telegram(title: str, body: Optional[str] = None, photo_url: Optional[str] = None):
     """Отправить новость только в канал (без рассылки подписчикам)."""
+    print(f"DEBUG notify_news_telegram called: title={title}, photo_url={photo_url}")
+    print(f"DEBUG CHANNEL_ID={CHANNEL_ID}, TELEGRAM_TOKEN exists={bool(TELEGRAM_TOKEN)}")
+
     caption = (
         f"📰 <b>Новость клуба Тайпан</b>\n\n"
         f"<b>{title}</b>\n\n"
@@ -71,10 +74,20 @@ async def notify_news_telegram(title: str, body: Optional[str] = None, photo_url
     if len(caption) > 1024:
         caption = caption[:1020] + "..."
 
-    if photo_url:
-        await send_telegram_photo(CHANNEL_ID, photo_url, caption)
-    else:
-        await notify_channel(caption)
+    print(f"DEBUG caption length={len(caption)}")
+
+    try:
+        if photo_url:
+            print(f"DEBUG sending photo to channel: {photo_url}")
+            result = await send_telegram_photo(CHANNEL_ID, photo_url, caption)
+        else:
+            print(f"DEBUG sending text to channel: {CHANNEL_ID}")
+            result = await send_telegram_message(CHANNEL_ID, caption)
+        print(f"DEBUG notify result: {result}")
+    except Exception as e:
+        print(f"DEBUG notify_news_telegram ERROR: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 async def notify_all_subscribers(db, message: str):
