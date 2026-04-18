@@ -21,6 +21,7 @@ export default function FeesTab({ token, role }) {
   const now = new Date()
   const currentYear  = now.getFullYear()
   const currentMonth = now.getMonth() + 1
+  const isPast = year < currentYear || (year === currentYear && month < currentMonth)
   const [config,      setConfig]      = useState({ payment_day: 1, fee_amount: 2000 })
   const [configDirty, setConfigDirty] = useState(false)
   const [year,        setYear]        = useState(now.getFullYear())
@@ -325,6 +326,16 @@ export default function FeesTab({ token, role }) {
 
       {!loading && periods.length > 0 && (
         <>
+          {isPast && (
+            <div style={{
+              background:'var(--dark2)', border:'1px solid var(--gray-dim)',
+              borderRadius:6, padding:'8px 16px', marginBottom:12,
+              color:'var(--gray)', fontSize:'0.85rem',
+            }}>
+              Период закрыт — только просмотр
+            </div>
+          )}
+
           {/* Статистика */}
           <div style={{ display:'flex', gap:20, marginBottom:12, flexWrap:'wrap' }}>
             <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>
@@ -366,7 +377,7 @@ export default function FeesTab({ token, role }) {
                         {p.group || '—'}
                       </td>
                       <td style={{...tdStyle, textAlign:'center'}}>
-                        {role === 'admin' ? (
+                        {(role === 'admin' || isPast) ? (
                           <span style={{fontSize:'0.82rem', color: isBudget ? 'var(--gray)' : 'var(--white)'}}>
                             {isBudget ? 'Бюджетник' : 'Внебюджетник'}
                           </span>
@@ -378,8 +389,8 @@ export default function FeesTab({ token, role }) {
                       </td>
                       <td style={{...tdStyle, textAlign:'center'}}>
                         {!isBudget && (
-                          role === 'admin' ? (
-                            <span style={{fontSize:'0.82rem', color: p.paid ? '#6cba6c' : 'var(--gray)'}}>
+                          (role === 'admin' || isPast) ? (
+                            <span style={{fontSize:'0.82rem', color: p.paid ? '#6cba6c' : 'var(--red)'}}>
                               {p.paid ? 'Оплачено' : 'Не оплачено'}
                             </span>
                           ) : (
@@ -390,22 +401,24 @@ export default function FeesTab({ token, role }) {
                         )}
                       </td>
                       <td style={{...tdStyle, textAlign:'center'}}>
+                        {!isBudget && p.paid && (
+                          <span style={{color:'#6cba6c', fontSize:'1.1rem'}}>✓</span>
+                        )}
                         {!isBudget && !p.paid && (
-                          <span style={{color:'var(--red)', fontSize:'0.85rem', fontWeight:700}}>
-                            {p.debt > 0 ? (
-                              <>
-                                <span>{config.fee_amount} руб. (текущий)</span><br/>
-                                <span>+{p.debt} руб. (долг за прошлые)</span><br/>
-                                <span>Итого: {config.fee_amount + p.debt} руб.</span>
-                              </>
-                            ) : (
-                              <span>{config.fee_amount} руб.</span>
+                          <div>
+                            <span style={{color:'var(--red)', fontWeight:700, fontSize:'0.85rem'}}>
+                              {config.fee_amount + p.debt} руб.
+                            </span>
+                            {p.debt > 0 && (
+                              <div style={{color:'var(--gray)', fontSize:'0.78rem'}}>
+                                {config.fee_amount} + {p.debt} долг
+                              </div>
                             )}
-                          </span>
+                          </div>
                         )}
                       </td>
                       <td style={tdStyle}>
-                        {role === 'admin' ? (
+                        {(role === 'admin' || isPast) ? (
                           <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>
                             {p.note || ''}
                           </span>
@@ -429,7 +442,7 @@ export default function FeesTab({ token, role }) {
           </div>
 
           {/* Кнопки */}
-          {role !== 'admin' && (
+          {role !== 'admin' && !isPast && (
             <div style={{ display:'flex', gap:12, marginTop:20, flexWrap:'wrap' }}>
               <button className="btn-outline" style={{padding:'9px 20px'}}
                 onClick={saveList} disabled={saving}>

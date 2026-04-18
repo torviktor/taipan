@@ -25,6 +25,7 @@ class AthleteFeePeriod(Base):
     paid_at      = Column(DateTime, nullable=True)
     debt         = Column(Integer, default=0)
     note         = Column(Text, nullable=True)
+    is_frozen    = Column(Boolean, default=False)
     created_at   = Column(DateTime, default=datetime.utcnow)
     athlete      = relationship("Athlete", foreign_keys=[athlete_id])
 

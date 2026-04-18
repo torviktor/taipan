@@ -615,6 +615,7 @@ def _period_out(p: AthleteFeePeriod) -> dict:
         "paid_at":      p.paid_at.isoformat() if p.paid_at else None,
         "debt":         p.debt or 0,
         "note":         p.note or "",
+        "is_frozen":    bool(p.is_frozen),
         "period_year":  p.period_year,
         "period_month": p.period_month,
     }
@@ -714,6 +715,12 @@ def init_periods(
     elif mg == 'senior':
         athletes = [a for a in athletes if a.group in SENIOR_GROUPS]
 
+    db.query(AthleteFeePeriod).filter(
+        AthleteFeePeriod.period_year  == prev_year,
+        AthleteFeePeriod.period_month == prev_month,
+    ).update({AthleteFeePeriod.is_frozen: True})
+    db.flush()
+
     created = 0
     skipped = 0
     for athlete in athletes:
@@ -726,20 +733,14 @@ def init_periods(
             skipped += 1
             continue
 
-        unpaid_count = db.query(AthleteFeePeriod).filter(
+        unpaid_frozen = db.query(AthleteFeePeriod).filter(
             AthleteFeePeriod.athlete_id == athlete.id,
-            AthleteFeePeriod.paid == False,
-            AthleteFeePeriod.is_budget == False,
-            or_(
-                AthleteFeePeriod.period_year < year,
-                and_(
-                    AthleteFeePeriod.period_year == year,
-                    AthleteFeePeriod.period_month < month,
-                )
-            )
+            AthleteFeePeriod.is_frozen  == True,
+            AthleteFeePeriod.paid       == False,
+            AthleteFeePeriod.is_budget  == False,
         ).count()
 
-        debt = unpaid_count * fee_amount
+        debt = unpaid_frozen * fee_amount
 
         db.add(AthleteFeePeriod(
             athlete_id=athlete.id,
@@ -774,20 +775,18 @@ def patch_period(
     if body.paid is not None:
         p.paid = body.paid
         if body.paid:
-            now = datetime.utcnow()
-            p.paid_at = now
+            p.paid_at = datetime.utcnow()
             p.debt    = 0
-            other_unpaid = db.query(AthleteFeePeriod).filter(
-                AthleteFeePeriod.athlete_id == p.athlete_id,
-                AthleteFeePeriod.id != p.id,
-                AthleteFeePeriod.paid == False,
-            ).all()
-            for op in other_unpaid:
-                op.paid    = True
-                op.paid_at = now
-                op.debt    = 0
         else:
             p.paid_at = None
+            unpaid_frozen = db.query(AthleteFeePeriod).filter(
+                AthleteFeePeriod.athlete_id == p.athlete_id,
+                AthleteFeePeriod.is_frozen  == True,
+                AthleteFeePeriod.paid       == False,
+                AthleteFeePeriod.is_budget  == False,
+            ).count()
+            _cfg = db.query(FeeConfig).first()
+            p.debt = unpaid_frozen * (_cfg.fee_amount if _cfg else 2000)
     db.commit()
     db.refresh(p)
     return _period_out(p)
