@@ -498,9 +498,6 @@ def _notify_all_about_competition(comp: Competition, db: Session):
                 body=body, link_id=comp.id, link_type="competition"
             ))
         db.commit()
-        from app.services.notifications import send_telegram_to_user
-        for u in users:
-            send_telegram_to_user(u.id, f"Соревнование — {comp.name}", body, db)
     except Exception as e:
         print(f"Competition notify error: {e}")
 
