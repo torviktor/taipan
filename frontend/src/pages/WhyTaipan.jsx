@@ -14,12 +14,12 @@ const SHOWCASE_CODES = [
   'camp_member',
 ]
 
-const RATING_MOCK = [
-  { place: 1, name: 'Александр К.', age: 12, points: '142.5', cls: 'why-rating-row--gold' },
-  { place: 2, name: 'Дмитрий П.',   age: 11, points: '118.3', cls: '' },
-  { place: 3, name: 'Михаил С.',    age: 13, points: '97.8',  cls: 'why-rating-row--bronze' },
-  { place: 4, name: 'Артём В.',     age: 12, points: '76.2',  cls: '' },
-  { place: 5, name: 'Никита Л.',    age: 11, points: '54.1',  cls: '' },
+const MOCK_RATING = [
+  { place: 1, name: 'Соколов Артём',   age: 11, ageGroup: '10-11', group: 'Старшая группа (11+)',       gup: 7,  weight: '34 кг', sex: 'М', tournaments: 6, rating: 68.42 },
+  { place: 2, name: 'Лебедев Никита',  age: 10, ageGroup: '10-11', group: 'Старшая группа (11+)',       gup: 8,  weight: '32 кг', sex: 'М', tournaments: 5, rating: 51.18 },
+  { place: 3, name: 'Фролова Диана',   age: 9,  ageGroup: '8-9',   group: 'Младшая группа (6-10 лет)', gup: 9,  weight: '28 кг', sex: 'Ж', tournaments: 4, rating: 38.75 },
+  { place: 4, name: 'Морозов Даниил',  age: 12, ageGroup: '12-14', group: 'Старшая группа (11+)',       gup: 6,  weight: '41 кг', sex: 'М', tournaments: 5, rating: 27.33 },
+  { place: 5, name: 'Захарова Полина', age: 8,  ageGroup: '8-9',   group: 'Младшая группа (6-10 лет)', gup: 10, weight: '24 кг', sex: 'Ж', tournaments: 3, rating: 19.60 },
 ]
 
 const FEATURES = [
@@ -144,16 +144,32 @@ export default function WhyTaipan() {
               <span>Место</span>
               <span>Спортсмен</span>
               <span>Возраст</span>
-              <span>Очки</span>
+              <span>Группа</span>
+              <span>Гып</span>
+              <span>Вес</span>
+              <span>Пол</span>
+              <span>Турниров</span>
+              <span>Рейтинг</span>
             </div>
-            {RATING_MOCK.map(r => (
-              <div key={r.place} className={`why-rating-row ${r.cls}`}>
-                <span className="why-place">{r.place}</span>
-                <span>{r.name}</span>
-                <span>{r.age} лет</span>
-                <span>{r.points}</span>
-              </div>
-            ))}
+            {MOCK_RATING.map(r => {
+              const cls = r.place === 1 ? 'why-rating-row--gold' : r.place === 3 ? 'why-rating-row--bronze' : ''
+              return (
+                <div key={r.place} className={`why-rating-row ${cls}`}>
+                  <span className="why-place">{r.place}</span>
+                  <span>{r.name}</span>
+                  <div>
+                    <div>{r.age} лет</div>
+                    <div className="why-rating-age-group">{r.ageGroup}</div>
+                  </div>
+                  <span className="why-rating-secondary">{r.group}</span>
+                  <span>{r.gup}</span>
+                  <span className="why-rating-secondary">{r.weight}</span>
+                  <span className="why-rating-secondary">{r.sex}</span>
+                  <span>{r.tournaments}</span>
+                  <span className="why-rating-score">{r.rating.toFixed(2)}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
       </section>
