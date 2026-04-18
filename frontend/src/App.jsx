@@ -18,6 +18,7 @@ import Champions from './pages/Champions'
 import Privacy from './pages/Privacy'
 import Quiz from './pages/Quiz'
 import NewsPage from './pages/News'
+import WhyTaipan from './pages/WhyTaipan'
 import CookieBanner from './components/CookieBanner'
 
 export default function App() {
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/privacy"           element={<Privacy />} />
         <Route path="/quiz"              element={<Quiz />} />
         <Route path="/news"              element={<NewsPage />} />
+        <Route path="/about/why"         element={<WhyTaipan />} />
       </Routes>
       <Footer />
 <CookieBanner />

@@ -5,6 +5,7 @@ import './Navbar.css'
 const STATIC_INDEX = [
   { path: '/',          title: 'Главная',           keywords: 'главная клуб тайпан тхэквондо павловский посад' },
   { path: '/about',     title: 'О клубе',           keywords: 'о клубе тренер ротарь екатерина история эмблема обязанности сезон аттестация сборы семья' },
+  { path: '/about/why', title: 'Почему Тайпан',    keywords: 'почему тайпан ачивки рейтинг зал славы геймификация личный кабинет взносы страховка уведомления' },
   { path: '/schedule',  title: 'Расписание',         keywords: 'расписание тренировки группа младшая старшая вторник четверг суббота время 17:30 19:00' },
   { path: '/calendar',  title: 'Календарь событий',  keywords: 'календарь события соревнования сборы турнир' },
   { path: '/champions', title: 'Зал Славы',          keywords: 'зал славы чемпионы кабанова шамарин фуртаева андрюшин келим медведев козлов комаров коростелёва дорофеев ротарь' },
@@ -101,9 +102,10 @@ export default function Navbar() {
   const role    = localStorage.getItem('role')
 
   const links = [
-    { to: '/',          label: 'Главная'    },
-    { to: '/about',     label: 'О клубе'   },
-    { to: '/schedule',  label: 'Расписание' },
+    { to: '/',           label: 'Главная'        },
+    { to: '/about',      label: 'О клубе'       },
+    { to: '/about/why',  label: 'Почему Тайпан' },
+    { to: '/schedule',   label: 'Расписание'    },
     { to: '/news',      label: 'Новости'    },
     { to: '/calendar',  label: 'Календарь'  },
     { to: '/champions', label: 'Зал Славы', gold: true },
