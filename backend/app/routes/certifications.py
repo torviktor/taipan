@@ -254,7 +254,7 @@ def send_notifications(
         # Определяем роль пользователя
         user_role = r.athlete.user.role if r.athlete.user else "parent"
 
-        title = f"Аттестация — {cert.name}"
+        title = cert.name if cert.name.lower().startswith('аттестац') else f"Аттестация — {cert.name}"
         if user_role == "athlete":
             body = (
                 f"Вы отобраны для сдачи экзамена "

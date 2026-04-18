@@ -125,7 +125,7 @@ def send_telegram_to_user(user_id: int, title: str, body: str, db) -> bool:
         if not token:
             return False
 
-        text = f"<b>{title}</b>\n\n{body}"
+        text = f"🔔 <b>{title}</b>\n\n{body}\n\n<i>taipan-tkd.ru/cabinet</i>"
 
         import httpx
         httpx.post(
