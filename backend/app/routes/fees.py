@@ -6,6 +6,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy import or_, and_
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
@@ -723,13 +724,20 @@ def init_periods(
             skipped += 1
             continue
 
-        prev = db.query(AthleteFeePeriod).filter(
-            AthleteFeePeriod.athlete_id   == athlete.id,
-            AthleteFeePeriod.period_year  == prev_year,
-            AthleteFeePeriod.period_month == prev_month,
-        ).first()
+        unpaid_count = db.query(AthleteFeePeriod).filter(
+            AthleteFeePeriod.athlete_id == athlete.id,
+            AthleteFeePeriod.paid == False,
+            AthleteFeePeriod.is_budget == False,
+            or_(
+                AthleteFeePeriod.period_year < year,
+                and_(
+                    AthleteFeePeriod.period_year == year,
+                    AthleteFeePeriod.period_month < month,
+                )
+            )
+        ).count()
 
-        debt = fee_amount if (prev and not prev.paid and not prev.is_budget) else 0
+        debt = unpaid_count * fee_amount
 
         db.add(AthleteFeePeriod(
             athlete_id=athlete.id,

@@ -364,9 +364,17 @@ export default function FeesTab({ token, role }) {
                         )}
                       </td>
                       <td style={{...tdStyle, textAlign:'center'}}>
-                        {p.debt > 0 && !isBudget && (
+                        {!isBudget && !p.paid && (
                           <span style={{color:'var(--red)', fontSize:'0.85rem', fontWeight:700}}>
-                            +{p.debt} руб.
+                            {p.debt > 0 ? (
+                              <>
+                                <span>{config.fee_amount} руб. (текущий)</span><br/>
+                                <span>+{p.debt} руб. (долг за прошлые)</span><br/>
+                                <span>Итого: {config.fee_amount + p.debt} руб.</span>
+                              </>
+                            ) : (
+                              <span>{config.fee_amount} руб.</span>
+                            )}
                           </span>
                         )}
                       </td>
