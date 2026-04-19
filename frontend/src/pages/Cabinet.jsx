@@ -60,6 +60,204 @@ class CabinetErrorBoundary extends Component {
   }
 }
 
+// ── ИНДИВИДУАЛЬНЫЕ ЗАНЯТИЯ ────────────────────────────────────────────────────
+function IndividualTrainingTab({ token, role, athletes }) {
+  const API_URL = (typeof API !== 'undefined' ? API : '/api')
+  const isManager = role === 'manager' || role === 'admin'
+
+  const [requests,      setRequests]      = useState([])
+  const [athleteId,     setAthleteId]     = useState(athletes && athletes.length === 1 ? athletes[0].id : '')
+  const [format,        setFormat]        = useState('individual')
+  const [prefTime,      setPrefTime]      = useState('')
+  const [comment,       setComment]       = useState('')
+  const [sending,       setSending]       = useState(false)
+  const [sent,          setSent]          = useState(false)
+  const [error,         setError]         = useState('')
+
+  const loadRequests = async () => {
+    try {
+      const r = await fetch(`${API_URL}/individual-training/requests`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (r.ok) setRequests(await r.json())
+    } catch {}
+  }
+
+  useEffect(() => { loadRequests() }, [])
+
+  const handleSubmit = async () => {
+    setError('')
+    if (!athleteId && athletes && athletes.length > 1) { setError('Выберите спортсмена'); return }
+    setSending(true)
+    try {
+      const r = await fetch(`${API_URL}/individual-training/request`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ athlete_id: athleteId || null, format, preferred_time: prefTime, comment }),
+      })
+      if (r.ok) {
+        setSent(true)
+        setPrefTime(''); setComment('')
+        loadRequests()
+      } else {
+        const d = await r.json()
+        setError(d.detail || 'Ошибка отправки')
+      }
+    } catch { setError('Ошибка сети') }
+    setSending(false)
+  }
+
+  const handleStatus = async (id, status) => {
+    await fetch(`${API_URL}/individual-training/requests/${id}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    })
+    loadRequests()
+  }
+
+  const statusLabel = s => {
+    if (s === 'new')       return <span style={{ color:'#FFD700' }}>На рассмотрении</span>
+    if (s === 'confirmed') return <span style={{ color:'#6cba6c' }}>Подтверждена</span>
+    if (s === 'rejected')  return <span style={{ color:'var(--red)' }}>Отклонена</span>
+    return s
+  }
+
+  if (isManager) {
+    return (
+      <div style={{ marginTop: 24 }}>
+        <p className="section-label" style={{ marginBottom: 16 }}>Заявки на индивидуальные занятия</p>
+        {requests.length === 0 && <p style={{ color:'var(--gray)' }}>Заявок пока нет.</p>}
+        {requests.length > 0 && (
+          <div style={{ overflowX:'auto' }}>
+            <table className="cabinet-table" style={{ minWidth: 700 }}>
+              <thead>
+                <tr>
+                  <th>Дата</th><th>Родитель</th><th>Спортсмен</th><th>Формат</th>
+                  <th>Пожелания</th><th>Комментарий</th><th>Статус</th><th>Действие</th>
+                </tr>
+              </thead>
+              <tbody>
+                {requests.map(r => (
+                  <tr key={r.id}>
+                    <td style={{ whiteSpace:'nowrap' }}>{r.created_at}</td>
+                    <td>{r.user_name}</td>
+                    <td>{r.athlete_name || '—'}</td>
+                    <td>{r.format === 'individual' ? 'Индивид.' : 'Мини-группа'}</td>
+                    <td>{r.preferred_time || '—'}</td>
+                    <td>{r.comment || '—'}</td>
+                    <td>{statusLabel(r.status)}</td>
+                    <td>
+                      {r.status === 'new' && (
+                        <div style={{ display:'flex', gap:6 }}>
+                          <button className="btn-primary" style={{ fontSize:'0.75rem', padding:'4px 10px', background:'#2a7a2a' }}
+                            onClick={() => handleStatus(r.id, 'confirmed')}>Подтвердить</button>
+                          <button className="btn-primary" style={{ fontSize:'0.75rem', padding:'4px 10px', background:'var(--red)' }}
+                            onClick={() => handleStatus(r.id, 'rejected')}>Отклонить</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      {/* Карточки форматов */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(260px,1fr))', gap:16, marginBottom:32 }}>
+        <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderTop:'3px solid var(--red)', borderRadius:10, padding:20 }}>
+          <div style={{ fontWeight:700, fontSize:'1.05rem', marginBottom:6 }}>Индивидуальное занятие</div>
+          <div style={{ color:'var(--red)', fontWeight:600, marginBottom:8 }}>1 ребёнок • 2000 руб / 1 час</div>
+          <div style={{ color:'var(--gray)', fontSize:'0.9rem' }}>Персональная работа, максимальное внимание тренера, точная корректировка техники.</div>
+        </div>
+        <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderTop:'3px solid #c8962a', borderRadius:10, padding:20 }}>
+          <div style={{ fontWeight:700, fontSize:'1.05rem', marginBottom:6 }}>Мини-группа</div>
+          <div style={{ color:'#c8962a', fontWeight:600, marginBottom:8 }}>2–3 ребёнка • 1000 руб / 1 час</div>
+          <div style={{ color:'var(--gray)', fontSize:'0.9rem' }}>Совместная работа, упражнения в парах и мини-группах.</div>
+        </div>
+      </div>
+
+      {/* Блок про состав */}
+      <div style={{ borderLeft:'3px solid var(--red)', paddingLeft:16, marginBottom:28, color:'var(--gray)', fontSize:'0.9rem' }}>
+        <strong style={{ color:'var(--white)', display:'block', marginBottom:6 }}>Если меняется состав группы</strong>
+        При отсутствии одного из детей мини-группы второй может: перейти в другую мини-группу этого дня если есть место — оплата 1000 руб,
+        или остаться на своём времени — занятие в формате индивидуального за 2000 руб.
+      </div>
+
+      {/* Форма */}
+      <p className="section-label" style={{ marginBottom: 12 }}>Записаться на индивидуальное занятие</p>
+      <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderRadius:10, padding:24 }}>
+        {athletes && athletes.length > 1 && (
+          <div style={{ marginBottom:16 }}>
+            <label style={{ display:'block', marginBottom:6, fontSize:'0.85rem', color:'var(--gray)' }}>Спортсмен</label>
+            <select className="td-input" value={athleteId} onChange={e => setAthleteId(Number(e.target.value))} style={{ width:'100%' }}>
+              <option value="">Выберите спортсмена</option>
+              {athletes.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
+            </select>
+          </div>
+        )}
+
+        <div style={{ marginBottom:16 }}>
+          <label style={{ display:'block', marginBottom:8, fontSize:'0.85rem', color:'var(--gray)' }}>Формат занятия</label>
+          <div style={{ display:'flex', gap:20 }}>
+            <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
+              <input type="radio" name="format" value="individual" checked={format==='individual'} onChange={() => setFormat('individual')} />
+              <span>Индивидуальное занятие <span style={{ color:'var(--red)' }}>(2000 руб)</span></span>
+            </label>
+            <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
+              <input type="radio" name="format" value="mini_group" checked={format==='mini_group'} onChange={() => setFormat('mini_group')} />
+              <span>Мини-группа <span style={{ color:'#c8962a' }}>(1000 руб с ребёнка)</span></span>
+            </label>
+          </div>
+        </div>
+
+        <div style={{ marginBottom:16 }}>
+          <label style={{ display:'block', marginBottom:6, fontSize:'0.85rem', color:'var(--gray)' }}>Пожелания по времени</label>
+          <input className="td-input" style={{ width:'100%' }} placeholder="Например: вторник после 17:00"
+            value={prefTime} onChange={e => setPrefTime(e.target.value)} />
+        </div>
+
+        <div style={{ marginBottom:20 }}>
+          <label style={{ display:'block', marginBottom:6, fontSize:'0.85rem', color:'var(--gray)' }}>Комментарий</label>
+          <textarea className="td-input" rows={3} style={{ width:'100%', resize:'vertical' }}
+            placeholder="Дополнительные пожелания..."
+            value={comment} onChange={e => setComment(e.target.value)} />
+        </div>
+
+        {error && <div style={{ color:'var(--red)', marginBottom:12 }}>{error}</div>}
+
+        <button className="btn-primary" onClick={handleSubmit} disabled={sending}>
+          {sending ? 'Отправка...' : 'Отправить заявку'}
+        </button>
+
+        {sent && (
+          <div style={{ color:'#6cba6c', marginTop:12 }}>
+            Заявка отправлена! Тренер свяжется с вами в ближайшее время.
+          </div>
+        )}
+
+        {requests.length > 0 && (
+          <div style={{ marginTop:28 }}>
+            <p style={{ color:'var(--gray)', fontSize:'0.85rem', marginBottom:10 }}>Ваши заявки</p>
+            {requests.map(r => (
+              <div key={r.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:'1px solid var(--gray-dim)', fontSize:'0.9rem' }}>
+                <span>{r.created_at} — {r.format === 'individual' ? 'Индивид.' : 'Мини-группа'}{r.athlete_name ? ` (${r.athlete_name})` : ''}</span>
+                <span>{statusLabel(r.status)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── СТАТУСЫ ЗАЯВОК ─────────────────────────────────────────────────────────────
 const STATUS_LABELS = {
   new:        { label: 'Новая',        color: '#FFD700' },
@@ -370,6 +568,7 @@ export default function Cabinet() {
             <button className={`cabinet-tab ${parentView==='analytics'?'active':''}`} onClick={() => setParentView('analytics')}>Аналитика</button>
             <button className={`cabinet-tab ${parentView==='insurance'?'active':''}`} onClick={() => setParentView('insurance')}>Страхование</button>
             <button className={`cabinet-tab ${parentView==='fees'?'active':''}`} onClick={() => setParentView('fees')}>Взносы</button>
+            <button className={`cabinet-tab ${parentView==='individual'?'active':''}`} onClick={() => setParentView('individual')}>Индивид. занятия</button>
             <button className={`cabinet-tab ${parentView==='info'?'active':''}`} style={{color: parentView==='info' ? undefined : 'var(--gray)'}} onClick={() => setParentView('info')}>Информация</button>
           </div>
 
@@ -412,6 +611,7 @@ export default function Cabinet() {
           {parentView === 'fees'          && (role === 'manager' ? <FeesTab token={token} role={role}/> : <MyFeesTab token={token}/>)}
           {parentView === 'info'          && <InfoTab isAdmin={false} isManager={false} token={token}/>}
           {parentView === 'analytics'     && !loading && <ParentAnalyticsTab token={token} athletes={myAthletes}/>}
+          {parentView === 'individual'    && <IndividualTrainingTab token={token} role={role} athletes={myAthletes}/>}
         </div>
       </main>
       </Suspense>
@@ -451,6 +651,7 @@ export default function Cabinet() {
       <button className={`cabinet-tab ${view==='fees'?'active':''}`} onClick={() => setView('fees')}>Взносы{overdueCount > 0 && <span className="tab-badge" style={{ background:'var(--red)' }}>{overdueCount}</span>}</button>
       <button className={`cabinet-tab ${view==='archive'?'active':''}`} style={{ color: view==='archive' ? undefined : 'var(--gray)' }} onClick={() => setView('archive')}>Архив ({athletes.filter(a=>a.is_archived).length})</button>
       <button className={`cabinet-tab ${view==='applications'?'active':''}`} onClick={() => setView('applications')}>Заявки{applications.filter(a => a.status==='new').length > 0 && <span className="tab-badge">{applications.filter(a => a.status==='new').length}</span>}</button>
+      <button className={`cabinet-tab ${view==='individual'?'active':''}`} onClick={() => setView('individual')}>Индивид. занятия</button>
       <button className={`cabinet-tab ${view==='hof'?'active':''}`} style={{ color: view==='hof' ? undefined : '#c8962a' }} onClick={() => setView('hof')}>Зал Славы</button>
     </div>
   </div>
@@ -511,6 +712,7 @@ export default function Cabinet() {
         {view === 'insurance_admin' && <InsuranceAdminTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'hof'           && <HallOfFameAdmin token={token} />}
         {view === 'fees'          && <FeesTab token={token} role={role} />}
+        {view === 'individual'    && <IndividualTrainingTab token={token} role={role} athletes={athletes.filter(a=>!a.is_archived)}/>}
         {view === 'archive'       && (
           <div>
             <div style={{ marginBottom:16, color:'var(--gray)', fontSize:'0.9rem' }}>

@@ -23,6 +23,8 @@ from app.routes.fees import router as fees_router
 from app.models import user, event, attendance, competition, certification, achievement, camp
 from app.models import hall_of_fame, analytics, news, competition_file
 from app.models import fees as fees_model
+from app.models import individual_training
+from app.routes.individual_training import router as individual_training_router
 import os
 
 Base.metadata.create_all(bind=engine)
@@ -69,6 +71,7 @@ app.include_router(news_router,       prefix="/api", tags=["Новости"])
 app.include_router(news_admin_router,  prefix="/api", tags=["Новости Admin"])
 app.include_router(hof_router,               prefix="/api",              tags=["Зал Славы"])
 app.include_router(fees_router,              prefix="/api/fees",         tags=["fees"])
+app.include_router(individual_training_router, prefix="/api",            tags=["Индивидуальные тренировки"])
 
 @app.on_event("startup")
 async def ensure_season_best_slots():
