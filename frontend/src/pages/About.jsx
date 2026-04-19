@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import './About.css'
-import WhyTaipan from './WhyTaipan'
 
 const SECTIONS = [
   { id: 'about',       title: 'О НАС' },
@@ -12,7 +11,6 @@ const SECTIONS = [
   { id: 'camps',        title: 'УЧЕБНО-ТРЕНИРОВОЧНЫЕ СБОРЫ' },
   { id: 'competitions', title: 'СОРЕВНОВАНИЯ' },
   { id: 'family',       title: 'РОЛЬ СЕМЬИ И ОКРУЖЕНИЯ В ОБУЧЕНИИ ТХЭКВОНДО' },
-  { id: 'why',          title: 'ПОЧЕМУ ТАЙПАН' },
 ]
 
 const CONTENT = {
@@ -599,7 +597,6 @@ family: (
   </div>
 ),
 
-why: <WhyTaipan />,
 }
 
 export default function About() {
