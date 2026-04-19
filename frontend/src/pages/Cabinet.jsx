@@ -665,7 +665,7 @@ export default function Cabinet() {
       <button className={`cabinet-tab ${view==='athletes'?'active':''}`} onClick={() => setView('athletes')}>Спортсмены ({athletes.filter(a=>!a.is_archived).length})</button>
       <button className={`cabinet-tab ${view==='parents'?'active':''}`} onClick={() => setView('parents')}>Родители ({parents.length})</button>
       <button className={`cabinet-tab ${view==='insurance_admin'?'active':''}`} onClick={() => setView('insurance_admin')}>Страхование</button>
-      <button className={`cabinet-tab ${view==='fees'?'active':''}`} onClick={() => setView('fees')}>Взносы{overdueCount > 0 && <span className="tab-badge" style={{ background:'var(--red)' }}>{overdueCount}</span>}</button>
+      <button className={`cabinet-tab ${view==='fees'?'active':''}`} onClick={() => setView('fees')}>Взносы</button>
       <button className={`cabinet-tab ${view==='archive'?'active':''}`} style={{ color: view==='archive' ? undefined : 'var(--gray)' }} onClick={() => setView('archive')}>Архив ({athletes.filter(a=>a.is_archived).length})</button>
       <button className={`cabinet-tab ${view==='applications'?'active':''}`} onClick={() => setView('applications')}>Заявки{(applications.filter(a => a.status==='new').length + indivRequests.filter(r => r.status==='new').length) > 0 && <span className="tab-badge">{applications.filter(a => a.status==='new').length + indivRequests.filter(r => r.status==='new').length}</span>}</button>
       <button className={`cabinet-tab ${view==='hof'?'active':''}`} style={{ color: view==='hof' ? undefined : '#c8962a' }} onClick={() => setView('hof')}>Зал Славы</button>
