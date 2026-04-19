@@ -126,43 +126,23 @@ function IndividualTrainingTab({ token, role, athletes }) {
   if (isManager) {
     return (
       <div style={{ marginTop: 24 }}>
-        <p className="section-label" style={{ marginBottom: 16 }}>Заявки на индивидуальные занятия</p>
-        {requests.length === 0 && <p style={{ color:'var(--gray)' }}>Заявок пока нет.</p>}
-        {requests.length > 0 && (
-          <div style={{ overflowX:'auto' }}>
-            <table className="cabinet-table" style={{ minWidth: 700 }}>
-              <thead>
-                <tr>
-                  <th>Дата</th><th>Родитель</th><th>Спортсмен</th><th>Формат</th>
-                  <th>Пожелания</th><th>Комментарий</th><th>Статус</th><th>Действие</th>
-                </tr>
-              </thead>
-              <tbody>
-                {requests.map(r => (
-                  <tr key={r.id}>
-                    <td style={{ whiteSpace:'nowrap' }}>{r.created_at}</td>
-                    <td>{r.user_name}</td>
-                    <td>{r.athlete_name || '—'}</td>
-                    <td>{r.format === 'individual' ? 'Индивид.' : 'Мини-группа'}</td>
-                    <td>{r.preferred_time || '—'}</td>
-                    <td>{r.comment || '—'}</td>
-                    <td>{statusLabel(r.status)}</td>
-                    <td>
-                      {r.status === 'new' && (
-                        <div style={{ display:'flex', gap:6 }}>
-                          <button className="btn-primary" style={{ fontSize:'0.75rem', padding:'4px 10px', background:'#2a7a2a' }}
-                            onClick={() => handleStatus(r.id, 'confirmed')}>Подтвердить</button>
-                          <button className="btn-primary" style={{ fontSize:'0.75rem', padding:'4px 10px', background:'var(--red)' }}
-                            onClick={() => handleStatus(r.id, 'rejected')}>Отклонить</button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(260px,1fr))', gap:16, marginBottom:24 }}>
+          <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderTop:'3px solid var(--red)', borderRadius:10, padding:20 }}>
+            <div style={{ fontWeight:700, fontSize:'1.05rem', marginBottom:6 }}>Индивидуальное занятие</div>
+            <div style={{ color:'var(--red)', fontWeight:600, marginBottom:8 }}>1 ребёнок • 2000 руб / 1 час</div>
+            <div style={{ color:'var(--gray)', fontSize:'0.9rem' }}>Персональная работа, максимальное внимание тренера, точная корректировка техники.</div>
           </div>
-        )}
+          <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderTop:'3px solid #c8962a', borderRadius:10, padding:20 }}>
+            <div style={{ fontWeight:700, fontSize:'1.05rem', marginBottom:6 }}>Мини-группа</div>
+            <div style={{ color:'#c8962a', fontWeight:600, marginBottom:8 }}>2–3 ребёнка • 1000 руб / 1 час</div>
+            <div style={{ color:'var(--gray)', fontSize:'0.9rem' }}>Совместная работа, упражнения в парах и мини-группах.</div>
+          </div>
+        </div>
+        <div style={{ borderLeft:'3px solid var(--red)', paddingLeft:16, color:'var(--gray)', fontSize:'0.9rem' }}>
+          <strong style={{ color:'var(--white)', display:'block', marginBottom:6 }}>Если меняется состав группы</strong>
+          При отсутствии одного из детей мини-группы второй может: перейти в другую мини-группу этого дня если есть место — оплата 1000 руб,
+          или остаться на своём времени — занятие в формате индивидуального за 2000 руб.
+        </div>
       </div>
     )
   }
