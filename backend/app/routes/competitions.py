@@ -147,33 +147,50 @@ def overall_rating(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    q = (
-        db.query(Athlete, func.sum(CompetitionResult.rating).label("total"),
-                 func.count(CompetitionResult.id).label("cnt"))
-        .join(CompetitionResult, CompetitionResult.athlete_id == Athlete.id)
+    # Подзапрос: суммы рейтинга за сезон (или за всё время)
+    sub_q = (
+        db.query(
+            CompetitionResult.athlete_id,
+            func.sum(CompetitionResult.rating).label("total"),
+            func.count(CompetitionResult.id).label("cnt"),
+        )
         .join(Competition, Competition.id == CompetitionResult.competition_id)
     )
-    if season: q = q.filter(Competition.season == season)
+    if season:
+        sub_q = sub_q.filter(Competition.season == season)
+    sub_q = sub_q.group_by(CompetitionResult.athlete_id).subquery()
+
+    # Все активные спортсмены + LEFT JOIN — нулевой рейтинг если нет результатов
+    q = (
+        db.query(
+            Athlete,
+            func.coalesce(sub_q.c.total, 0).label("total"),
+            func.coalesce(sub_q.c.cnt, 0).label("cnt"),
+        )
+        .filter(Athlete.is_archived == False)
+        .outerjoin(sub_q, sub_q.c.athlete_id == Athlete.id)
+    )
     if group:  q = q.filter(Athlete.group == group)
     if gender: q = q.filter(Athlete.gender == gender)
 
-    rows = q.group_by(Athlete.id).order_by(func.sum(CompetitionResult.rating).desc()).all()
+    rows = q.order_by(
+        func.coalesce(sub_q.c.total, 0).desc(),
+        Athlete.full_name.asc(),
+    ).all()
 
     result = []
-    for i, (a, total, cnt) in enumerate(rows):
+    for a, total, cnt in rows:
         age = _calc_age(a.birth_date)
         cat = _age_category(age)
-        if cat is None:  # взрослые 18+ не участвуют в рейтинге
-            continue
         if age_category and cat != age_category:
             continue
         result.append({
-            "place": i + 1, "athlete_id": a.id, "full_name": a.full_name,
+            "place": 0, "athlete_id": a.id, "full_name": a.full_name,
             "birth_date": str(a.birth_date) if a.birth_date else None,
             "age": age, "age_category": cat, "gender": a.gender,
             "gup": a.gup, "weight": float(a.weight) if a.weight else None,
-            "group": a.group, "total_rating": round(total or 0, 2),
-            "tournaments_count": cnt,
+            "group": a.group, "total_rating": round(float(total or 0), 2),
+            "tournaments_count": int(cnt or 0),
         })
     for i, r in enumerate(result):
         r["place"] = i + 1
@@ -453,7 +470,7 @@ def _age_category(age):
     if age <= 11:    return "10-11"
     if age <= 14:    return "12-14"
     if age <= 17:    return "15-17"
-    return None  # взрослые не попадают в возрастной рейтинг
+    return "18+"
 
 
 def _comp_out(c):
