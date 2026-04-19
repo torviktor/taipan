@@ -105,7 +105,12 @@ def get_all_users(db: Session = Depends(get_db), _: User = Depends(require_manag
 # ─── Все спортсмены (только admin/manager) ────────────────────────────────────
 @router.get("/athletes")
 def get_athletes(db: Session = Depends(get_db), _: User = Depends(require_manager)):
-    athletes = db.query(Athlete).join(User, Athlete.user_id == User.id).all()
+    athletes = (
+        db.query(Athlete)
+        .join(User, Athlete.user_id == User.id)
+        .filter(Athlete.is_archived == False)
+        .all()
+    )
     return [build_athlete_out(a) for a in athletes]
 
 # ─── Обновить спортсмена (только admin/manager) ───────────────────────────────
