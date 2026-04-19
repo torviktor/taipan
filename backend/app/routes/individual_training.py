@@ -11,8 +11,8 @@ from app.models.individual_training import IndividualTrainingRequest
 router = APIRouter(prefix="/individual-training", tags=["Индивидуальные тренировки"])
 
 
-def require_manager(u: User = Depends(get_current_user)) -> User:
-    if u.role not in ("manager", "admin"):
+def require_admin(u: User = Depends(get_current_user)) -> User:
+    if u.role != "admin":
         raise HTTPException(403, "Недостаточно прав")
     return u
 
@@ -77,7 +77,7 @@ def create_request(
     from app.services.notifications import send_telegram_to_user
 
     managers = db.query(User).filter(
-        User.role.in_(["manager", "admin"]),
+        User.role == "admin",
         User.is_active == True,
     ).all()
     for m in managers:
@@ -99,7 +99,7 @@ def list_requests(
     db:   Session = Depends(get_db),
     user: User    = Depends(get_current_user),
 ):
-    if user.role in ("manager", "admin"):
+    if user.role == "admin":
         rows = db.query(IndividualTrainingRequest).order_by(
             IndividualTrainingRequest.status == "new",
             IndividualTrainingRequest.created_at.desc(),
@@ -116,7 +116,7 @@ def update_status(
     req_id: int,
     body:   UpdateStatusBody,
     db:     Session = Depends(get_db),
-    _:      User    = Depends(require_manager),
+    _:      User    = Depends(require_admin),
 ):
     req = db.query(IndividualTrainingRequest).filter(IndividualTrainingRequest.id == req_id).first()
     if not req:

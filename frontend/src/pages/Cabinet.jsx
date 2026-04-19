@@ -291,11 +291,28 @@ export default function Cabinet() {
   const setCf = (k, v) => setCfState(f => ({ ...f, [k]: v }))
   const [userRoles, setUserRoles] = useState({}) // user_id → role
   const [overdueCount, setOverdueCount] = useState(0)
+  const [indivRequests, setIndivRequests] = useState([])
   const resetFilters = () => { setSearch(''); setCfState({ gender:'', group:'', gup_dan:'', parent_name:'' }) }
+
+  const loadIndivRequests = async () => {
+    try {
+      const r = await fetch(`${API}/individual-training/requests`, { headers: { Authorization: `Bearer ${token}` } })
+      if (r.ok) setIndivRequests(await r.json())
+    } catch {}
+  }
+
+  const updateIndivStatus = async (id, status) => {
+    await fetch(`${API}/individual-training/requests/${id}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    })
+    loadIndivRequests()
+  }
 
   useEffect(() => {
     if (!token) { navigate('/login'); return }
-    if (isAdmin) { loadAthletes(); loadApplications(); loadUserRoles() }
+    if (isAdmin) { loadAthletes(); loadApplications(); loadUserRoles(); loadIndivRequests() }
     else loadMyAthletes()
   }, [])
 
@@ -650,8 +667,7 @@ export default function Cabinet() {
       <button className={`cabinet-tab ${view==='insurance_admin'?'active':''}`} onClick={() => setView('insurance_admin')}>Страхование</button>
       <button className={`cabinet-tab ${view==='fees'?'active':''}`} onClick={() => setView('fees')}>Взносы{overdueCount > 0 && <span className="tab-badge" style={{ background:'var(--red)' }}>{overdueCount}</span>}</button>
       <button className={`cabinet-tab ${view==='archive'?'active':''}`} style={{ color: view==='archive' ? undefined : 'var(--gray)' }} onClick={() => setView('archive')}>Архив ({athletes.filter(a=>a.is_archived).length})</button>
-      <button className={`cabinet-tab ${view==='applications'?'active':''}`} onClick={() => setView('applications')}>Заявки{applications.filter(a => a.status==='new').length > 0 && <span className="tab-badge">{applications.filter(a => a.status==='new').length}</span>}</button>
-      <button className={`cabinet-tab ${view==='individual'?'active':''}`} onClick={() => setView('individual')}>Индивид. занятия</button>
+      <button className={`cabinet-tab ${view==='applications'?'active':''}`} onClick={() => setView('applications')}>Заявки{(applications.filter(a => a.status==='new').length + indivRequests.filter(r => r.status==='new').length) > 0 && <span className="tab-badge">{applications.filter(a => a.status==='new').length + indivRequests.filter(r => r.status==='new').length}</span>}</button>
       <button className={`cabinet-tab ${view==='hof'?'active':''}`} style={{ color: view==='hof' ? undefined : '#c8962a' }} onClick={() => setView('hof')}>Зал Славы</button>
     </div>
   </div>
@@ -712,7 +728,6 @@ export default function Cabinet() {
         {view === 'insurance_admin' && <InsuranceAdminTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'hof'           && <HallOfFameAdmin token={token} />}
         {view === 'fees'          && <FeesTab token={token} role={role} />}
-        {view === 'individual'    && <IndividualTrainingTab token={token} role={role} athletes={athletes.filter(a=>!a.is_archived)}/>}
         {view === 'archive'       && (
           <div>
             <div style={{ marginBottom:16, color:'var(--gray)', fontSize:'0.9rem' }}>
@@ -1001,6 +1016,51 @@ export default function Cabinet() {
             </table>
             {sortedApps.length === 0 && !loading && <div className="cabinet-empty">Заявок нет</div>}
             </div>
+
+            {/* ── Индивидуальные тренировки ── */}
+            <div style={{ borderLeft:'3px solid var(--red)', paddingLeft:16, marginTop:36, marginBottom:12 }}>
+              <p className="section-label" style={{ margin:0 }}>Заявки на индивидуальные тренировки</p>
+            </div>
+            {indivRequests.length === 0 && <div className="cabinet-empty">Заявок нет</div>}
+            {indivRequests.length > 0 && (
+              <div className="athletes-table-wrap">
+                <table className="athletes-table">
+                  <thead>
+                    <tr>
+                      <th>Дата</th><th>Родитель</th><th>Спортсмен</th><th>Формат</th>
+                      <th>Пожелания</th><th>Комментарий</th><th>Статус</th><th>Действие</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {indivRequests.map(r => (
+                      <tr key={r.id}>
+                        <td style={{ whiteSpace:'nowrap' }}>{r.created_at}</td>
+                        <td>{r.user_name}</td>
+                        <td>{r.athlete_name || '—'}</td>
+                        <td>{r.format === 'individual' ? 'Индивидуальное' : 'Мини-группа'}</td>
+                        <td style={{ fontSize:'13px', color:'var(--gray)' }}>{r.preferred_time || '—'}</td>
+                        <td style={{ fontSize:'13px', color:'var(--gray)', maxWidth:160 }}>{r.comment || '—'}</td>
+                        <td>
+                          {r.status === 'new' && <span style={{ color:'#FFD700' }}>На рассмотрении</span>}
+                          {r.status === 'confirmed' && <span style={{ color:'#6cba6c' }}>Подтверждена</span>}
+                          {r.status === 'rejected' && <span style={{ color:'var(--red)' }}>Отклонена</span>}
+                        </td>
+                        <td>
+                          {r.status === 'new' && (
+                            <div style={{ display:'flex', gap:6 }}>
+                              <button className="td-btn td-btn-edit" style={{ background:'rgba(42,122,42,0.15)', color:'#6cba6c', borderColor:'rgba(108,186,108,0.4)' }}
+                                onClick={() => updateIndivStatus(r.id, 'confirmed')}>Подтвердить</button>
+                              <button className="td-btn td-btn-del"
+                                onClick={() => updateIndivStatus(r.id, 'rejected')}>Отклонить</button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
