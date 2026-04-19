@@ -50,8 +50,8 @@ def calc_group(birth_date: date) -> str:
     today = date.today()
     age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
     if age <= 10:   return "Младшая группа (6–10 лет)"
-    elif age <= 16: return "Старшая группа (11–16 лет)"
-    else:           return "Взрослые"
+    elif age <= 17: return "Старшая группа (11+)"
+    else:           return "Взрослые (18+)"
 
 def calc_age(birth_date: date) -> int:
     today = date.today()

@@ -170,8 +170,7 @@ export default function FeesTab({ token, role }) {
     )
     if (groupFilter === 'senior') return list.filter(p =>
       p.group === 'senior' ||
-      p.group === 'Старшая группа (11+)' ||
-      p.group === 'Старшая группа (11–16 лет)'
+      p.group === 'Старшая группа (11+)'
     )
     if (groupFilter === 'adults') return list.filter(p =>
       p.group === 'adults' ||
@@ -257,7 +256,7 @@ export default function FeesTab({ token, role }) {
           <div style={{display:'flex', gap:10, flexWrap:'wrap'}}>
             {[
               { id:'junior', label:'Младшая (6–10 лет)' },
-              { id:'senior', label:'Старшая (11–16 лет)' },
+              { id:'senior', label:'Старшая (11+)' },
               { id:'adults', label:'Взрослые' },
             ].map(g => (
               <button key={g.id} className="btn-primary" disabled={groupSaving}
