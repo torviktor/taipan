@@ -78,8 +78,10 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
   const [msg,            setMsg]            = useState('')
   const [form, setForm] = useState({ name:'', date:'', time:'09:00', location:'', level:'Местный', comp_type:'Турнир', notes:'', add_to_calendar: false })
 
-  const [compFiles,    setCompFiles]    = useState([])
-  const [filesLoading, setFilesLoading] = useState(false)
+  const [compFiles,      setCompFiles]      = useState([])
+  const [filesLoading,   setFilesLoading]   = useState(false)
+  const [availableToAdd, setAvailableToAdd] = useState([])
+  const [addLoading,     setAddLoading]     = useState(false)
 
   const loadFiles = async (compId) => {
     try {
@@ -244,6 +246,21 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
     setRows(prev => prev.filter(r => r.athlete_id !== athleteId))
   }
 
+  const openAddModal = async () => {
+    setAvailableToAdd([])
+    setAddLoading(true)
+    setShowAddAthlete(true)
+    try {
+      const r = await fetch(`${API}/users/athletes`, { headers: h })
+      if (r.ok) {
+        const fresh = await r.json()
+        const alreadyIn = new Set(rows.map(r => r.athlete_id))
+        setAvailableToAdd(fresh.filter(a => !alreadyIn.has(a.id)))
+      }
+    } catch {}
+    setAddLoading(false)
+  }
+
   const addAthleteToList = (a) => {
     if (rows.find(r => r.athlete_id === a.id)) return
     setRows(prev => [...prev, {
@@ -254,6 +271,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
       tuli_place: '',     tuli_perfs: 0,
       saved_rating: null, _inList: true,
     }])
+    setAvailableToAdd(prev => prev.filter(x => x.id !== a.id))
     setShowAddAthlete(false)
   }
 
@@ -544,7 +562,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
               </div>
             </div>
             <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-              {!readOnly && <button className="att-all-btn" onClick={() => setShowAddAthlete(true)}>+ Добавить бойца</button>}
+              {!readOnly && <button className="att-all-btn" onClick={openAddModal}>+ Добавить бойца</button>}
               {!readOnly && <button className="att-all-btn" onClick={notifyComp}>Уведомить всех</button>}
               <button className="att-all-btn" onClick={exportResultsXlsx}>Экспорт xlsx</button>
               {!readOnly && (
@@ -775,14 +793,16 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
         <div className="modal-overlay" onClick={() => setShowAddAthlete(false)}>
           <div className="modal-box" onClick={e => e.stopPropagation()}>
             <h3>Добавить бойца</h3>
-            {notInList.length === 0
-              ? <p style={{ color:'var(--gray)' }}>Все спортсмены уже в списке.</p>
-              : notInList.map(a => (
-                  <div key={a.id} className="att-athlete-row absent" style={{ cursor:'pointer' }} onClick={() => addAthleteToList(a)}>
-                    <div className="att-athlete-name">{a.full_name}</div>
-                    <div className="att-athlete-age">{a.age} лет · {a.group || a.auto_group}</div>
-                  </div>
-                ))
+            {addLoading
+              ? <p style={{ color:'var(--gray)' }}>Загрузка...</p>
+              : availableToAdd.length === 0
+                ? <p style={{ color:'var(--gray)' }}>Все спортсмены уже в списке.</p>
+                : availableToAdd.map(a => (
+                    <div key={a.id} className="att-athlete-row absent" style={{ cursor:'pointer' }} onClick={() => addAthleteToList(a)}>
+                      <div className="att-athlete-name">{a.full_name}</div>
+                      <div className="att-athlete-age">{a.age} лет · {a.group || a.auto_group}</div>
+                    </div>
+                  ))
             }
             <div className="modal-btns-row" style={{ marginTop:12 }}>
               <button className="btn-outline" onClick={() => setShowAddAthlete(false)}>Закрыть</button>
