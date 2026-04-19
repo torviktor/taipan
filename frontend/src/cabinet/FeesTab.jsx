@@ -46,39 +46,12 @@ export default function FeesTab({ token, role }) {
       .then(d => { if (d) setConfig(d) })
       .catch(() => {})
 
-    const initManagerGroup = async () => {
-      try {
-        const r = await fetch(`${API}/users/me`, { headers: h })
-        if (!r.ok) return
-        const d = await r.json()
-        if (d?.manager_group) {
-          setGroupFilter(d.manager_group)
-          return
-        }
-        // manager_group не задан — определяем по первому спортсмену
-        if (role === 'manager') {
-          const r2 = await fetch(`${API}/users/my-athletes`, { headers: h })
-          if (r2.ok) {
-            const athletes = await r2.json()
-            if (athletes.length > 0) {
-              const groupValue = (athletes[0].group || '').toLowerCase()
-              const autoGroup = (
-                groupValue.includes('младш') ||
-                groupValue.includes('6–10') ||
-                groupValue.includes('6-10')
-              ) ? 'junior' : 'senior'
-              setGroupFilter(autoGroup)
-              await fetch(`${API}/users/me/group`, {
-                method: 'PATCH',
-                headers: hj,
-                body: JSON.stringify({ manager_group: autoGroup }),
-              })
-            }
-          }
-        }
-      } catch {}
+    if (role === 'manager') {
+      fetch(`${API}/users/me`, { headers: h })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.manager_group) setGroupFilter(d.manager_group) })
+        .catch(() => {})
     }
-    initManagerGroup()
   }, [])
 
   const loadAndInit = async () => {
@@ -87,35 +60,35 @@ export default function FeesTab({ token, role }) {
     setMsg('')
     try {
       const res = await fetch(
-        `/api/fees/periods?year=${year}&month=${month}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        `${API}/fees/periods?year=${year}&month=${month}`,
+        { headers: h }
       )
       if (res.ok) {
         const data = await res.json()
-        console.log('periods loaded:', data.length, data)
         setPeriods(data)
         if (data.length === 0) {
-          console.log('periods empty, calling init...')
           const initRes = await fetch(
-            `/api/fees/periods/init?year=${year}&month=${month}`,
-            { method: 'POST', headers: { Authorization: `Bearer ${token}` } }
+            `${API}/fees/periods/init?year=${year}&month=${month}`,
+            { method: 'POST', headers: h }
           )
           const initText = await initRes.text()
-          console.log('init response:', initRes.status, initText)
           if (initRes.ok) {
-            const initData = JSON.parse(initText)
-            console.log('init ok:', initData)
             const res2 = await fetch(
-              `/api/fees/periods?year=${year}&month=${month}`,
-              { headers: { Authorization: `Bearer ${token}` } }
+              `${API}/fees/periods?year=${year}&month=${month}`,
+              { headers: h }
             )
-            if (res2.ok) setPeriods(await res2.json())
+            if (res2.ok) {
+              const data2 = await res2.json()
+              setPeriods(data2)
+              if (data2.length === 0) setMsg('Нет спортсменов в вашей группе')
+            }
           } else {
             setMsg('Ошибка инициализации: ' + initText)
           }
         }
       } else {
         setPeriods([])
+        setMsg('Ошибка загрузки данных')
       }
     } catch (e) {
       console.error('loadAndInit error:', e)
@@ -272,13 +245,67 @@ export default function FeesTab({ token, role }) {
       </div>
 
       {/* Фильтр по группе */}
-      {role === 'manager' ? (
-        <div style={{ marginBottom:16 }}>
+      {role === 'manager' && groupFilter === 'all' ? (
+        <div style={{
+          background:'var(--dark2)', border:'1px solid var(--gray-dim)',
+          borderRadius:8, padding:'24px', marginBottom:20,
+        }}>
+          <p style={{color:'var(--white)', fontFamily:'Barlow Condensed', fontSize:'1.1rem',
+            fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:16}}>
+            Выберите вашу группу
+          </p>
+          <div style={{display:'flex', gap:10, flexWrap:'wrap'}}>
+            {[
+              { id:'junior', label:'Младшая (6–10 лет)' },
+              { id:'senior', label:'Старшая (11–16 лет)' },
+              { id:'adults', label:'Взрослые' },
+            ].map(g => (
+              <button key={g.id} className="btn-primary" disabled={groupSaving}
+                style={{padding:'9px 20px', fontSize:'0.85rem'}}
+                onClick={() => changeGroup(g.id)}>
+                {groupSaving ? '...' : g.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : role === 'manager' ? (
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
           <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>
             Ваша группа: <strong style={{color:'var(--white)'}}>
-              {groupFilter === 'junior' ? 'Младшая' : groupFilter === 'senior' ? 'Старшая + Взрослые' : groupFilter}
+              {groupFilter === 'junior' ? 'Младшая' : groupFilter === 'senior' ? 'Старшая' : groupFilter === 'adults' ? 'Взрослые' : groupFilter}
             </strong>
           </span>
+          {!showGroupChange && (
+            <button className="btn-outline" style={{padding:'4px 12px', fontSize:'0.78rem'}}
+              onClick={() => setShowGroupChange(true)}>
+              Изменить
+            </button>
+          )}
+          {showGroupChange && (
+            <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+              {[
+                { id:'junior', label:'Младшая' },
+                { id:'senior', label:'Старшая' },
+                { id:'adults', label:'Взрослые' },
+              ].map(g => (
+                <button key={g.id}
+                  style={{
+                    fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.8rem',
+                    letterSpacing:'0.06em', textTransform:'uppercase',
+                    padding:'5px 14px', borderRadius:6, cursor:'pointer',
+                    background: groupFilter === g.id ? 'var(--red)' : 'transparent',
+                    color: groupFilter === g.id ? 'var(--white)' : 'var(--gray)',
+                    border: groupFilter === g.id ? '1px solid var(--red)' : '1px solid var(--gray-dim)',
+                  }}
+                  disabled={groupSaving}
+                  onClick={() => { changeGroup(g.id); setShowGroupChange(false) }}>
+                  {g.label}
+                </button>
+              ))}
+              <button className="btn-outline" style={{padding:'5px 10px', fontSize:'0.78rem'}}
+                onClick={() => setShowGroupChange(false)}>✕</button>
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap', alignItems:'center' }}>
@@ -325,7 +352,13 @@ export default function FeesTab({ token, role }) {
 
       {loading && <div className="cabinet-loading">Загрузка...</div>}
 
-      {!loading && periods.length > 0 && (
+      {!loading && !msg && periods.length > 0 && filteredPeriods.length === 0 && (
+        <div style={{color:'var(--gray)', fontSize:'0.9rem', padding:'24px 0'}}>
+          Нет спортсменов в вашей группе за этот период
+        </div>
+      )}
+
+      {!loading && periods.length > 0 && filteredPeriods.length > 0 && (
         <>
           {isPast && (
             <div style={{
