@@ -123,30 +123,6 @@ function IndividualTrainingTab({ token, role, athletes }) {
     return s
   }
 
-  if (isManager) {
-    return (
-      <div style={{ marginTop: 24 }}>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(260px,1fr))', gap:16, marginBottom:24 }}>
-          <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderTop:'3px solid var(--red)', borderRadius:10, padding:20 }}>
-            <div style={{ fontWeight:700, fontSize:'1.05rem', marginBottom:6 }}>Индивидуальное занятие</div>
-            <div style={{ color:'var(--red)', fontWeight:600, marginBottom:8 }}>1 ребёнок • 2000 руб / 1 час</div>
-            <div style={{ color:'var(--gray)', fontSize:'0.9rem' }}>Персональная работа, максимальное внимание тренера, точная корректировка техники.</div>
-          </div>
-          <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderTop:'3px solid #c8962a', borderRadius:10, padding:20 }}>
-            <div style={{ fontWeight:700, fontSize:'1.05rem', marginBottom:6 }}>Мини-группа</div>
-            <div style={{ color:'#c8962a', fontWeight:600, marginBottom:8 }}>2–3 ребёнка • 1000 руб / 1 час</div>
-            <div style={{ color:'var(--gray)', fontSize:'0.9rem' }}>Совместная работа, упражнения в парах и мини-группах.</div>
-          </div>
-        </div>
-        <div style={{ borderLeft:'3px solid var(--red)', paddingLeft:16, color:'var(--gray)', fontSize:'0.9rem' }}>
-          <strong style={{ color:'var(--white)', display:'block', marginBottom:6 }}>Если меняется состав группы</strong>
-          При отсутствии одного из детей мини-группы второй может: перейти в другую мини-группу этого дня если есть место — оплата 1000 руб,
-          или остаться на своём времени — занятие в формате индивидуального за 2000 руб.
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div style={{ marginTop: 24 }}>
       {/* Карточки форматов */}
@@ -606,7 +582,7 @@ export default function Cabinet() {
           {parentView === 'notifications' && <NotificationsTab token={token}/>}
           {parentView === 'insurance'     && <ParentInsuranceTab token={token} athletes={myAthletes}/>}
           {parentView === 'fees'          && (role === 'manager' ? <FeesTab token={token} role={role}/> : <MyFeesTab token={token}/>)}
-          {parentView === 'info'          && <InfoTab isAdmin={false} isManager={false} token={token}/>}
+          {parentView === 'info'          && <InfoTab isAdmin={false} isManager={role === 'manager'} token={token}/>}
           {parentView === 'analytics'     && !loading && <ParentAnalyticsTab token={token} athletes={myAthletes}/>}
           {parentView === 'individual'    && <IndividualTrainingTab token={token} role={role} athletes={myAthletes}/>}
         </div>
