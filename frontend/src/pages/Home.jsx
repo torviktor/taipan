@@ -82,7 +82,7 @@ const SECTIONS = [
 ]
 
 const STATS = [
-  { target: 10,  suffix: '+', label: 'лет тхэквондо в городе' },
+  { target: 25,  suffix: '+', label: 'лет тхэквондо в городе' },
   { target: 50,  suffix: '+', label: 'спортсменов сегодня' },
   { target: 4,   suffix: '',  label: 'чемпиона Европы и мира' },
   { target: 9,   suffix: '+', label: 'чемпионов и призёров России' },
