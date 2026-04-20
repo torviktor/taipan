@@ -19,6 +19,7 @@ import Privacy from './pages/Privacy'
 import Quiz from './pages/Quiz'
 import NewsPage from './pages/News'
 import WhyTaipan from './pages/WhyTaipan'
+import InvitePage from './pages/InvitePage'
 import CookieBanner from './components/CookieBanner'
 
 export default function App() {
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="/quiz"              element={<Quiz />} />
         <Route path="/news"              element={<NewsPage />} />
         <Route path="/about/why"         element={<WhyTaipan />} />
+        <Route path="/invite/:token"     element={<InvitePage />} />
       </Routes>
       <Footer />
 <CookieBanner />

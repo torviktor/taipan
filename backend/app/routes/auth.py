@@ -150,6 +150,46 @@ def add_athlete(data: AddAthleteRequest, db: Session = Depends(get_db)):
     token = create_access_token({"sub": str(user.id), "role": user.role})
     return TokenResponse(access_token=token, role=user.role, full_name=user.full_name)
 
+# ─── Регистрация по ссылке-инвайту ───────────────────────────────────────────
+class RegisterByInviteRequest(BaseModel):
+    token:     str
+    full_name: str
+    phone:     str
+    password:  str
+
+@router.post("/register-by-invite", response_model=TokenResponse)
+@limiter.limit("10/minute")
+def register_by_invite(request: Request, data: RegisterByInviteRequest, db: Session = Depends(get_db)):
+    from datetime import datetime
+    from app.models.invite import AthleteInvite, AthleteViewer
+
+    inv = db.query(AthleteInvite).filter(AthleteInvite.token == data.token).first()
+    if not inv or not inv.is_active or inv.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Ссылка недействительна или истекла")
+
+    if db.query(User).filter(User.phone == data.phone).first():
+        raise HTTPException(status_code=400, detail="Телефон уже зарегистрирован")
+
+    user = User(
+        full_name = data.full_name,
+        phone     = data.phone,
+        password  = hash_password(data.password),
+        role      = UserRole.parent,
+    )
+    db.add(user)
+    db.flush()
+
+    db.add(AthleteViewer(
+        athlete_id = inv.athlete_id,
+        viewer_id  = user.id,
+    ))
+    db.commit()
+    db.refresh(user)
+
+    token = create_access_token({"sub": str(user.id), "role": user.role})
+    return TokenResponse(access_token=token, role=user.role, full_name=user.full_name)
+
+
 # ─── Вход ─────────────────────────────────────────────────────────────────────
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("10/minute")

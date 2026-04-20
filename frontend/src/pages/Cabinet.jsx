@@ -248,6 +248,7 @@ export default function Cabinet() {
   const [userRoles, setUserRoles] = useState({}) // user_id → role
   const [overdueCount, setOverdueCount] = useState(0)
   const [indivRequests, setIndivRequests] = useState([])
+  const [shareModal,   setShareModal]   = useState(null) // { athleteId, athleteName, inviteUrl, viewers, revoking }
   const resetFilters = () => { setSearch(''); setCfState({ gender:'', group:'', gup_dan:'', parent_name:'' }) }
 
   const loadIndivRequests = async () => {
@@ -255,6 +256,43 @@ export default function Cabinet() {
       const r = await fetch(`${API}/individual-training/requests`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) setIndivRequests(await r.json())
     } catch {}
+  }
+
+  const openShareModal = async (athlete) => {
+    try {
+      const [invRes, viewRes] = await Promise.all([
+        fetch(`${API}/invite/generate`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ athlete_id: athlete.id }),
+        }),
+        fetch(`${API}/invite/my-viewers/${athlete.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ])
+      const inv     = invRes.ok  ? await invRes.json()  : null
+      const viewers = viewRes.ok ? await viewRes.json() : []
+      setShareModal({
+        athleteId:  athlete.id,
+        athleteName: athlete.full_name,
+        inviteUrl:  inv ? inv.invite_url : '',
+        viewers,
+        revoking:   false,
+      })
+    } catch {}
+  }
+
+  const revokeShare = async (athleteId) => {
+    setShareModal(prev => prev ? { ...prev, revoking: true } : prev)
+    try {
+      await fetch(`${API}/invite/revoke/${athleteId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setShareModal(prev => prev ? { ...prev, viewers: [], revoking: false } : prev)
+    } catch {
+      setShareModal(prev => prev ? { ...prev, revoking: false } : prev)
+    }
   }
 
   const updateIndivStatus = async (id, status) => {
@@ -554,7 +592,17 @@ export default function Cabinet() {
                   <p className="section-label" style={{ marginBottom:'16px' }}>Спортсмены</p>
                   {myAthletes.map(a => (
                     <div className="my-athlete-card" key={a.id}>
-                      <div className="my-athlete-name">{a.full_name}</div>
+                      <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                        <div className="my-athlete-name">{a.full_name}</div>
+                        {a.is_viewer && (
+                          <span style={{
+                            fontSize:'0.72rem', fontFamily:'Barlow Condensed', fontWeight:700,
+                            letterSpacing:'0.06em', textTransform:'uppercase',
+                            color:'var(--gray)', border:'1px solid var(--gray-dim)',
+                            borderRadius:4, padding:'2px 8px',
+                          }}>Просмотр</span>
+                        )}
+                      </div>
                       <div className="my-athlete-details">
                         <span>Дата рождения: {a.birth_date}</span>
                         <span>{a.age} лет</span>
@@ -562,7 +610,15 @@ export default function Cabinet() {
                         <span>{a.group || a.auto_group}</span>
                       </div>
                       <BeltDisplay gup={a.gup} dan={a.dan}/>
-                      <InsuranceStatus athleteId={a.id} token={token} />
+                      {!a.is_viewer && <InsuranceStatus athleteId={a.id} token={token} />}
+                      {!a.is_viewer && role === 'parent' && (
+                        <button
+                          className="btn-outline"
+                          style={{ marginTop:10, fontSize:'0.8rem', padding:'6px 14px' }}
+                          onClick={() => openShareModal(a)}>
+                          Поделиться доступом
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -586,6 +642,65 @@ export default function Cabinet() {
           {parentView === 'analytics'     && !loading && <ParentAnalyticsTab token={token} athletes={myAthletes}/>}
           {parentView === 'individual'    && <IndividualTrainingTab token={token} role={role} athletes={myAthletes}/>}
         </div>
+
+        {/* ── Модал: поделиться доступом ── */}
+        {shareModal && (
+          <div className="modal-overlay" onClick={() => setShareModal(null)}>
+            <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth:480 }}>
+              <h3 style={{ marginBottom:8 }}>Поделиться доступом</h3>
+              <p style={{ color:'var(--gray)', fontSize:'0.85rem', marginBottom:20 }}>
+                Профиль: <strong style={{ color:'var(--white)' }}>{shareModal.athleteName}</strong>
+              </p>
+
+              {shareModal.inviteUrl && (
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontSize:'0.8rem', color:'var(--gray)', fontFamily:'Barlow Condensed',
+                    fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:8 }}>
+                    Ссылка-приглашение
+                  </div>
+                  <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                    <input readOnly value={shareModal.inviteUrl}
+                      style={{ flex:1, background:'var(--dark2)', border:'1px solid var(--gray-dim)',
+                        borderRadius:6, padding:'9px 12px', color:'var(--white)',
+                        fontFamily:'Barlow', fontSize:'13px', outline:'none' }} />
+                    <button className="btn-outline" style={{ padding:'9px 14px', fontSize:'0.8rem', whiteSpace:'nowrap' }}
+                      onClick={() => { navigator.clipboard.writeText(shareModal.inviteUrl) }}>
+                      Копировать
+                    </button>
+                  </div>
+                  <p style={{ color:'var(--gray)', fontSize:'0.78rem', marginTop:6 }}>
+                    Ссылка действительна 30 дней
+                  </p>
+                </div>
+              )}
+
+              {shareModal.viewers && shareModal.viewers.length > 0 && (
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontSize:'0.8rem', color:'var(--gray)', fontFamily:'Barlow Condensed',
+                    fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:8 }}>
+                    Имеют доступ
+                  </div>
+                  {shareModal.viewers.map(v => (
+                    <div key={v.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                      padding:'8px 0', borderBottom:'1px solid var(--gray-dim)', fontSize:'0.88rem',
+                      color:'var(--white)' }}>
+                      {v.viewer_name}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="modal-btns-row">
+                <button className="btn-outline" style={{ color:'var(--red)', borderColor:'var(--red)' }}
+                  disabled={shareModal.revoking}
+                  onClick={() => revokeShare(shareModal.athleteId)}>
+                  {shareModal.revoking ? 'Отзыв...' : 'Отозвать доступ'}
+                </button>
+                <button className="btn-outline" onClick={() => setShareModal(null)}>Закрыть</button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
       </Suspense>
       </CabinetErrorBoundary>

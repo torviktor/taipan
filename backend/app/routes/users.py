@@ -85,17 +85,42 @@ def set_manager_group(
     db.commit()
     return {"ok": True, "manager_group": current_user.manager_group}
 
-# ─── МОИ спортсмены — только свои дети текущего пользователя ─────────────────
+# ─── МОИ спортсмены — свои дети + просматриваемые по инвайту ─────────────────
 @router.get("/my-athletes")
 def get_my_athletes(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    athletes = db.query(Athlete).filter(
+    from app.models.invite import AthleteViewer
+
+    own = db.query(Athlete).filter(
         Athlete.user_id == current_user.id,
-        Athlete.is_archived == False
+        Athlete.is_archived == False,
     ).all()
-    return [build_athlete_out(a) for a in athletes]
+    result = []
+    for a in own:
+        out = build_athlete_out(a)
+        out["is_viewer"] = False
+        result.append(out)
+
+    viewers = db.query(AthleteViewer).filter(
+        AthleteViewer.viewer_id == current_user.id
+    ).all()
+    seen_ids = {a.id for a in own}
+    for v in viewers:
+        if v.athlete_id in seen_ids:
+            continue
+        athlete = db.query(Athlete).filter(
+            Athlete.id == v.athlete_id,
+            Athlete.is_archived == False,
+        ).first()
+        if athlete:
+            out = build_athlete_out(athlete)
+            out["is_viewer"] = True
+            result.append(out)
+            seen_ids.add(athlete.id)
+
+    return result
 
 # ─── Все пользователи (только admin/manager) ──────────────────────────────────
 @router.get("/", response_model=List[UserOut])
