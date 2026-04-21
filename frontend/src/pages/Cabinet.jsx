@@ -579,7 +579,7 @@ export default function Cabinet() {
             <button className={`cabinet-tab ${parentView==='analytics'?'active':''}`} onClick={() => setParentView('analytics')}>Аналитика</button>
             <button className={`cabinet-tab ${parentView==='insurance'?'active':''}`} onClick={() => setParentView('insurance')}>Страхование</button>
             <button className={`cabinet-tab ${parentView==='fees'?'active':''}`} onClick={() => setParentView('fees')}>Взносы</button>
-            <button className={`cabinet-tab ${parentView==='individual'?'active':''}`} onClick={() => setParentView('individual')}>Индивид. занятия</button>
+            <button className={`cabinet-tab ${parentView==='individual'?'active':''}`} onClick={() => setParentView('individual')} style={{ display: 'none' }}>Индивид. занятия</button>
             <button className={`cabinet-tab ${parentView==='info'?'active':''}`} style={{color: parentView==='info' ? undefined : 'var(--gray)'}} onClick={() => setParentView('info')}>Информация</button>
           </div>
 
@@ -640,7 +640,7 @@ export default function Cabinet() {
           {parentView === 'fees'          && (role === 'manager' ? <FeesTab token={token} role={role}/> : <MyFeesTab token={token}/>)}
           {parentView === 'info'          && <InfoTab isAdmin={false} isManager={role === 'manager'} token={token}/>}
           {parentView === 'analytics'     && !loading && <ParentAnalyticsTab token={token} athletes={myAthletes}/>}
-          {parentView === 'individual'    && <IndividualTrainingTab token={token} role={role} athletes={myAthletes}/>}
+          {false && parentView === 'individual'    && <IndividualTrainingTab token={token} role={role} athletes={myAthletes}/>}
         </div>
 
         {/* ── Модал: поделиться доступом ── */}
