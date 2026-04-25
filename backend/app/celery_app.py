@@ -40,6 +40,11 @@ celery_app.conf.update(
             "task":     "app.tasks.generate_monthly_fees",
             "schedule": crontab(day_of_month=1, hour=9, minute=0),
         },
+        # Еженедельный дайджест событий — воскресенье 18:00
+        "weekly-digest": {
+            "task":     "app.tasks.weekly_digest",
+            "schedule": crontab(hour=18, minute=0, day_of_week=0),
+        },
         # Уведомление должников — ежедневно в 10:00
         "notify-overdue-fees": {
             "task":     "app.tasks.notify_overdue_fees",
@@ -100,5 +105,77 @@ def notify_overdue_fees_task():
         sent = notify_overdue(db)
         print(f"[fees] Уведомлений должникам отправлено: {sent}")
         return sent
+    finally:
+        db.close()
+
+
+@celery_app.task(name="app.tasks.weekly_digest")
+def weekly_digest_task():
+    from app.core.database import SessionLocal
+    from app.models.user import User, Athlete
+    from app.models.certification import Notification, NotificationType
+    from app.models.attendance import Attendance, TrainingSession
+    from app.models.achievement import AthleteAchievement, ACHIEVEMENT_MAP
+    from datetime import datetime, timedelta
+
+    db = SessionLocal()
+    sent = 0
+    try:
+        week_ago = datetime.utcnow() - timedelta(days=7)
+        parents = db.query(User).filter(User.role == "parent", User.is_active == True).all()
+
+        for parent in parents:
+            athletes = db.query(Athlete).filter(
+                Athlete.user_id == parent.id,
+                Athlete.is_archived == False
+            ).all()
+            if not athletes:
+                continue
+
+            lines = []
+            for ath in athletes:
+                new_ach = db.query(AthleteAchievement).filter(
+                    AthleteAchievement.athlete_id == ath.id,
+                    AthleteAchievement.granted_at >= week_ago
+                ).all()
+                attendances = db.query(Attendance).join(
+                    TrainingSession, Attendance.session_id == TrainingSession.id
+                ).filter(
+                    Attendance.athlete_id == ath.id,
+                    Attendance.present == True,
+                    TrainingSession.date >= week_ago.date()
+                ).count()
+
+                if new_ach or attendances > 0:
+                    parts = []
+                    if attendances > 0:
+                        parts.append(f"тренировок: {attendances}")
+                    if new_ach:
+                        names = [ACHIEVEMENT_MAP[a.code]["name"] for a in new_ach if a.code in ACHIEVEMENT_MAP]
+                        if names:
+                            parts.append(f"новые ачивки: {', '.join(names)}")
+                    if parts:
+                        lines.append(f"{ath.full_name} — {'; '.join(parts)}")
+
+            if not lines:
+                continue
+
+            body = "Сводка за неделю:\n" + "\n".join(lines) + "\n\nЗагляните в кабинет — там подробности."
+            notif = Notification(
+                user_id=parent.id,
+                type=NotificationType.general,
+                title="Дайджест недели",
+                body=body,
+            )
+            db.add(notif)
+            sent += 1
+
+        db.commit()
+        print(f"[weekly_digest] Дайджестов отправлено: {sent}")
+        return sent
+    except Exception as e:
+        db.rollback()
+        print(f"[weekly_digest] Ошибка: {e}")
+        return 0
     finally:
         db.close()

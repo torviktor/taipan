@@ -150,6 +150,8 @@ def get_viewers(db: Session = Depends(get_db), _: User = Depends(require_manager
             "primary_parent_id":   primary_parent.id if primary_parent else None,
             "primary_parent_name": primary_parent.full_name if primary_parent else "—",
             "granted_at":          v.created_at.isoformat() if v.created_at else None,
+            "last_login_at":       viewer.last_login_at.isoformat() if viewer.last_login_at else None,
+            "last_activity_at":    viewer.last_activity_at.isoformat() if viewer.last_activity_at else None,
             "viewer_is_active":    bool(getattr(viewer, "is_active", True)),
         })
     result.sort(key=lambda x: x["granted_at"] or "", reverse=True)
@@ -340,6 +342,23 @@ def update_user_role(
     user.role = data.role
     db.commit()
     return {"ok": True, "user_id": user_id, "role": data.role}
+
+
+# ─── Активность пользователей (admin/manager) ────────────────────────────────
+@router.get("/activity")
+def get_users_activity(db: Session = Depends(get_db), _: User = Depends(require_manager)):
+    users = db.query(User).filter(User.is_active == True).all()
+    return [
+        {
+            "user_id":          u.id,
+            "full_name":        u.full_name,
+            "phone":            u.phone,
+            "role":             u.role.value if hasattr(u.role, 'value') else u.role,
+            "last_login_at":    u.last_login_at.isoformat() if u.last_login_at else None,
+            "last_activity_at": u.last_activity_at.isoformat() if u.last_activity_at else None,
+        }
+        for u in users
+    ]
 
 
 # ─── Сброс пароля (только admin/manager) ─────────────────────────────────────

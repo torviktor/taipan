@@ -40,6 +40,17 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise credentials_exception
+
+    # Троттлинг: обновляем last_activity_at не чаще раза в 5 минут
+    try:
+        now = datetime.utcnow()
+        last = user.last_activity_at
+        if last is None or (now - last) > timedelta(minutes=5):
+            user.last_activity_at = now
+            db.commit()
+    except Exception:
+        db.rollback()
+
     return user
 
 def require_manager(current_user: User = Depends(get_current_user)) -> User:

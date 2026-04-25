@@ -5,7 +5,7 @@ from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
-from datetime import date
+from datetime import date, datetime
 from app.core.database import get_db
 from app.core.security import hash_password, verify_password, create_access_token
 from app.models.user import User, UserRole, Athlete, Gender
@@ -199,5 +199,8 @@ def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Ses
         raise HTTPException(status_code=401, detail="Неверный телефон или пароль")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Аккаунт заблокирован")
+    user.last_login_at = datetime.utcnow()
+    user.last_activity_at = datetime.utcnow()
+    db.commit()
     token = create_access_token({"sub": str(user.id), "role": user.role})
     return TokenResponse(access_token=token, role=user.role, full_name=user.full_name)

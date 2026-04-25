@@ -29,6 +29,8 @@ class User(Base):
     created_at     = Column(DateTime, default=datetime.utcnow)
     is_active      = Column(Boolean, default=True)
     strategy_items = Column(Text, default='[]')
+    last_login_at    = Column(DateTime, nullable=True)
+    last_activity_at = Column(DateTime, nullable=True)
     manager_group  = Column(String(20), nullable=True)
     # manager_group: 'junior' = только младшая, 'senior' = старшая + взрослые, None = все (admin)
 

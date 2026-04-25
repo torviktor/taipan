@@ -250,6 +250,8 @@ export default function Cabinet() {
   const [indivRequests, setIndivRequests] = useState([])
   const [shareModal,   setShareModal]   = useState(null) // { athleteId, athleteName, inviteUrl, viewers, revoking }
   const [viewers,      setViewers]      = useState([])
+  const [activityMap,  setActivityMap]  = useState({}) // user_id → { last_login_at, last_activity_at }
+  const [showInactiveOnly, setShowInactiveOnly] = useState(false)
   const [revokeViewerModal, setRevokeViewerModal] = useState(null) // { viewerId, athleteId, viewerName, athleteName }
   const resetFilters = () => { setSearch(''); setCfState({ gender:'', group:'', gup_dan:'', parent_name:'' }) }
 
@@ -308,7 +310,7 @@ export default function Cabinet() {
 
   useEffect(() => {
     if (!token) { navigate('/login'); return }
-    if (isAdmin) { loadAthletes(); loadApplications(); loadUserRoles(); loadIndivRequests(); loadViewers() }
+    if (isAdmin) { loadAthletes(); loadApplications(); loadUserRoles(); loadIndivRequests(); loadViewers(); loadActivity() }
     else loadMyAthletes()
   }, [])
 
@@ -324,6 +326,18 @@ export default function Cabinet() {
     const interval = setInterval(load, 300000)
     return () => clearInterval(interval)
   }, [token])
+
+  const loadActivity = async () => {
+    try {
+      const r = await fetch(`${API}/users/activity`, { headers: { Authorization: `Bearer ${token}` } })
+      if (r.ok) {
+        const data = await r.json()
+        const map = {}
+        data.forEach(u => { map[u.user_id] = u })
+        setActivityMap(map)
+      }
+    } catch {}
+  }
 
   const loadViewers = async () => {
     try {
@@ -559,10 +573,41 @@ export default function Cabinet() {
     return [...map.values()]
   }, [athletes])
 
-  const filteredParents = parents.filter(p =>
-    p.parent_name.toLowerCase().includes(search.toLowerCase()) ||
-    p.children.join(' ').toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredParents = parents.filter(p => {
+    const matchSearch = p.parent_name.toLowerCase().includes(search.toLowerCase()) ||
+      p.children.join(' ').toLowerCase().includes(search.toLowerCase())
+    if (!matchSearch) return false
+    if (showInactiveOnly) {
+      const s = getActivityStatus(p.user_id)
+      if (s.daysAgo !== null && s.daysAgo < 14) return false
+    }
+    return true
+  })
+  // Хелпер: статус активности по дате последнего входа
+  const getActivityStatus = (userId) => {
+    const u = activityMap[userId]
+    const lastLogin = u?.last_login_at
+    if (!lastLogin) return { color: '#666', label: 'Не заходил', daysAgo: null }
+    const days = Math.floor((Date.now() - new Date(lastLogin).getTime()) / 86400000)
+    if (days < 5)   return { color: '#6cba6c', label: days === 0 ? 'сегодня' : `${days} дн. назад`, daysAgo: days }
+    if (days < 14)  return { color: '#c8962a', label: `${days} дн. назад`, daysAgo: days }
+    return { color: '#cc0000', label: `${days} дн. назад`, daysAgo: days }
+  }
+
+  const ActivityDot = ({ userId, withLabel = false }) => {
+    const s = getActivityStatus(userId)
+    return (
+      <span style={{ display:'inline-flex', alignItems:'center', gap:8 }}>
+        <span style={{
+          width:10, height:10, borderRadius:'50%',
+          background: s.color, flexShrink:0,
+          boxShadow: `0 0 6px ${s.color}88`
+        }} title={s.label} />
+        {withLabel && <span style={{ fontSize:'0.78rem', color:'var(--gray)' }}>{s.label}</span>}
+      </span>
+    )
+  }
+
   const isAnalyticsApp = (a) => !!(a.comment && a.comment.toLowerCase().includes('аналитику'))
 
   const filteredApps = applications.filter(a =>
@@ -999,6 +1044,7 @@ export default function Cabinet() {
                     <th>Доступ к спортсмену</th>
                     <th>Основной родитель</th>
                     <th>Получен доступ</th>
+                    <th>Активность</th>
                     <th>Действия</th>
                   </tr>
                 </thead>
@@ -1020,6 +1066,9 @@ export default function Cabinet() {
                         <td style={{ whiteSpace:'nowrap', color:'var(--gray)', fontSize:'0.85rem' }}>
                           {v.granted_at ? new Date(v.granted_at).toLocaleDateString('ru-RU', { day:'numeric', month:'short', year:'numeric' }) : '—'}
                         </td>
+                        <td style={{ fontSize:'0.78rem', whiteSpace:'nowrap' }}>
+                          <ActivityDot userId={v.viewer_id} withLabel />
+                        </td>
                         <td className="td-actions">
                           <button className="td-btn td-btn-edit" onClick={() => setResetUser({ user_id: v.viewer_id, parent_name: v.viewer_name, parent_phone: v.viewer_phone })}>Сбросить пароль</button>
                           <button className="td-btn td-btn-del" onClick={() => revokeViewerAccess(v.viewer_id, v.athlete_id, v.viewer_name, v.athlete_name)}>Отозвать</button>
@@ -1036,6 +1085,20 @@ export default function Cabinet() {
         {/* ── Родители ── */}
         {view === 'parents' && (
           <div>
+            <div style={{ display:'flex', gap:10, marginBottom:14, alignItems:'center', flexWrap:'wrap' }}>
+              <button
+                className={showInactiveOnly ? 'btn-primary' : 'btn-outline'}
+                style={{ padding:'6px 14px', fontSize:'13px' }}
+                onClick={() => setShowInactiveOnly(!showInactiveOnly)}>
+                {showInactiveOnly ? '✓ Только неактивные (>14 дн.)' : 'Только неактивные (>14 дн.)'}
+              </button>
+              <span style={{ fontSize:'0.78rem', color:'var(--gray)', display:'inline-flex', alignItems:'center', gap:14 }}>
+                <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:10,height:10,borderRadius:'50%',background:'#6cba6c',boxShadow:'0 0 6px #6cba6c88'}}/>до 5 дн.</span>
+                <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:10,height:10,borderRadius:'50%',background:'#c8962a',boxShadow:'0 0 6px #c8962a88'}}/>5–14 дн.</span>
+                <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:10,height:10,borderRadius:'50%',background:'#cc0000',boxShadow:'0 0 6px #cc000088'}}/>14+ дн.</span>
+                <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:10,height:10,borderRadius:'50%',background:'#666'}}/>не заходил</span>
+              </span>
+            </div>
             {archiveParentModal && (
               <div className="modal-overlay" onClick={() => setArchiveParentModal(null)}>
                 <div className="modal-box" onClick={e => e.stopPropagation()} style={{maxWidth:420}}>
@@ -1061,6 +1124,7 @@ export default function Cabinet() {
                     <Th colKey="parent_name"  sort={sortP} toggle={toggleP}>ФИО</Th>
                     <Th colKey="parent_phone" sort={sortP} toggle={toggleP}>Телефон</Th>
                     <Th colKey="children"     sort={sortP} toggle={toggleP}>Спортсмены</Th>
+                    <th>Активность</th>
                     <th>Роль</th>
                     <th>Пароль</th>
                     <th></th>
@@ -1070,13 +1134,21 @@ export default function Cabinet() {
                   {sortedParents.map((p, i) => (
                     <tr key={i}>
                       <td className="td-name">
-                        {p.parent_name}
-                        {p.children.length === 1 && p.children[0] === p.parent_name && (
-                          <span style={{color:'var(--gray)', fontSize:'0.75rem', marginLeft:6}}>(взрослый спортсмен)</span>
-                        )}
+                        <span style={{ display:'inline-flex', alignItems:'center', gap:10 }}>
+                          <ActivityDot userId={p.user_id} />
+                          <span>
+                            {p.parent_name}
+                            {p.children.length === 1 && p.children[0] === p.parent_name && (
+                              <span style={{color:'var(--gray)', fontSize:'0.75rem', marginLeft:6}}>(взрослый спортсмен)</span>
+                            )}
+                          </span>
+                        </span>
                       </td>
                       <td>{p.parent_phone}</td>
                       <td>{p.children.join(', ') || '—'}</td>
+                      <td style={{ fontSize:'0.78rem', color:'var(--gray)', whiteSpace:'nowrap' }}>
+                        {(() => { const s = getActivityStatus(p.user_id); return s.label })()}
+                      </td>
                       <td>
                         {role === 'admin' ? (
                           <select
