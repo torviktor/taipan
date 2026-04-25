@@ -251,6 +251,8 @@ export default function Cabinet() {
   const [shareModal,   setShareModal]   = useState(null) // { athleteId, athleteName, inviteUrl, viewers, revoking }
   const [viewers,      setViewers]      = useState([])
   const [activityMap,  setActivityMap]  = useState({}) // user_id → { last_login_at, last_activity_at }
+  const [activitySort, setActivitySort] = useState(null) // null | 'active_first' | 'inactive_first'
+  const [viewerActivitySort, setViewerActivitySort] = useState(null)
   const [revokeViewerModal, setRevokeViewerModal] = useState(null) // { viewerId, athleteId, viewerName, athleteName }
   const resetFilters = () => { setSearch(''); setCfState({ gender:'', group:'', gup_dan:'', parent_name:'' }) }
 
@@ -572,19 +574,38 @@ export default function Cabinet() {
     return [...map.values()]
   }, [athletes])
 
-  const filteredParents = parents.filter(p =>
-    p.parent_name.toLowerCase().includes(search.toLowerCase()) ||
-    p.children.join(' ').toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredParents = (() => {
+    const list = parents.filter(p =>
+      p.parent_name.toLowerCase().includes(search.toLowerCase()) ||
+      p.children.join(' ').toLowerCase().includes(search.toLowerCase())
+    )
+    if (activitySort === 'active_first')   return [...list].sort((a, b) => getActivityRank(a.user_id) - getActivityRank(b.user_id))
+    if (activitySort === 'inactive_first') return [...list].sort((a, b) => getActivityRank(b.user_id) - getActivityRank(a.user_id))
+    return list
+  })()
   // Хелпер: статус активности по дате последнего входа
   const getActivityStatus = (userId) => {
     const u = activityMap[userId]
-    const lastLogin = u?.last_login_at
-    if (!lastLogin) return { color: '#666', label: 'Не заходил', daysAgo: null }
-    const days = Math.floor((Date.now() - new Date(lastLogin).getTime()) / 86400000)
+    const ts = u?.last_activity_at || u?.last_login_at
+    if (!ts) return { color: '#666', label: 'Не заходил', daysAgo: null }
+    const days = Math.floor((Date.now() - new Date(ts).getTime()) / 86400000)
     if (days < 5)   return { color: '#6cba6c', label: days === 0 ? 'сегодня' : `${days} дн. назад`, daysAgo: days }
     if (days < 14)  return { color: '#c8962a', label: `${days} дн. назад`, daysAgo: days }
     return { color: '#cc0000', label: `${days} дн. назад`, daysAgo: days }
+  }
+
+  // Числовая метрика для сортировки: 0 для активных сегодня, ∞ для никогда
+  const getActivityRank = (userId) => {
+    const u = activityMap[userId]
+    const ts = u?.last_activity_at || u?.last_login_at
+    if (!ts) return Number.MAX_SAFE_INTEGER
+    return Math.floor((Date.now() - new Date(ts).getTime()) / 60000) // в минутах
+  }
+
+  const cycleActivitySort = (current, setter) => {
+    if (current === null)              setter('active_first')
+    else if (current === 'active_first') setter('inactive_first')
+    else                                 setter(null)
   }
 
   const ActivityDot = ({ userId, withLabel = false }) => {
@@ -1037,19 +1058,27 @@ export default function Cabinet() {
                     <th>Доступ к спортсмену</th>
                     <th>Основной родитель</th>
                     <th>Получен доступ</th>
-                    <th>Активность</th>
+                    <th
+                      style={{ cursor:'pointer', userSelect:'none' }}
+                      onClick={() => cycleActivitySort(viewerActivitySort, setViewerActivitySort)}
+                      title="Клик: активные сверху → неактивные сверху → без сортировки">
+                      Активность {viewerActivitySort === 'active_first' ? '▲' : viewerActivitySort === 'inactive_first' ? '▼' : ''}
+                    </th>
                     <th>Действия</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {viewers
-                    .filter(v =>
+                  {(() => {
+                    let list = viewers.filter(v =>
                       !search ||
                       (v.viewer_name||'').toLowerCase().includes(search.toLowerCase()) ||
                       (v.viewer_phone||'').includes(search) ||
                       (v.athlete_name||'').toLowerCase().includes(search.toLowerCase())
                     )
-                    .map((v, i) => (
+                    if (viewerActivitySort === 'active_first')   list = [...list].sort((a, b) => getActivityRank(a.viewer_id) - getActivityRank(b.viewer_id))
+                    if (viewerActivitySort === 'inactive_first') list = [...list].sort((a, b) => getActivityRank(b.viewer_id) - getActivityRank(a.viewer_id))
+                    return list
+                  })().map((v, i) => (
                       <tr key={`${v.viewer_id}-${v.athlete_id}-${i}`}>
                         <td className="td-name">{v.viewer_name}</td>
                         <td>{v.viewer_phone}</td>
@@ -1103,7 +1132,12 @@ export default function Cabinet() {
                     <Th colKey="parent_name"  sort={sortP} toggle={toggleP}>ФИО</Th>
                     <Th colKey="parent_phone" sort={sortP} toggle={toggleP}>Телефон</Th>
                     <Th colKey="children"     sort={sortP} toggle={toggleP}>Спортсмены</Th>
-                    <th>Активность</th>
+                    <th
+                      style={{ cursor:'pointer', userSelect:'none' }}
+                      onClick={() => cycleActivitySort(activitySort, setActivitySort)}
+                      title="Клик: активные сверху → неактивные сверху → без сортировки">
+                      Активность {activitySort === 'active_first' ? '▲' : activitySort === 'inactive_first' ? '▼' : ''}
+                    </th>
                     <th>Роль</th>
                     <th>Пароль</th>
                     <th></th>

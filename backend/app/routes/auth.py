@@ -170,11 +170,14 @@ def register_by_invite(request: Request, data: RegisterByInviteRequest, db: Sess
     if db.query(User).filter(User.phone == data.phone).first():
         raise HTTPException(status_code=400, detail="Телефон уже зарегистрирован")
 
+    now = datetime.utcnow()
     user = User(
-        full_name = data.full_name,
-        phone     = data.phone,
-        password  = hash_password(data.password),
-        role      = UserRole.parent,
+        full_name        = data.full_name,
+        phone            = data.phone,
+        password         = hash_password(data.password),
+        role             = UserRole.parent,
+        last_login_at    = now,
+        last_activity_at = now,
     )
     db.add(user)
     db.flush()
