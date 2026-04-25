@@ -249,6 +249,7 @@ export default function Cabinet() {
   const [overdueCount, setOverdueCount] = useState(0)
   const [indivRequests, setIndivRequests] = useState([])
   const [shareModal,   setShareModal]   = useState(null) // { athleteId, athleteName, inviteUrl, viewers, revoking }
+  const [viewers,      setViewers]      = useState([])
   const resetFilters = () => { setSearch(''); setCfState({ gender:'', group:'', gup_dan:'', parent_name:'' }) }
 
   const loadIndivRequests = async () => {
@@ -306,7 +307,7 @@ export default function Cabinet() {
 
   useEffect(() => {
     if (!token) { navigate('/login'); return }
-    if (isAdmin) { loadAthletes(); loadApplications(); loadUserRoles(); loadIndivRequests() }
+    if (isAdmin) { loadAthletes(); loadApplications(); loadUserRoles(); loadIndivRequests(); loadViewers() }
     else loadMyAthletes()
   }, [])
 
@@ -322,6 +323,29 @@ export default function Cabinet() {
     const interval = setInterval(load, 300000)
     return () => clearInterval(interval)
   }, [token])
+
+  const loadViewers = async () => {
+    try {
+      const r = await fetch(`${API}/users/viewers`, { headers: { Authorization: `Bearer ${token}` } })
+      if (r.ok) setViewers(await r.json())
+    } catch {}
+  }
+
+  const revokeViewerAccess = async (viewerId, athleteId, viewerName, athleteName) => {
+    if (!confirm(`Отозвать у "${viewerName}" доступ к спортсмену "${athleteName}"?`)) return
+    try {
+      const r = await fetch(`${API}/users/viewers/${viewerId}/athlete/${athleteId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (r.ok) {
+        setViewers(prev => prev.filter(v => !(v.viewer_id === viewerId && v.athlete_id === athleteId)))
+      } else {
+        const err = await r.json()
+        alert(err.detail || 'Ошибка')
+      }
+    } catch {}
+  }
 
   const loadUserRoles = async () => {
     try {
@@ -737,6 +761,7 @@ export default function Cabinet() {
       <button className={`cabinet-tab ${view==='parents'?'active':''}`} onClick={() => setView('parents')}>Родители ({parents.length})</button>
       <button className={`cabinet-tab ${view==='insurance_admin'?'active':''}`} onClick={() => setView('insurance_admin')}>Страхование</button>
       <button className={`cabinet-tab ${view==='fees'?'active':''}`} onClick={() => setView('fees')}>Взносы</button>
+      <button className={`cabinet-tab ${view==='viewers'?'active':''}`} onClick={() => setView('viewers')}>Приглашённые ({viewers.length})</button>
       <button className={`cabinet-tab ${view==='archive'?'active':''}`} style={{ color: view==='archive' ? undefined : 'var(--gray)' }} onClick={() => setView('archive')}>Архив ({athletes.filter(a=>a.is_archived).length})</button>
       <button className={`cabinet-tab ${view==='applications'?'active':''}`} onClick={() => setView('applications')}>Заявки{(applications.filter(a => a.status==='new').length + indivRequests.filter(r => r.status==='new').length) > 0 && <span className="tab-badge">{applications.filter(a => a.status==='new').length + indivRequests.filter(r => r.status==='new').length}</span>}</button>
       <button className={`cabinet-tab ${view==='hof'?'active':''}`} style={{ color: view==='hof' ? undefined : '#c8962a' }} onClick={() => setView('hof')}>Зал Славы</button>
@@ -930,6 +955,56 @@ export default function Cabinet() {
               </tbody>
             </table>
             {sortedAthletes.length === 0 && !loading && <div className="cabinet-empty">Спортсменов не найдено</div>}
+            </div>
+          </div>
+        )}
+
+        {/* ── Приглашённые (вторые родители по invite-ссылке) ── */}
+        {view === 'viewers' && (
+          <div>
+            <div style={{ marginBottom:16, padding:'12px 16px', background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', fontSize:'0.88rem', color:'var(--gray)', lineHeight:1.6 }}>
+              Это пользователи, которые получили доступ к профилю спортсмена по ссылке-приглашению от основного родителя. У них режим <span style={{color:'var(--white)'}}>только чтение</span> — они видят профиль, посещаемость, рейтинг и ачивки, но не могут отвечать на уведомления, оплачивать взносы и т.п. Создавать такие приглашения может сам родитель из своей карточки спортсмена.
+            </div>
+            <div className="athletes-table-wrap">
+              <table className="athletes-table">
+                <thead>
+                  <tr>
+                    <th>ФИО</th>
+                    <th>Телефон</th>
+                    <th>Email</th>
+                    <th>Доступ к спортсмену</th>
+                    <th>Основной родитель</th>
+                    <th>Получен доступ</th>
+                    <th>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {viewers
+                    .filter(v =>
+                      !search ||
+                      (v.viewer_name||'').toLowerCase().includes(search.toLowerCase()) ||
+                      (v.viewer_phone||'').includes(search) ||
+                      (v.athlete_name||'').toLowerCase().includes(search.toLowerCase())
+                    )
+                    .map((v, i) => (
+                      <tr key={`${v.viewer_id}-${v.athlete_id}-${i}`}>
+                        <td className="td-name">{v.viewer_name}</td>
+                        <td>{v.viewer_phone}</td>
+                        <td style={{ color:'var(--gray)', fontSize:'0.85rem' }}>{v.viewer_email || '—'}</td>
+                        <td className="td-name">{v.athlete_name}</td>
+                        <td style={{ color:'var(--gray)' }}>{v.primary_parent_name}</td>
+                        <td style={{ whiteSpace:'nowrap', color:'var(--gray)', fontSize:'0.85rem' }}>
+                          {v.granted_at ? new Date(v.granted_at).toLocaleDateString('ru-RU', { day:'numeric', month:'short', year:'numeric' }) : '—'}
+                        </td>
+                        <td className="td-actions">
+                          <button className="td-btn td-btn-edit" onClick={() => setResetUser({ user_id: v.viewer_id, parent_name: v.viewer_name, parent_phone: v.viewer_phone })}>Сбросить пароль</button>
+                          <button className="td-btn td-btn-del" onClick={() => revokeViewerAccess(v.viewer_id, v.athlete_id, v.viewer_name, v.athlete_name)}>Отозвать</button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+              {viewers.length === 0 && !loading && <div className="cabinet-empty">Приглашённых пользователей пока нет.</div>}
             </div>
           </div>
         )}

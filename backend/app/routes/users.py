@@ -127,6 +127,53 @@ def get_my_athletes(
 def get_all_users(db: Session = Depends(get_db), _: User = Depends(require_manager)):
     return db.query(User).order_by(User.created_at.desc()).all()
 
+# ─── Приглашённые пользователи (viewers) — admin/manager ─────────────────────
+@router.get("/viewers")
+def get_viewers(db: Session = Depends(get_db), _: User = Depends(require_manager)):
+    from app.models.invite import AthleteViewer
+    rows = db.query(AthleteViewer).all()
+    result = []
+    for v in rows:
+        viewer = db.query(User).filter(User.id == v.viewer_id).first()
+        athlete = db.query(Athlete).filter(Athlete.id == v.athlete_id).first()
+        if not viewer or not athlete:
+            continue
+        primary_parent = db.query(User).filter(User.id == athlete.user_id).first()
+        result.append({
+            "viewer_id":           viewer.id,
+            "viewer_name":         viewer.full_name,
+            "viewer_phone":        viewer.phone,
+            "viewer_email":        viewer.email,
+            "viewer_created_at":   viewer.created_at.isoformat() if viewer.created_at else None,
+            "athlete_id":          athlete.id,
+            "athlete_name":        athlete.full_name,
+            "primary_parent_id":   primary_parent.id if primary_parent else None,
+            "primary_parent_name": primary_parent.full_name if primary_parent else "—",
+            "granted_at":          v.created_at.isoformat() if v.created_at else None,
+            "viewer_is_active":    bool(getattr(viewer, "is_active", True)),
+        })
+    result.sort(key=lambda x: x["granted_at"] or "", reverse=True)
+    return result
+
+
+@router.delete("/viewers/{viewer_id}/athlete/{athlete_id}")
+def revoke_viewer_access(
+    viewer_id: int, athlete_id: int,
+    db: Session = Depends(get_db), _: User = Depends(require_manager)
+):
+    from app.models.invite import AthleteViewer
+    rows = db.query(AthleteViewer).filter(
+        AthleteViewer.viewer_id == viewer_id,
+        AthleteViewer.athlete_id == athlete_id,
+    ).all()
+    if not rows:
+        raise HTTPException(404, "Связь не найдена")
+    for r in rows:
+        db.delete(r)
+    db.commit()
+    return {"ok": True}
+
+
 # ─── Все спортсмены (только admin/manager) ────────────────────────────────────
 @router.get("/athletes")
 def get_athletes(db: Session = Depends(get_db), _: User = Depends(require_manager)):
