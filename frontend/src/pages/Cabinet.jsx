@@ -250,6 +250,7 @@ export default function Cabinet() {
   const [indivRequests, setIndivRequests] = useState([])
   const [shareModal,   setShareModal]   = useState(null) // { athleteId, athleteName, inviteUrl, viewers, revoking }
   const [viewers,      setViewers]      = useState([])
+  const [revokeViewerModal, setRevokeViewerModal] = useState(null) // { viewerId, athleteId, viewerName, athleteName }
   const resetFilters = () => { setSearch(''); setCfState({ gender:'', group:'', gup_dan:'', parent_name:'' }) }
 
   const loadIndivRequests = async () => {
@@ -331,8 +332,13 @@ export default function Cabinet() {
     } catch {}
   }
 
-  const revokeViewerAccess = async (viewerId, athleteId, viewerName, athleteName) => {
-    if (!confirm(`Отозвать у "${viewerName}" доступ к спортсмену "${athleteName}"?`)) return
+  const revokeViewerAccess = (viewerId, athleteId, viewerName, athleteName) => {
+    setRevokeViewerModal({ viewerId, athleteId, viewerName, athleteName })
+  }
+
+  const doRevokeViewer = async () => {
+    if (!revokeViewerModal) return
+    const { viewerId, athleteId } = revokeViewerModal
     try {
       const r = await fetch(`${API}/users/viewers/${viewerId}/athlete/${athleteId}`, {
         method: 'DELETE',
@@ -340,6 +346,7 @@ export default function Cabinet() {
       })
       if (r.ok) {
         setViewers(prev => prev.filter(v => !(v.viewer_id === viewerId && v.athlete_id === athleteId)))
+        setRevokeViewerModal(null)
       } else {
         const err = await r.json()
         alert(err.detail || 'Ошибка')
@@ -759,9 +766,9 @@ export default function Cabinet() {
     <div style={{ display:'flex', flexWrap:'wrap', gap:2, paddingLeft:8 }}>
       <button className={`cabinet-tab ${view==='athletes'?'active':''}`} onClick={() => setView('athletes')}>Спортсмены ({athletes.filter(a=>!a.is_archived).length})</button>
       <button className={`cabinet-tab ${view==='parents'?'active':''}`} onClick={() => setView('parents')}>Родители ({parents.length})</button>
+      <button className={`cabinet-tab ${view==='viewers'?'active':''}`} onClick={() => setView('viewers')}>Приглашённые ({viewers.length})</button>
       <button className={`cabinet-tab ${view==='insurance_admin'?'active':''}`} onClick={() => setView('insurance_admin')}>Страхование</button>
       <button className={`cabinet-tab ${view==='fees'?'active':''}`} onClick={() => setView('fees')}>Взносы</button>
-      <button className={`cabinet-tab ${view==='viewers'?'active':''}`} onClick={() => setView('viewers')}>Приглашённые ({viewers.length})</button>
       <button className={`cabinet-tab ${view==='archive'?'active':''}`} style={{ color: view==='archive' ? undefined : 'var(--gray)' }} onClick={() => setView('archive')}>Архив ({athletes.filter(a=>a.is_archived).length})</button>
       <button className={`cabinet-tab ${view==='applications'?'active':''}`} onClick={() => setView('applications')}>Заявки{(applications.filter(a => a.status==='new').length + indivRequests.filter(r => r.status==='new').length) > 0 && <span className="tab-badge">{applications.filter(a => a.status==='new').length + indivRequests.filter(r => r.status==='new').length}</span>}</button>
       <button className={`cabinet-tab ${view==='hof'?'active':''}`} style={{ color: view==='hof' ? undefined : '#c8962a' }} onClick={() => setView('hof')}>Зал Славы</button>
@@ -962,6 +969,23 @@ export default function Cabinet() {
         {/* ── Приглашённые (вторые родители по invite-ссылке) ── */}
         {view === 'viewers' && (
           <div>
+            {revokeViewerModal && (
+              <div className="modal-overlay" onClick={() => setRevokeViewerModal(null)}>
+                <div className="modal-box" onClick={e => e.stopPropagation()} style={{maxWidth:440}}>
+                  <h3 style={{marginBottom:12}}>Отозвать доступ?</h3>
+                  <p style={{color:'var(--gray)', marginBottom:8, fontSize:'0.9rem', lineHeight:1.6}}>
+                    У пользователя <span style={{color:'var(--white)'}}>{revokeViewerModal.viewerName}</span> будет отозван доступ к спортсмену <span style={{color:'var(--white)'}}>{revokeViewerModal.athleteName}</span>.
+                  </p>
+                  <p style={{color:'var(--gray)', marginBottom:16, fontSize:'0.85rem'}}>
+                    Аккаунт пользователя останется, но он перестанет видеть данные этого спортсмена.
+                  </p>
+                  <div style={{display:'flex', gap:8, marginTop:8, flexWrap:'wrap'}}>
+                    <button className="btn-primary" style={{padding:'8px 16px', fontSize:'13px'}} onClick={doRevokeViewer}>Отозвать</button>
+                    <button className="btn-outline" style={{padding:'8px 16px', fontSize:'13px'}} onClick={() => setRevokeViewerModal(null)}>Отмена</button>
+                  </div>
+                </div>
+              </div>
+            )}
             <div style={{ marginBottom:16, padding:'12px 16px', background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', fontSize:'0.88rem', color:'var(--gray)', lineHeight:1.6 }}>
               Это пользователи, которые получили доступ к профилю спортсмена по ссылке-приглашению от основного родителя. У них режим <span style={{color:'var(--white)'}}>только чтение</span> — они видят профиль, посещаемость, рейтинг и ачивки, но не могут отвечать на уведомления, оплачивать взносы и т.п. Создавать такие приглашения может сам родитель из своей карточки спортсмена.
             </div>
