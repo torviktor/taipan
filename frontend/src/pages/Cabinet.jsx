@@ -584,7 +584,7 @@ export default function Cabinet() {
     return list
   })()
   // Хелпер: статус активности по дате последнего входа
-  const getActivityStatus = (userId) => {
+  function getActivityStatus(userId) {
     const u = activityMap[userId]
     const ts = u?.last_activity_at || u?.last_login_at
     if (!ts) return { color: '#666', label: 'Не заходил', daysAgo: null }
@@ -594,12 +594,11 @@ export default function Cabinet() {
     return { color: '#cc0000', label: `${days} дн. назад`, daysAgo: days }
   }
 
-  // Числовая метрика для сортировки: 0 для активных сегодня, ∞ для никогда
-  const getActivityRank = (userId) => {
+  function getActivityRank(userId) {
     const u = activityMap[userId]
     const ts = u?.last_activity_at || u?.last_login_at
     if (!ts) return Number.MAX_SAFE_INTEGER
-    return Math.floor((Date.now() - new Date(ts).getTime()) / 60000) // в минутах
+    return Math.floor((Date.now() - new Date(ts).getTime()) / 60000)
   }
 
   const cycleActivitySort = (current, setter) => {
