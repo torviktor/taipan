@@ -1066,19 +1066,19 @@ export default function Cabinet() {
                 {sortedAthletes.map(a => {
                   const bday = getBirthdayStatus(a.birth_date)
                   const rowStyle = bday === 'today'
-                    ? { borderLeft: '3px solid #c8962a', background: 'rgba(200,150,42,0.06)' }
+                    ? { boxShadow: 'inset 4px 0 0 #c8962a', background: 'rgba(200,150,42,0.14)' }
                     : bday === 'tomorrow'
-                    ? { borderLeft: '3px solid #cc0000', background: 'rgba(204,0,0,0.06)' }
+                    ? { boxShadow: 'inset 4px 0 0 #ff4444', background: 'rgba(255,68,68,0.12)' }
                     : {}
                   return (
                   <tr key={a.id} style={rowStyle}>
                     <td className="td-name">{a.full_name}</td>
-                    <td>
-                      {a.birth_date}
+                    <td style={{ whiteSpace:'nowrap' }}>
+                      <div>{a.birth_date}</div>
                       {(() => {
                         const s = getBirthdayStatus(a.birth_date)
-                        if (s === 'today')    return <span style={{ marginLeft:8, color:'#c8962a', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.7rem', letterSpacing:'0.08em' }}>СЕГОДНЯ ДР</span>
-                        if (s === 'tomorrow') return <span style={{ marginLeft:8, color:'#cc0000', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.7rem', letterSpacing:'0.08em' }}>ЗАВТРА ДР</span>
+                        if (s === 'today')    return <div style={{ color:'#c8962a', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.7rem', letterSpacing:'0.1em', marginTop:2 }}>СЕГОДНЯ ДР</div>
+                        if (s === 'tomorrow') return <div style={{ color:'#ff4444', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.7rem', letterSpacing:'0.1em', marginTop:2 }}>ЗАВТРА ДР</div>
                         return null
                       })()}
                     </td>
