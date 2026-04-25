@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import InsuranceTab from '../pages/InsuranceTab'
+import { daysUntilBirthday, ageOnNextBirthday } from './birthdayUtils'
 
-export default function InfoTab({ isAdmin, isManager = false, token }) {
+export default function InfoTab({ isAdmin, isManager = false, token, athletes = [] }) {
   const [section, setSection] = useState('rating')
 
   const SectionBtn = ({ id, label }) => (
@@ -592,6 +593,56 @@ export default function InfoTab({ isAdmin, isManager = false, token }) {
       {section === 'admin' && isAdmin && (
         <div>
           <H2>Памятка тренера</H2>
+
+          {(() => {
+            const upcoming = (athletes || [])
+              .filter(a => !a.is_archived && a.birth_date)
+              .map(a => ({ ...a, _days: daysUntilBirthday(a.birth_date), _age: ageOnNextBirthday(a.birth_date) }))
+              .filter(a => a._days <= 30)
+              .sort((a, b) => a._days - b._days)
+              .slice(0, 5)
+            if (upcoming.length === 0) return null
+            return (
+              <div style={{
+                background:'var(--dark2)',
+                border:'1px solid var(--gray-dim)',
+                borderLeft:'3px solid #c8962a',
+                borderRadius:8,
+                padding:'16px 20px',
+                marginBottom:24,
+              }}>
+                <div style={{
+                  fontFamily:'Barlow Condensed', fontWeight:700,
+                  fontSize:'0.78rem', letterSpacing:'0.12em',
+                  color:'#c8962a', textTransform:'uppercase', marginBottom:12,
+                }}>Ближайшие дни рождения</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {upcoming.map(a => {
+                    const labelDays = a._days === 0 ? 'сегодня'
+                                    : a._days === 1 ? 'завтра'
+                                    : `через ${a._days} дн.`
+                    const dotColor = a._days === 0 ? '#c8962a' : a._days === 1 ? '#cc0000' : 'var(--gray-dim)'
+                    return (
+                      <div key={a.id} style={{
+                        display:'flex', alignItems:'center', justifyContent:'space-between',
+                        padding:'8px 0',
+                        borderBottom:'1px solid var(--gray-dim)',
+                        gap:12, flexWrap:'wrap',
+                      }}>
+                        <span style={{ display:'inline-flex', alignItems:'center', gap:10, color:'var(--white)', fontSize:'0.92rem' }}>
+                          <span style={{ width:8, height:8, borderRadius:'50%', background:dotColor, boxShadow:`0 0 6px ${dotColor}88`, flexShrink:0 }}/>
+                          {a.full_name}
+                        </span>
+                        <span style={{ color:'var(--gray)', fontSize:'0.85rem' }}>
+                          {labelDays} · исполнится {a._age}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
 
           <H3>Соревнования — полный цикл</H3>
           <P><Hl>Создание:</Hl> нажмите «+ Соревнование», заполните название, дату, место, уровень и тип. При создании система автоматически добавляет всех активных спортсменов в список участников со статусом «Ожидает» и рассылает уведомления всем родителям.</P>

@@ -9,6 +9,7 @@ import StrategyTab  from './StrategyTab'
 import { API, GROUPS, getSeason, seasonLabel, currentSeason, currentSeasonLabel, seasonRange } from '../cabinet/constants'
 import { useSorted, SortIcon, Th, ColFilter } from '../cabinet/tableUtils'
 import ResetPasswordModal from '../cabinet/ResetPasswordModal'
+import { getBirthdayStatus } from '../cabinet/birthdayUtils'
 import LineChart from '../cabinet/LineChart'
 import ConfirmModal from '../cabinet/ConfirmModal'
 import UnreadBadge from '../cabinet/UnreadBadge'
@@ -640,7 +641,17 @@ export default function Cabinet() {
     (a.phone||'').includes(search))
   )
 
-  const { sorted: sortedAthletes, sort: sortA,  toggle: toggleA  } = useSorted(filteredAthletes)
+  const { sorted: sortedAthletesRaw, sort: sortA,  toggle: toggleA  } = useSorted(filteredAthletes)
+
+  const sortedAthletes = (() => {
+    if (sortA && sortA.col) return sortedAthletesRaw
+    return [...sortedAthletesRaw].sort((a, b) => {
+      const sa = getBirthdayStatus(a.birth_date)
+      const sb = getBirthdayStatus(b.birth_date)
+      const rank = (s) => s === 'today' ? 0 : s === 'tomorrow' ? 1 : 2
+      return rank(sa) - rank(sb)
+    })
+  })()
   const { sorted: sortedParents,  sort: sortP,  toggle: toggleP  } = useSorted(filteredParents)
   const { sorted: sortedApps,     sort: sortAp, toggle: toggleAp } = useSorted(filteredApps)
 
@@ -962,7 +973,7 @@ export default function Cabinet() {
         {view === 'achievements'  && <AchievementsLeaderboard token={token} />}
         {view === 'camps'         && <CampsTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'news'          && <NewsTab token={token} />}
-        {view === 'info'          && <InfoTab isAdmin={role === 'admin'} isManager={role === 'manager' || role === 'admin'} token={token} />}
+        {view === 'info'          && <InfoTab isAdmin={role === 'admin'} isManager={role === 'manager' || role === 'admin'} token={token} athletes={athletes} />}
         {view === 'strategy'      && (role === 'manager' || role === 'admin') && <StrategyTab token={token} role={role} />}
         {view === 'analytics'     && <AnalyticsAdminTab token={token} athletes={athletes} />}
         {view === 'insurance_admin' && <InsuranceAdminTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
@@ -1052,10 +1063,25 @@ export default function Cabinet() {
                 </tr>
               </thead>
               <tbody>
-                {sortedAthletes.map(a => (
-                  <tr key={a.id}>
+                {sortedAthletes.map(a => {
+                  const bday = getBirthdayStatus(a.birth_date)
+                  const rowStyle = bday === 'today'
+                    ? { borderLeft: '3px solid #c8962a', background: 'rgba(200,150,42,0.06)' }
+                    : bday === 'tomorrow'
+                    ? { borderLeft: '3px solid #cc0000', background: 'rgba(204,0,0,0.06)' }
+                    : {}
+                  return (
+                  <tr key={a.id} style={rowStyle}>
                     <td className="td-name">{a.full_name}</td>
-                    <td>{a.birth_date}</td>
+                    <td>
+                      {a.birth_date}
+                      {(() => {
+                        const s = getBirthdayStatus(a.birth_date)
+                        if (s === 'today')    return <span style={{ marginLeft:8, color:'#c8962a', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.7rem', letterSpacing:'0.08em' }}>СЕГОДНЯ ДР</span>
+                        if (s === 'tomorrow') return <span style={{ marginLeft:8, color:'#cc0000', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.7rem', letterSpacing:'0.08em' }}>ЗАВТРА ДР</span>
+                        return null
+                      })()}
+                    </td>
                     <td>{a.age}</td>
                     <td>{a.gender === 'male' ? 'М' : 'Ж'}</td>
                     <td>
@@ -1095,7 +1121,8 @@ export default function Cabinet() {
                       )}
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
             {sortedAthletes.length === 0 && !loading && <div className="cabinet-empty">Спортсменов не найдено</div>}
