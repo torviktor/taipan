@@ -344,6 +344,210 @@ def update_user_role(
     return {"ok": True, "user_id": user_id, "role": data.role}
 
 
+# ─── Лента событий по своим/просматриваемым спортсменам ──────────────────────
+@router.get("/my-feed")
+def get_my_feed(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Лента событий за последние 30 дней по всем спортсменам пользователя:
+    - Своим (Athlete.user_id == current_user.id)
+    - Просматриваемым через invite (AthleteViewer.viewer_id == current_user.id)
+
+    Возвращает список событий с типом, датой и текстом.
+    """
+    from app.models.invite import AthleteViewer
+    from app.models.attendance import Attendance, TrainingSession
+    from app.models.achievement import AthleteAchievement, ACHIEVEMENT_MAP
+    from app.models.competition import Competition, CompetitionResult
+    from app.models.camp import Camp, CampParticipant
+    from app.models.certification import Certification, CertificationResult
+    from datetime import datetime, timedelta, date
+
+    # Собираем все доступные athlete_id
+    own_ids = [
+        a.id for a in db.query(Athlete).filter(
+            Athlete.user_id == current_user.id,
+            Athlete.is_archived == False
+        ).all()
+    ]
+    viewer_links = db.query(AthleteViewer).filter(AthleteViewer.viewer_id == current_user.id).all()
+    viewer_ids = [v.athlete_id for v in viewer_links]
+    all_ids = list(set(own_ids + viewer_ids))
+
+    if not all_ids:
+        return []
+
+    # Карта athlete_id → full_name
+    athletes = db.query(Athlete).filter(Athlete.id.in_(all_ids)).all()
+    name_map = {a.id: a.full_name for a in athletes}
+
+    today = date.today()
+    period_start = today - timedelta(days=30)
+    feed = []
+
+    # ─── 1. Посещённые тренировки за 30 дней ──────────────────────────────────
+    for ath_id in all_ids:
+        records = (
+            db.query(Attendance, TrainingSession)
+            .join(TrainingSession, Attendance.session_id == TrainingSession.id)
+            .filter(
+                Attendance.athlete_id == ath_id,
+                Attendance.present == True,
+                TrainingSession.date >= period_start,
+            )
+            .order_by(TrainingSession.date.desc())
+            .limit(10)
+            .all()
+        )
+        for att, sess in records:
+            feed.append({
+                "type":        "attendance",
+                "date":        sess.date.isoformat(),
+                "athlete_id":  ath_id,
+                "athlete_name": name_map.get(ath_id, "—"),
+                "title":       "Тренировка",
+                "text":        f"{name_map.get(ath_id, '—')} был на тренировке",
+            })
+
+    # ─── 2. Новые ачивки за 30 дней ───────────────────────────────────────────
+    period_start_dt = datetime.combine(period_start, datetime.min.time())
+    achs = (
+        db.query(AthleteAchievement)
+        .filter(
+            AthleteAchievement.athlete_id.in_(all_ids),
+            AthleteAchievement.granted_at >= period_start_dt,
+        )
+        .order_by(AthleteAchievement.granted_at.desc())
+        .all()
+    )
+    for a in achs:
+        meta = ACHIEVEMENT_MAP.get(a.code, {})
+        feed.append({
+            "type":         "achievement",
+            "date":         a.granted_at.isoformat() if a.granted_at else None,
+            "athlete_id":   a.athlete_id,
+            "athlete_name": name_map.get(a.athlete_id, "—"),
+            "title":        f"Новая ачивка — {meta.get('name', a.code)}",
+            "text":         f"{name_map.get(a.athlete_id, '—')}: {meta.get('description', '')}",
+            "tier":         meta.get("tier", "common"),
+        })
+
+    # ─── 3. Ближайшие соревнования (на 30 дней вперёд) ────────────────────────
+    future_30 = today + timedelta(days=30)
+    upcoming_comps = (
+        db.query(Competition, CompetitionResult)
+        .join(CompetitionResult, Competition.id == CompetitionResult.competition_id)
+        .filter(
+            CompetitionResult.athlete_id.in_(all_ids),
+            Competition.date >= today,
+            Competition.date <= future_30,
+        )
+        .all()
+    )
+    for comp, _ in upcoming_comps:
+        days_left = (comp.date - today).days
+        feed.append({
+            "type":         "competition_upcoming",
+            "date":         comp.date.isoformat(),
+            "athlete_id":   None,
+            "athlete_name": "",
+            "title":        f"Соревнование — {comp.name}",
+            "text":         f"Через {days_left} дн.{' (' + comp.location + ')' if comp.location else ''}",
+        })
+
+    # ─── 4. Результаты прошедших соревнований за 30 дней ─────────────────────
+    past_comps = (
+        db.query(Competition, CompetitionResult)
+        .join(CompetitionResult, Competition.id == CompetitionResult.competition_id)
+        .filter(
+            CompetitionResult.athlete_id.in_(all_ids),
+            Competition.date >= period_start,
+            Competition.date < today,
+        )
+        .all()
+    )
+    for comp, res in past_comps:
+        places = []
+        if res.sparring_place: places.append(f"спарринг — {res.sparring_place} место")
+        if res.stopball_place: places.append(f"стоп-балл — {res.stopball_place} место")
+        if res.tegtim_place:   places.append(f"тег-тим — {res.tegtim_place} место")
+        if res.tuli_place:     places.append(f"тули — {res.tuli_place} место")
+        text = f"{name_map.get(res.athlete_id, '—')}: " + (", ".join(places) if places else "участие")
+        feed.append({
+            "type":         "competition_result",
+            "date":         comp.date.isoformat(),
+            "athlete_id":   res.athlete_id,
+            "athlete_name": name_map.get(res.athlete_id, "—"),
+            "title":        f"Результат — {comp.name}",
+            "text":         text,
+        })
+
+    # ─── 5. Ближайшие сборы ───────────────────────────────────────────────────
+    upcoming_camps = (
+        db.query(Camp, CampParticipant)
+        .join(CampParticipant, Camp.id == CampParticipant.camp_id)
+        .filter(
+            CampParticipant.athlete_id.in_(all_ids),
+            Camp.date_start >= today,
+            Camp.date_start <= future_30,
+        )
+        .all()
+    )
+    for camp, _ in upcoming_camps:
+        days_left = (camp.date_start - today).days
+        feed.append({
+            "type":         "camp_upcoming",
+            "date":         camp.date_start.isoformat(),
+            "athlete_id":   None,
+            "athlete_name": "",
+            "title":        f"Сборы — {camp.name}",
+            "text":         f"Через {days_left} дн.{' (' + camp.location + ')' if camp.location else ''}",
+        })
+
+    # ─── 6. Ближайшие аттестации + результаты прошедших ──────────────────────
+    cert_links = (
+        db.query(Certification, CertificationResult)
+        .join(CertificationResult, Certification.id == CertificationResult.certification_id)
+        .filter(
+            CertificationResult.athlete_id.in_(all_ids),
+            Certification.date >= period_start,
+            Certification.date <= future_30,
+        )
+        .all()
+    )
+    for cert, res in cert_links:
+        if cert.date >= today:
+            days_left = (cert.date - today).days
+            target = f"{res.target_dan} дан" if res.target_dan else (f"{res.target_gup} гып" if res.target_gup else "")
+            feed.append({
+                "type":         "certification_upcoming",
+                "date":         cert.date.isoformat(),
+                "athlete_id":   res.athlete_id,
+                "athlete_name": name_map.get(res.athlete_id, "—"),
+                "title":        f"Аттестация — {cert.name}",
+                "text":         f"{name_map.get(res.athlete_id, '—')}: на {target} через {days_left} дн." if target else f"{name_map.get(res.athlete_id, '—')}: через {days_left} дн.",
+            })
+        else:
+            if res.passed is True:
+                target = f"{res.target_dan} дан" if res.target_dan else (f"{res.target_gup} гып" if res.target_gup else "")
+                feed.append({
+                    "type":         "certification_passed",
+                    "date":         cert.date.isoformat(),
+                    "athlete_id":   res.athlete_id,
+                    "athlete_name": name_map.get(res.athlete_id, "—"),
+                    "title":        f"Сдан экзамен — {target}" if target else "Аттестация сдана",
+                    "text":         f"{name_map.get(res.athlete_id, '—')} успешно сдал аттестацию {cert.name}",
+                })
+
+    # ─── Сортировка: новое сверху ────────────────────────────────────────────
+    feed.sort(key=lambda x: x["date"] or "", reverse=True)
+
+    # Лимит на 15 событий
+    return feed[:15]
+
+
 # ─── Активность пользователей (admin/manager) ────────────────────────────────
 @router.get("/activity")
 def get_users_activity(db: Session = Depends(get_db), _: User = Depends(require_manager)):

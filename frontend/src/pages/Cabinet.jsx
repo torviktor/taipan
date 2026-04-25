@@ -253,6 +253,8 @@ export default function Cabinet() {
   const [activityMap,  setActivityMap]  = useState({}) // user_id → { last_login_at, last_activity_at }
   const [activitySort, setActivitySort] = useState(null) // null | 'active_first' | 'inactive_first'
   const [viewerActivitySort, setViewerActivitySort] = useState(null)
+  const [feed, setFeed] = useState([])
+  const [feedLoading, setFeedLoading] = useState(false)
   const [revokeViewerModal, setRevokeViewerModal] = useState(null) // { viewerId, athleteId, viewerName, athleteName }
   const resetFilters = () => { setSearch(''); setCfState({ gender:'', group:'', gup_dan:'', parent_name:'' }) }
 
@@ -312,7 +314,7 @@ export default function Cabinet() {
   useEffect(() => {
     if (!token) { navigate('/login'); return }
     if (isAdmin) { loadAthletes(); loadApplications(); loadUserRoles(); loadIndivRequests(); loadViewers(); loadActivity() }
-    else loadMyAthletes()
+    else { loadMyAthletes(); loadFeed() }
   }, [])
 
   useEffect(() => {
@@ -327,6 +329,15 @@ export default function Cabinet() {
     const interval = setInterval(load, 300000)
     return () => clearInterval(interval)
   }, [token])
+
+  const loadFeed = async () => {
+    setFeedLoading(true)
+    try {
+      const r = await fetch(`${API}/users/my-feed`, { headers: { Authorization: `Bearer ${token}` } })
+      if (r.ok) setFeed(await r.json())
+    } catch {}
+    setFeedLoading(false)
+  }
 
   const loadActivity = async () => {
     try {
@@ -715,6 +726,74 @@ export default function Cabinet() {
                 <div className="cabinet-coming">
                   <p>Данные о спортсменах пока не добавлены.</p>
                   <p>Если вы регистрировали ребёнка — обратитесь к тренеру.</p>
+                </div>
+              )}
+
+              {/* ── ЛЕНТА СОБЫТИЙ ──────────────────────────────────────── */}
+              {myAthletes.length > 0 && (
+                <div style={{ marginTop:32 }}>
+                  <p className="section-label" style={{ marginBottom:14 }}>Лента событий</p>
+                  {feedLoading && <div className="cabinet-loading" style={{padding:20}}>Загрузка...</div>}
+                  {!feedLoading && feed.length === 0 && (
+                    <div style={{ padding:'20px 22px', background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--gray-dim)', color:'var(--gray)', fontSize:'0.9rem' }}>
+                      За последний месяц событий нет. Загляните позже — здесь появятся тренировки, ачивки и анонсы.
+                    </div>
+                  )}
+                  {!feedLoading && feed.length > 0 && (
+                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                      {feed.map((ev, idx) => {
+                        const palette = {
+                          attendance:              { color:'#6cba6c', bg:'rgba(108,186,108,0.06)', label:'ТРЕНИРОВКА' },
+                          achievement:             { color:'#c8962a', bg:'rgba(200,150,42,0.06)',  label:'АЧИВКА' },
+                          competition_upcoming:    { color:'#cc0000', bg:'rgba(204,0,0,0.06)',     label:'СОРЕВНОВАНИЕ' },
+                          competition_result:      { color:'#cc0000', bg:'rgba(204,0,0,0.06)',     label:'РЕЗУЛЬТАТ' },
+                          camp_upcoming:           { color:'#6a8ecb', bg:'rgba(106,142,203,0.06)', label:'СБОРЫ' },
+                          certification_upcoming:  { color:'#9c64d4', bg:'rgba(156,100,212,0.06)', label:'АТТЕСТАЦИЯ' },
+                          certification_passed:    { color:'#9c64d4', bg:'rgba(156,100,212,0.06)', label:'ЭКЗАМЕН СДАН' },
+                        }
+                        const p = palette[ev.type] || { color:'var(--gray)', bg:'var(--dark2)', label:'СОБЫТИЕ' }
+                        const dateLabel = ev.date
+                          ? new Date(ev.date).toLocaleDateString('ru-RU', { day:'numeric', month:'long' })
+                          : ''
+                        return (
+                          <div key={idx} style={{
+                            background: p.bg,
+                            border: '1px solid var(--gray-dim)',
+                            borderLeft: `3px solid ${p.color}`,
+                            borderRadius: 6,
+                            padding: '12px 16px',
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            justifyContent: 'space-between',
+                            gap: 12,
+                            flexWrap: 'wrap',
+                          }}>
+                            <div style={{ flex:'1 1 60%', minWidth:200 }}>
+                              <div style={{
+                                fontFamily:'Barlow Condensed', fontWeight:700,
+                                fontSize:'0.7rem', letterSpacing:'0.1em',
+                                color:p.color, marginBottom:4,
+                              }}>{p.label}</div>
+                              <div style={{ color:'var(--white)', fontSize:'0.95rem', fontWeight:600, marginBottom:2 }}>
+                                {ev.title}
+                              </div>
+                              <div style={{ color:'var(--gray)', fontSize:'0.85rem', lineHeight:1.5 }}>
+                                {ev.text}
+                              </div>
+                            </div>
+                            <div style={{
+                              fontFamily:'Barlow Condensed',
+                              fontSize:'0.78rem', letterSpacing:'0.06em',
+                              color:'var(--gray)', whiteSpace:'nowrap',
+                              textTransform:'uppercase',
+                            }}>
+                              {dateLabel}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </>
