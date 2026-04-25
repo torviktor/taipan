@@ -30,6 +30,7 @@ const CertificationTab  = lazy(() => import('../cabinet/CertificationTab'))
 const HallOfFameAdmin   = lazy(() => import('../cabinet/HallOfFameAdmin'))
 const CampsTab          = lazy(() => import('../cabinet/CampsTab'))
 const InfoTab           = lazy(() => import('../cabinet/InfoTab'))
+const TrainerGuideTab   = lazy(() => import('../cabinet/TrainerGuideTab'))
 const AnalyticsAdminTab = lazy(() => import('../cabinet/AnalyticsAdminTab'))
 const CompetitionsTab   = lazy(() => import('../cabinet/CompetitionsTab'))
 const NewsTab           = lazy(() => import('../cabinet/NewsTab'))
@@ -946,6 +947,7 @@ export default function Cabinet() {
       <button className={`cabinet-tab ${view==='analytics'?'active':''}`} onClick={() => setView('analytics')}>Аналитика</button>
       <button className={`cabinet-tab ${view==='info'?'active':''}`} style={{color: view==='info' ? undefined : 'var(--gray)'}} onClick={() => setView('info')}>Информация</button>
       {(role === 'manager' || role === 'admin') && <button className={`cabinet-tab ${view==='strategy'?'active':''}`} onClick={() => setView('strategy')}>Стратегия</button>}
+      {role === 'admin' && <button className={`cabinet-tab ${view==='guide'?'active':''}`} onClick={() => setView('guide')}>Памятка тренера</button>}
     </div>
   </div>
 </div>
@@ -973,8 +975,9 @@ export default function Cabinet() {
         {view === 'achievements'  && <AchievementsLeaderboard token={token} />}
         {view === 'camps'         && <CampsTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'news'          && <NewsTab token={token} />}
-        {view === 'info'          && <InfoTab isAdmin={role === 'admin'} isManager={role === 'manager' || role === 'admin'} token={token} athletes={athletes} />}
+        {view === 'info'          && <InfoTab isAdmin={role === 'admin'} isManager={role === 'manager' || role === 'admin'} token={token} />}
         {view === 'strategy'      && (role === 'manager' || role === 'admin') && <StrategyTab token={token} role={role} />}
+        {view === 'guide'         && isAdmin && <TrainerGuideTab athletes={athletes} />}
         {view === 'analytics'     && <AnalyticsAdminTab token={token} athletes={athletes} />}
         {view === 'insurance_admin' && <InsuranceAdminTab token={token} athletes={athletes.filter(a=>!a.is_archived)} />}
         {view === 'hof'           && <HallOfFameAdmin token={token} />}
