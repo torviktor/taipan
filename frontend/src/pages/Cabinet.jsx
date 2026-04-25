@@ -251,7 +251,6 @@ export default function Cabinet() {
   const [shareModal,   setShareModal]   = useState(null) // { athleteId, athleteName, inviteUrl, viewers, revoking }
   const [viewers,      setViewers]      = useState([])
   const [activityMap,  setActivityMap]  = useState({}) // user_id → { last_login_at, last_activity_at }
-  const [showInactiveOnly, setShowInactiveOnly] = useState(false)
   const [revokeViewerModal, setRevokeViewerModal] = useState(null) // { viewerId, athleteId, viewerName, athleteName }
   const resetFilters = () => { setSearch(''); setCfState({ gender:'', group:'', gup_dan:'', parent_name:'' }) }
 
@@ -573,16 +572,10 @@ export default function Cabinet() {
     return [...map.values()]
   }, [athletes])
 
-  const filteredParents = parents.filter(p => {
-    const matchSearch = p.parent_name.toLowerCase().includes(search.toLowerCase()) ||
-      p.children.join(' ').toLowerCase().includes(search.toLowerCase())
-    if (!matchSearch) return false
-    if (showInactiveOnly) {
-      const s = getActivityStatus(p.user_id)
-      if (s.daysAgo !== null && s.daysAgo < 14) return false
-    }
-    return true
-  })
+  const filteredParents = parents.filter(p =>
+    p.parent_name.toLowerCase().includes(search.toLowerCase()) ||
+    p.children.join(' ').toLowerCase().includes(search.toLowerCase())
+  )
   // Хелпер: статус активности по дате последнего входа
   const getActivityStatus = (userId) => {
     const u = activityMap[userId]
@@ -1085,20 +1078,6 @@ export default function Cabinet() {
         {/* ── Родители ── */}
         {view === 'parents' && (
           <div>
-            <div style={{ display:'flex', gap:10, marginBottom:14, alignItems:'center', flexWrap:'wrap' }}>
-              <button
-                className={showInactiveOnly ? 'btn-primary' : 'btn-outline'}
-                style={{ padding:'6px 14px', fontSize:'13px' }}
-                onClick={() => setShowInactiveOnly(!showInactiveOnly)}>
-                {showInactiveOnly ? '✓ Только неактивные (>14 дн.)' : 'Только неактивные (>14 дн.)'}
-              </button>
-              <span style={{ fontSize:'0.78rem', color:'var(--gray)', display:'inline-flex', alignItems:'center', gap:14 }}>
-                <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:10,height:10,borderRadius:'50%',background:'#6cba6c',boxShadow:'0 0 6px #6cba6c88'}}/>до 5 дн.</span>
-                <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:10,height:10,borderRadius:'50%',background:'#c8962a',boxShadow:'0 0 6px #c8962a88'}}/>5–14 дн.</span>
-                <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:10,height:10,borderRadius:'50%',background:'#cc0000',boxShadow:'0 0 6px #cc000088'}}/>14+ дн.</span>
-                <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:10,height:10,borderRadius:'50%',background:'#666'}}/>не заходил</span>
-              </span>
-            </div>
             {archiveParentModal && (
               <div className="modal-overlay" onClick={() => setArchiveParentModal(null)}>
                 <div className="modal-box" onClick={e => e.stopPropagation()} style={{maxWidth:420}}>
