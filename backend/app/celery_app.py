@@ -50,6 +50,11 @@ celery_app.conf.update(
             "task":     "app.tasks.notify_overdue_fees",
             "schedule": crontab(hour=10, minute=0),
         },
+        # Пересчёт ачивок — ежедневно в 10:00
+        "recompute-achievements": {
+            "task":     "app.tasks.recompute_achievements",
+            "schedule": crontab(hour=10, minute=0),
+        },
     },
 )
 
@@ -177,5 +182,28 @@ def weekly_digest_task():
         db.rollback()
         print(f"[weekly_digest] Ошибка: {e}")
         return 0
+    finally:
+        db.close()
+
+
+@celery_app.task(name="app.tasks.recompute_achievements")
+def recompute_achievements_task():
+    from app.core.database import SessionLocal
+    from app.models.user import Athlete
+    from app.routes.achievements import auto_grant
+
+    db = SessionLocal()
+    try:
+        athletes = db.query(Athlete).filter(Athlete.is_archived == False).all()
+        total_granted = 0
+        for a in athletes:
+            try:
+                new_codes = auto_grant(a.id, db)
+                if new_codes:
+                    total_granted += len(new_codes)
+            except Exception as e:
+                print(f"[recompute_achievements] error for athlete {a.id}: {e}")
+        print(f"[recompute_achievements] обработано {len(athletes)} спортсменов, начислено новых ачивок: {total_granted}")
+        return total_granted
     finally:
         db.close()

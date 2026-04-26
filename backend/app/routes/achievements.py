@@ -235,7 +235,8 @@ def auto_grant(athlete_id: int, db: Session) -> list[str]:
             .filter(
                 CompetitionResult.athlete_id == athlete_id,
                 Competition.season == current_season,
-                CompetitionResult.status.in_(["confirmed", "paid"])
+                CompetitionResult.status.in_(["confirmed", "paid"]),
+                Competition.date < date.today(),
             )
             .all()
         )
