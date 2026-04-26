@@ -41,7 +41,7 @@ jobs:
             sudo git reset --hard origin/main
 
             # ── 3. Пересборка и запуск
-            sudo docker compose build backend frontend
+            sudo docker compose build
             sudo docker compose up -d --remove-orphans --force-recreate
             sudo docker image prune -f
 
