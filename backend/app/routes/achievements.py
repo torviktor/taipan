@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, Integer
 from typing import Optional
 from datetime import date
 
@@ -206,7 +206,7 @@ def auto_grant(athlete_id: int, db: Session) -> list[str]:
                 extract('year',  TrainingSession.date).label('y'),
                 extract('month', TrainingSession.date).label('m'),
                 func.count(TrainingSession.id).label('total'),
-                func.sum(Attendance.present.cast('integer')).label('present')
+                func.sum(Attendance.present.cast(Integer)).label('present')
             )
             .join(Attendance, Attendance.session_id == TrainingSession.id)
             .filter(
