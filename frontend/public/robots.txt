@@ -1,6 +1,11 @@
 User-agent: *
 Allow: /
-Disallow: /cabinet
+Disallow: /cabinet/
+Disallow: /cabinet$
+Disallow: /admin
+Disallow: /login
+Disallow: /register
+Disallow: /invite/
 Disallow: /api/
 
 Sitemap: https://taipan-tkd.ru/sitemap.xml
