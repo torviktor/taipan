@@ -27,6 +27,7 @@ from app.models import individual_training
 from app.models import invite as invite_model
 from app.routes.individual_training import router as individual_training_router
 from app.routes.invite import router as invite_router
+from app.routes.preparation import router as preparation_router
 import os
 
 Base.metadata.create_all(bind=engine)
@@ -75,6 +76,7 @@ app.include_router(hof_router,               prefix="/api",              tags=["
 app.include_router(fees_router,              prefix="/api/fees",         tags=["fees"])
 app.include_router(individual_training_router, prefix="/api",            tags=["Индивидуальные тренировки"])
 app.include_router(invite_router,              prefix="/api",            tags=["Приглашения"])
+app.include_router(preparation_router,         prefix="/api",            tags=["Подготовка к аттестации"])
 
 @app.on_event("startup")
 async def ensure_season_best_slots():

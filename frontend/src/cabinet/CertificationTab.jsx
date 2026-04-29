@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { API, currentSeason, seasonRange, seasonLabel } from './constants'
 import ConfirmModal from './ConfirmModal'
+import '../pages/preparation/Preparation.css'
 
 export default function CertificationTab({ token, athletes }) {
   const [certs,       setCerts]       = useState([])
@@ -147,6 +149,27 @@ export default function CertificationTab({ token, athletes }) {
   const statusLabel = (s) => s === 'planned' ? 'Планируется' : s === 'active' ? 'Идёт' : 'Завершена'
   const statusColor = (s) => s === 'completed' ? '#6cba6c' : s === 'active' ? '#c8962a' : 'var(--gray)'
 
+  const navigate = useNavigate()
+
+  // Ближайшая будущая аттестация (date >= сегодня)
+  const upcomingCert = (() => {
+    if (!certs || certs.length === 0) return null
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const future = certs
+      .filter(c => c.date && new Date(c.date) >= today)
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+    return future[0] || null
+  })()
+
+  const daysUntilCert = upcomingCert
+    ? Math.ceil((new Date(upcomingCert.date) - new Date()) / (1000 * 60 * 60 * 24))
+    : null
+
+  const showGoldButton = daysUntilCert != null && daysUntilCert >= 0 && daysUntilCert <= 30
+
+  const goPrep = () => navigate('/preparation')
+
   return (
     <div className="comp-wrap">
       {confirm && <ConfirmModal message={confirm.message} confirmText={confirm.confirmText} danger={confirm.danger} onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)}/>}
@@ -162,6 +185,28 @@ export default function CertificationTab({ token, athletes }) {
             </select>
           )}
         </div>
+        <button
+          type="button"
+          onClick={goPrep}
+          className={`btn-outline ${showGoldButton ? 'cabinet-tab-cert-soon' : ''}`}
+          style={{ marginLeft: 'auto' }}
+        >
+          Подготовка к аттестации
+          {showGoldButton && (
+            <span className="cert-prep-counter">
+              {daysUntilCert === 0 ? 'сегодня!'
+               : daysUntilCert === 1 ? 'завтра!'
+               : `осталось ${daysUntilCert} ${(() => {
+                   const n = daysUntilCert % 100
+                   const n10 = n % 10
+                   if (n > 10 && n < 20) return 'дней'
+                   if (n10 === 1) return 'день'
+                   if (n10 >= 2 && n10 <= 4) return 'дня'
+                   return 'дней'
+                 })()}`}
+            </span>
+          )}
+        </button>
         <div className="comp-top-right">
           {!detail && <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={() => { setShowForm(true); setMsg('') }}>+ Аттестация</button>}
           {detail && detail.status !== 'completed' && (

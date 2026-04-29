@@ -1,0 +1,284 @@
+/* ─── Раздел «Подготовка к аттестации» ─────────────────────────────────────── */
+
+.prep-page {
+  background: var(--black);
+  color: var(--white);
+  min-height: 100vh;
+  padding: 120px 0 100px;
+}
+
+.prep-back-link {
+  display: inline-block;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gray);
+  text-decoration: none;
+  margin-bottom: 24px;
+  transition: color 0.2s;
+}
+.prep-back-link:hover { color: var(--red); }
+
+.prep-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 64px;
+  letter-spacing: 4px;
+  color: var(--white);
+  margin: 0 0 16px;
+  line-height: 1;
+}
+
+.prep-lead {
+  font-family: 'Barlow', sans-serif;
+  font-size: 18px;
+  color: var(--gray);
+  max-width: 720px;
+  margin: 0 0 56px;
+  line-height: 1.6;
+}
+
+.prep-error { color: var(--red-hot); }
+
+/* ─── Заголовок-разделитель блока ──────────────────────────────────────────── */
+.prep-block-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 36px;
+  letter-spacing: 3px;
+  color: var(--white);
+  margin: 0 0 24px;
+}
+.prep-divider {
+  margin-top: 64px;
+  padding-top: 24px;
+  border-top: 1px solid var(--gray-dim);
+}
+
+/* ─── Большая плашка «Галерея» (1 из 3 блоков) ────────────────────────────── */
+.prep-gallery-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--dark);
+  border: 1px solid var(--gray-dim);
+  border-left: 3px solid var(--red);
+  padding: 32px 40px;
+  margin-bottom: 16px;
+  text-decoration: none;
+  color: var(--white);
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
+}
+.prep-gallery-card:hover {
+  background: var(--dark2);
+  border-left-color: var(--red-hot);
+  transform: translateX(4px);
+}
+.prep-gallery-content { flex: 1; }
+.prep-gallery-card .prep-block-title { margin: 0 0 8px; }
+.prep-gallery-desc {
+  font-family: 'Barlow', sans-serif;
+  font-size: 16px;
+  color: var(--gray);
+  margin: 0;
+}
+.prep-gallery-arrow {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 48px;
+  color: var(--red);
+  margin-left: 24px;
+  flex-shrink: 0;
+}
+
+/* ─── Сетка карточек (методички и программы) ──────────────────────────────── */
+.prep-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.prep-card {
+  position: relative;
+  display: block;
+  background: transparent;
+  border: 2px solid var(--white);
+  padding: 24px;
+  text-decoration: none;
+  color: var(--white);
+  transition: border-color 0.2s, color 0.2s, transform 0.2s;
+}
+.prep-card:hover {
+  border-color: var(--red);
+  color: var(--red);
+  transform: translateY(-2px);
+}
+
+.prep-card-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 2px;
+  margin: 0 0 6px;
+  line-height: 1;
+}
+
+.prep-card-subtitle {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gray);
+  margin: 0;
+}
+
+/* ─── Подсветка карточки под пользователя ─────────────────────────────────── */
+.prep-card-highlight {
+  border-color: var(--red);
+  background: rgba(204, 0, 0, 0.08);
+}
+.prep-card-highlight:hover {
+  border-color: var(--red-hot);
+  background: rgba(255, 26, 26, 0.12);
+}
+
+.prep-card-badge {
+  position: absolute;
+  top: -10px;
+  right: 12px;
+  background: var(--red);
+  color: var(--white);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  font-weight: 700;
+}
+
+/* ─── Заглушка «Контент в разработке» ─────────────────────────────────────── */
+.prep-stub {
+  background: var(--dark);
+  border: 1px solid var(--gray-dim);
+  border-top: 3px solid var(--red);
+  padding: 56px 40px;
+  text-align: center;
+  max-width: 600px;
+  margin: 40px auto;
+}
+.prep-stub-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 32px;
+  letter-spacing: 3px;
+  color: var(--white);
+  margin: 0 0 16px;
+}
+.prep-stub-text {
+  font-family: 'Barlow', sans-serif;
+  font-size: 16px;
+  color: var(--gray);
+  margin: 0 0 32px;
+  line-height: 1.6;
+}
+
+.prep-content {
+  font-family: 'Barlow', sans-serif;
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--white);
+}
+
+/* ─── Фильтры галереи ──────────────────────────────────────────────────────── */
+.prep-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+.prep-filter-btn {
+  padding: 8px 18px !important;
+  font-size: 13px !important;
+  letter-spacing: 1.5px !important;
+}
+.prep-filter-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.prep-filter-active {
+  border-color: var(--red) !important;
+  color: var(--red) !important;
+}
+
+/* ─── Сетка элементов галереи ─────────────────────────────────────────────── */
+.prep-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 24px;
+}
+.prep-gallery-item {
+  background: var(--dark);
+  border: 1px solid var(--gray-dim);
+  padding: 16px;
+}
+.prep-gallery-img-placeholder {
+  background: var(--dark2);
+  border: 1px dashed var(--gray-dim);
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gray);
+  font-family: 'Barlow Condensed', sans-serif;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.prep-gallery-item-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 2px;
+  margin: 0 0 4px;
+}
+.prep-gallery-item-cat {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--red);
+  margin: 0 0 8px;
+}
+.prep-gallery-item-desc {
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  color: var(--gray);
+  margin: 0;
+}
+
+/* ─── Кнопка «Аттестация» в кабинете с золотой рамкой и счётчиком ─────────── */
+.cabinet-tab-cert-soon {
+  position: relative;
+  border-color: #c8962a !important;
+  color: #c8962a !important;
+  box-shadow: 0 0 0 1px #c8962a inset;
+}
+.cabinet-tab-cert-soon.active {
+  background: rgba(200, 150, 42, 0.12) !important;
+  color: #e0b14a !important;
+}
+.cert-prep-counter {
+  display: block;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #c8962a;
+  margin-top: 2px;
+  font-weight: 600;
+}
+
+/* ─── Адаптив ──────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .prep-page { padding: 80px 0 60px; }
+  .prep-title { font-size: 44px; letter-spacing: 2px; }
+  .prep-block-title { font-size: 28px; }
+  .prep-gallery-card { flex-direction: column; align-items: flex-start; padding: 24px; }
+  .prep-gallery-arrow { display: none; }
+  .prep-cards-grid { grid-template-columns: 1fr; }
+}

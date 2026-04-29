@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import ScrollToTop from './components/ScrollToTop'
+import PrivateRoute from './components/PrivateRoute'
 import Home from './pages/Home'
 import Schedule from './pages/Schedule'
 import Calendar from './pages/Calendar'
@@ -21,6 +22,10 @@ import NewsPage from './pages/News'
 import WhyTaipan from './pages/WhyTaipan'
 import InvitePage from './pages/InvitePage'
 import CookieBanner from './components/CookieBanner'
+import Preparation from './pages/preparation/Preparation'
+import Gallery from './pages/preparation/Gallery'
+import Methodichka from './pages/preparation/Methodichka'
+import Plan from './pages/preparation/Plan'
 
 export default function App() {
   return (
@@ -46,6 +51,12 @@ export default function App() {
         <Route path="/news"              element={<NewsPage />} />
         <Route path="/about/why"         element={<WhyTaipan />} />
         <Route path="/invite/:token"     element={<InvitePage />} />
+
+        {/* Закрытый раздел «Подготовка к аттестации» — только для членов клуба */}
+        <Route path="/preparation"                  element={<PrivateRoute><Preparation /></PrivateRoute>} />
+        <Route path="/preparation/gallery"          element={<PrivateRoute><Gallery /></PrivateRoute>} />
+        <Route path="/preparation/method/:slug"     element={<PrivateRoute><Methodichka /></PrivateRoute>} />
+        <Route path="/preparation/plan/:gup"        element={<PrivateRoute><Plan /></PrivateRoute>} />
       </Routes>
       <Footer />
 <CookieBanner />
