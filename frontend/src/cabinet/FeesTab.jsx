@@ -59,6 +59,17 @@ export default function FeesTab({ token, role }) {
     setLocalBudget({})
     setMsg('')
     try {
+      // Backend идемпотентен: если записи уже есть — пропустит, если нет — создаст.
+      // Это гарантирует что недавно добавленные спортсмены попадут в текущий период.
+      const initRes = await fetch(
+        `${API}/fees/periods/init?year=${year}&month=${month}`,
+        { method: 'POST', headers: h }
+      )
+      if (!initRes.ok) {
+        const initText = await initRes.text()
+        setMsg('Ошибка инициализации: ' + initText)
+      }
+
       const res = await fetch(
         `${API}/fees/periods?year=${year}&month=${month}`,
         { headers: h }
@@ -66,26 +77,7 @@ export default function FeesTab({ token, role }) {
       if (res.ok) {
         const data = await res.json()
         setPeriods(data)
-        if (data.length === 0) {
-          const initRes = await fetch(
-            `${API}/fees/periods/init?year=${year}&month=${month}`,
-            { method: 'POST', headers: h }
-          )
-          const initText = await initRes.text()
-          if (initRes.ok) {
-            const res2 = await fetch(
-              `${API}/fees/periods?year=${year}&month=${month}`,
-              { headers: h }
-            )
-            if (res2.ok) {
-              const data2 = await res2.json()
-              setPeriods(data2)
-              if (data2.length === 0) setMsg('Нет спортсменов в вашей группе')
-            }
-          } else {
-            setMsg('Ошибка инициализации: ' + initText)
-          }
-        }
+        if (data.length === 0) setMsg('Нет спортсменов в вашей группе')
       } else {
         setPeriods([])
         setMsg('Ошибка загрузки данных')
