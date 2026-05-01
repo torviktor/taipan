@@ -27,13 +27,11 @@ export default function FeesTab({ token, role }) {
   const [month,       setMonth]       = useState(now.getMonth() + 1)
   const isPast = year < currentYear || (year === currentYear && month < currentMonth)
   const [periods,     setPeriods]     = useState([])
-  const [localBudget, setLocalBudget] = useState({})
   const [localNotes,  setLocalNotes]  = useState({})
   const [groupFilter, setGroupFilter] = useState('all')
   const [groupSaving,       setGroupSaving]       = useState(false)
   const [showGroupChange,   setShowGroupChange]   = useState(false)
   const [loading,     setLoading]     = useState(false)
-  const [saving,      setSaving]      = useState(false)
   const [notifying,   setNotifying]   = useState(false)
   const [msg,         setMsg]         = useState('')
 
@@ -56,7 +54,6 @@ export default function FeesTab({ token, role }) {
 
   const loadAndInit = async () => {
     setLoading(true)
-    setLocalBudget({})
     setMsg('')
     try {
       // Backend идемпотентен: если записи уже есть — пропустит, если нет — создаст.
@@ -96,7 +93,7 @@ export default function FeesTab({ token, role }) {
       const r = await fetch(`${API}/fees/config`, {
         method: 'POST',
         headers: hj,
-        body: JSON.stringify({ payment_day: config.payment_day, fee_amount: config.fee_amount }),
+        body: JSON.stringify({ fee_amount: config.fee_amount }),
       })
       if (r.ok) { setConfigDirty(false); setMsg('Настройки сохранены') }
     } catch {}
@@ -139,6 +136,20 @@ export default function FeesTab({ token, role }) {
     } catch {}
   }
 
+  const toggleBudget = async (periodId, isBudget) => {
+    try {
+      const r = await fetch(`${API}/fees/periods/${periodId}`, {
+        method: 'PATCH',
+        headers: hj,
+        body: JSON.stringify({ is_budget: isBudget }),
+      })
+      if (r.ok) {
+        const updated = await r.json()
+        setPeriods(prev => prev.map(p => p.id === periodId ? updated : p))
+      }
+    } catch {}
+  }
+
   const changeGroup = async (gid) => {
     setGroupFilter(gid)
     setGroupSaving(true)
@@ -172,45 +183,30 @@ export default function FeesTab({ token, role }) {
     return list
   }, [periods, groupFilter])
 
-  const getBody = () => (filteredPeriods || []).map(p => ({
-    athlete_id: p.athlete_id,
-    is_budget:  localBudget[p.athlete_id] ?? p.is_budget,
-  }))
-
-  const saveList = async () => {
-    setSaving(true)
-    try {
-      await fetch(`${API}/fees/periods/save-and-notify?year=${year}&month=${month}&notify=false`, {
-        method: 'POST',
-        headers: hj,
-        body: JSON.stringify(getBody()),
-      })
-      await loadAndInit()
-      setMsg('Список сохранён')
-    } catch {}
-    setSaving(false)
-  }
-
-  const saveAndNotify = async () => {
+  const notifyDebtors = async () => {
     setNotifying(true)
     try {
       const r = await fetch(`${API}/fees/periods/save-and-notify?year=${year}&month=${month}`, {
         method: 'POST',
         headers: hj,
-        body: JSON.stringify(getBody()),
+        body: JSON.stringify([]),  // пустой массив — ничего не меняем, только шлём уведомления
       })
       if (r.ok) {
         const result = await r.json()
-        await loadAndInit()
-        setMsg(`Уведомлено: ${result.notified} чел.`)
+        setMsg(`Напоминание отправлено: ${result.notified} чел.`)
       }
     } catch {}
     setNotifying(false)
   }
 
-  const countNonBudget = (filteredPeriods || []).filter(p => !(localBudget[p.athlete_id] ?? p.is_budget)).length
-  const countPaid      = (filteredPeriods || []).filter(p => !(localBudget[p.athlete_id] ?? p.is_budget) && p.paid).length
-  const countDebt      = (filteredPeriods || []).filter(p => !(localBudget[p.athlete_id] ?? p.is_budget) && !p.paid && p.debt > 0).length
+  const countDebtors  = (filteredPeriods || []).filter(p => !p.is_budget && !p.paid).length
+  const countPaid     = (filteredPeriods || []).filter(p => !p.is_budget && p.paid).length
+  const countBudget   = (filteredPeriods || []).filter(p =>  p.is_budget).length
+
+  // Денежные счётчики (только для платящих клубу)
+  const moneyDue   = (filteredPeriods || []).filter(p => !p.is_budget).reduce((s, p) => s + (config.fee_amount + (p.debt || 0)), 0)
+  const moneyPaid  = (filteredPeriods || []).filter(p => !p.is_budget && p.paid).reduce((s, p) => s + (config.fee_amount + (p.debt || 0)), 0)
+  const moneyDebt  = (filteredPeriods || []).filter(p => !p.is_budget && !p.paid).reduce((s, p) => s + (config.fee_amount + (p.debt || 0)), 0)
 
   return (
     <div>
@@ -218,21 +214,20 @@ export default function FeesTab({ token, role }) {
       <div style={{ display:'flex', gap:16, alignItems:'center', flexWrap:'wrap',
         background:'var(--dark2)', border:'1px solid var(--gray-dim)',
         borderRadius:8, padding:'14px 18px', marginBottom:20 }}>
-        <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>День сбора взносов:</span>
-        <input type="number" min="1" max="28" value={config.payment_day}
-          onChange={e => { setConfig(p => ({...p, payment_day: +e.target.value})); setConfigDirty(true) }}
-          className="td-input" style={{width:60}} />
-        <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>Сумма (руб.):</span>
+        <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>Сумма взноса (руб.):</span>
         <input type="number" min="0" value={config.fee_amount}
           onChange={e => { setConfig(p => ({...p, fee_amount: +e.target.value})); setConfigDirty(true) }}
           className="td-input" style={{width:100}} />
         {configDirty ? (
           <button className="btn-primary" style={{padding:'6px 16px', fontSize:'13px'}} onClick={saveConfig}>
-            Сохранить настройки
+            Сохранить
           </button>
         ) : (
           <span style={{color:'#6cba6c', fontSize:'0.82rem'}}>✓ Сохранено</span>
         )}
+        <span style={{color:'var(--gray)', fontSize:'0.78rem', marginLeft:'auto'}}>
+          Дедлайн оплаты — 25 число каждого месяца
+        </span>
       </div>
 
       {/* Фильтр по группе */}
@@ -361,19 +356,30 @@ export default function FeesTab({ token, role }) {
             </div>
           )}
 
-          {/* Статистика */}
+          {/* Статистика — люди */}
+          <div style={{ display:'flex', gap:20, marginBottom:8, flexWrap:'wrap' }}>
+            <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>
+              Должников: <strong style={{color:'var(--red)'}}>{countDebtors}</strong>
+            </span>
+            <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>
+              Сдали взносы: <strong style={{color:'#6cba6c'}}>{countPaid}</strong>
+            </span>
+            <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>
+              Абонемент: <strong style={{color:'var(--white)'}}>{countBudget}</strong>
+            </span>
+          </div>
+
+          {/* Статистика — деньги */}
           <div style={{ display:'flex', gap:20, marginBottom:12, flexWrap:'wrap' }}>
             <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>
-              Внебюджетников: <strong style={{color:'var(--white)'}}>{countNonBudget}</strong>
+              Сумма к сбору: <strong style={{color:'var(--white)'}}>{moneyDue.toLocaleString('ru-RU')} руб.</strong>
             </span>
             <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>
-              Оплатили: <strong style={{color:'#6cba6c'}}>{countPaid}</strong> из {countNonBudget}
+              Получено: <strong style={{color:'#6cba6c'}}>{moneyPaid.toLocaleString('ru-RU')} руб.</strong>
             </span>
-            {countDebt > 0 && (
-              <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>
-                Должников: <strong style={{color:'var(--red)'}}>{countDebt}</strong>
-              </span>
-            )}
+            <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>
+              Долг: <strong style={{color:'var(--red)'}}>{moneyDebt.toLocaleString('ru-RU')} руб.</strong>
+            </span>
           </div>
 
           {/* Таблица */}
@@ -383,7 +389,7 @@ export default function FeesTab({ token, role }) {
                 <tr style={{borderBottom:'1px solid var(--gray-dim)'}}>
                   <th style={{...thStyle, textAlign:'left'}}>Спортсмен</th>
                   <th style={thStyle}>Группа</th>
-                  <th style={thStyle}>Бюджетник</th>
+                  <th style={thStyle}>Абонемент</th>
                   <th style={thStyle}>Оплачено</th>
                   <th style={thStyle}>Долг</th>
                   <th style={{...thStyle, textAlign:'left'}}>Комментарий</th>
@@ -391,7 +397,7 @@ export default function FeesTab({ token, role }) {
               </thead>
               <tbody>
                 {(filteredPeriods || []).map(p => {
-                  const isBudget = localBudget[p.athlete_id] ?? p.is_budget
+                  const isBudget = p.is_budget
                   return (
                     <tr key={p.id} style={{
                       borderBottom: '1px solid var(--gray-dim)',
@@ -404,11 +410,11 @@ export default function FeesTab({ token, role }) {
                       <td style={{...tdStyle, textAlign:'center'}}>
                         {(role === 'admin' || isPast) ? (
                           <span style={{fontSize:'0.82rem', color: isBudget ? 'var(--gray)' : 'var(--white)'}}>
-                            {isBudget ? 'Бюджетник' : 'Внебюджетник'}
+                            {isBudget ? 'Абонемент' : 'Платит клубу'}
                           </span>
                         ) : (
                           <input type="checkbox" checked={isBudget}
-                            onChange={e => setLocalBudget(prev => ({...prev, [p.athlete_id]: e.target.checked}))}
+                            onChange={e => toggleBudget(p.id, e.target.checked)}
                             style={{width:16, height:16, accentColor:'var(--red)', cursor:'pointer'}}/>
                         )}
                       </td>
@@ -466,16 +472,12 @@ export default function FeesTab({ token, role }) {
             </table>
           </div>
 
-          {/* Кнопки */}
-          {role !== 'admin' && !isPast && (
+          {/* Кнопка уведомления */}
+          {role !== 'admin' && !isPast && countDebtors > 0 && (
             <div style={{ display:'flex', gap:12, marginTop:20, flexWrap:'wrap' }}>
-              <button className="btn-outline" style={{padding:'9px 20px'}}
-                onClick={saveList} disabled={saving}>
-                {saving ? 'Сохранение...' : 'Сохранить список'}
-              </button>
               <button className="btn-primary" style={{padding:'9px 20px'}}
-                onClick={saveAndNotify} disabled={notifying}>
-                {notifying ? 'Отправка...' : 'Сохранить и уведомить внебюджетников'}
+                onClick={notifyDebtors} disabled={notifying}>
+                {notifying ? 'Отправка...' : `Напомнить должникам (${countDebtors})`}
               </button>
             </div>
           )}

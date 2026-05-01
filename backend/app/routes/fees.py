@@ -17,6 +17,9 @@ from app.models.certification import Notification
 
 router = APIRouter()
 
+# День месяца, когда формируется счёт на взнос. Зашит в код, не настраивается.
+PAYMENT_DAY = 25
+
 
 def require_manager(u: User = Depends(get_current_user)) -> User:
     if u.role not in ("manager", "admin"):
@@ -650,33 +653,36 @@ def _period_out(p: AthleteFeePeriod) -> dict:
 @router.get("/config")
 def get_fee_config(db: Session = Depends(get_db)):
     cfg = db.query(FeeConfig).first()
-    if not cfg:
-        return {"payment_day": 1, "fee_amount": 2000}
-    return {"payment_day": cfg.payment_day, "fee_amount": cfg.fee_amount}
+    fee_amount = cfg.fee_amount if cfg else 2000
+    # payment_day всегда 25 — захардкожено в коде, поле в БД игнорируется
+    return {"payment_day": PAYMENT_DAY, "fee_amount": fee_amount}
 
 
 # ── POST /fees/config ─────────────────────────────────────────────────────────
 
+class FeeAmountBody(BaseModel):
+    fee_amount: int
+
 @router.post("/config")
 def save_fee_config(
-    body: FeeConfigBody,
+    body: FeeAmountBody,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_manager),
 ):
+    # payment_day игнорируется — он жёстко 25 в коде
     cfg = db.query(FeeConfig).first()
     if cfg:
-        cfg.payment_day = body.payment_day
-        cfg.fee_amount  = body.fee_amount
-        cfg.updated_by  = current_user.id
+        cfg.fee_amount = body.fee_amount
+        cfg.updated_by = current_user.id
     else:
         cfg = FeeConfig(
-            payment_day=body.payment_day,
+            payment_day=PAYMENT_DAY,  # для совместимости со схемой
             fee_amount=body.fee_amount,
             updated_by=current_user.id,
         )
         db.add(cfg)
     db.commit()
-    return {"payment_day": cfg.payment_day, "fee_amount": cfg.fee_amount}
+    return {"payment_day": PAYMENT_DAY, "fee_amount": cfg.fee_amount}
 
 
 # ── GET /fees/periods ─────────────────────────────────────────────────────────
