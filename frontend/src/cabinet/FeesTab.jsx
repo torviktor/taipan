@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import './FeesTab.css'
 import { API } from './constants'
 
 const MONTHS_RU = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -183,6 +184,23 @@ export default function FeesTab({ token, role }) {
     return list
   }, [periods, groupFilter])
 
+  // Алфавитная сортировка по ФИО
+  const byName = (a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'ru')
+
+  // Три списка — по состоянию галочек
+  const debtors = useMemo(
+    () => (filteredPeriods || []).filter(p => !p.is_budget && !p.paid).sort(byName),
+    [filteredPeriods]
+  )
+  const paidList = useMemo(
+    () => (filteredPeriods || []).filter(p => !p.is_budget && p.paid).sort(byName),
+    [filteredPeriods]
+  )
+  const budgetList = useMemo(
+    () => (filteredPeriods || []).filter(p => p.is_budget).sort(byName),
+    [filteredPeriods]
+  )
+
   const notifyDebtors = async () => {
     setNotifying(true)
     try {
@@ -207,6 +225,111 @@ export default function FeesTab({ token, role }) {
   const moneyDue   = (filteredPeriods || []).filter(p => !p.is_budget).reduce((s, p) => s + (config.fee_amount + (p.debt || 0)), 0)
   const moneyPaid  = (filteredPeriods || []).filter(p => !p.is_budget && p.paid).reduce((s, p) => s + (config.fee_amount + (p.debt || 0)), 0)
   const moneyDebt  = (filteredPeriods || []).filter(p => !p.is_budget && !p.paid).reduce((s, p) => s + (config.fee_amount + (p.debt || 0)), 0)
+
+  // Рендер одной строки таблицы (общий для всех трёх списков)
+  const renderRow = (p) => {
+    const isBudget = p.is_budget
+    return (
+      <tr key={p.id} style={{ borderBottom: '1px solid var(--gray-dim)' }}>
+        <td style={{...tdStyle, color:'var(--white)'}}>{p.full_name}</td>
+        <td style={{...tdStyle, textAlign:'center', color:'var(--gray)', fontSize:'0.85rem'}}>
+          {p.group || '—'}
+        </td>
+        <td style={{...tdStyle, textAlign:'center'}}>
+          {(role === 'admin' || isPast) ? (
+            <span style={{fontSize:'0.82rem', color: isBudget ? 'var(--gray)' : 'var(--white)'}}>
+              {isBudget ? 'Абонемент' : 'Платит клубу'}
+            </span>
+          ) : (
+            <input type="checkbox" checked={isBudget}
+              onChange={e => toggleBudget(p.id, e.target.checked)}
+              style={{width:16, height:16, accentColor:'var(--red)', cursor:'pointer'}}/>
+          )}
+        </td>
+        <td style={{...tdStyle, textAlign:'center'}}>
+          {!isBudget && (
+            (role === 'admin' || isPast) ? (
+              <span style={{fontSize:'0.82rem', color: p.paid ? '#6cba6c' : 'var(--red)'}}>
+                {p.paid ? 'Оплачено' : 'Не оплачено'}
+              </span>
+            ) : (
+              <input type="checkbox" checked={p.paid}
+                onChange={e => togglePaid(p.id, e.target.checked)}
+                style={{width:16, height:16, accentColor:'#6cba6c', cursor:'pointer'}}/>
+            )
+          )}
+        </td>
+        <td style={{...tdStyle, textAlign:'center'}}>
+          {!isBudget && p.paid && (
+            <span style={{color:'#6cba6c', fontSize:'1.1rem'}}>✓</span>
+          )}
+          {!isBudget && !p.paid && (
+            <div>
+              <span style={{color:'var(--red)', fontWeight:700, fontSize:'0.85rem'}}>
+                {config.fee_amount + p.debt} руб.
+              </span>
+              {p.debt > 0 && (
+                <div style={{color:'var(--gray)', fontSize:'0.78rem'}}>
+                  {config.fee_amount} + {p.debt} долг
+                </div>
+              )}
+            </div>
+          )}
+        </td>
+        <td style={tdStyle}>
+          {(role === 'admin' || isPast) ? (
+            <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>
+              {p.note || ''}
+            </span>
+          ) : (
+            <input
+              type="text"
+              className="td-input"
+              placeholder="Комментарий..."
+              value={localNotes[p.id] ?? p.note ?? ''}
+              onChange={e => setLocalNotes(prev => ({...prev, [p.id]: e.target.value}))}
+              onBlur={e => saveNote(p.id, e.target.value)}
+              style={{width:'100%', minWidth:120}}
+            />
+          )}
+        </td>
+      </tr>
+    )
+  }
+
+  // Рендер заголовка таблицы (общий для всех трёх списков)
+  const renderTableHead = () => (
+    <thead>
+      <tr style={{borderBottom:'1px solid var(--gray-dim)'}}>
+        <th style={{...thStyle, textAlign:'left'}}>Спортсмен</th>
+        <th style={thStyle}>Группа</th>
+        <th style={thStyle}>Абонемент</th>
+        <th style={thStyle}>Оплачено</th>
+        <th style={thStyle}>Долг</th>
+        <th style={{...thStyle, textAlign:'left'}}>Комментарий</th>
+      </tr>
+    </thead>
+  )
+
+  // Рендер одного из трёх списков с заголовком
+  const renderList = (variant, title, rows) => (
+    <div className={`fees-list fees-list-${variant}`}>
+      <h3 className="fees-list-title">
+        {title}
+        <span className="fees-list-title-count">({rows.length})</span>
+      </h3>
+      {rows.length === 0 ? (
+        <div className="fees-list-empty">Пусто</div>
+      ) : (
+        <div className="athletes-table-wrap fees-list-rows">
+          <table style={{width:'100%', borderCollapse:'collapse'}}>
+            {renderTableHead()}
+            <tbody>{rows.map(renderRow)}</tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
 
   return (
     <div>
@@ -382,95 +505,10 @@ export default function FeesTab({ token, role }) {
             </span>
           </div>
 
-          {/* Таблица */}
-          <div className="athletes-table-wrap">
-            <table style={{width:'100%', borderCollapse:'collapse'}}>
-              <thead>
-                <tr style={{borderBottom:'1px solid var(--gray-dim)'}}>
-                  <th style={{...thStyle, textAlign:'left'}}>Спортсмен</th>
-                  <th style={thStyle}>Группа</th>
-                  <th style={thStyle}>Абонемент</th>
-                  <th style={thStyle}>Оплачено</th>
-                  <th style={thStyle}>Долг</th>
-                  <th style={{...thStyle, textAlign:'left'}}>Комментарий</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(filteredPeriods || []).map(p => {
-                  const isBudget = p.is_budget
-                  return (
-                    <tr key={p.id} style={{
-                      borderBottom: '1px solid var(--gray-dim)',
-                      opacity: isBudget ? 0.5 : 1,
-                    }}>
-                      <td style={{...tdStyle, color:'var(--white)'}}>{p.full_name}</td>
-                      <td style={{...tdStyle, textAlign:'center', color:'var(--gray)', fontSize:'0.85rem'}}>
-                        {p.group || '—'}
-                      </td>
-                      <td style={{...tdStyle, textAlign:'center'}}>
-                        {(role === 'admin' || isPast) ? (
-                          <span style={{fontSize:'0.82rem', color: isBudget ? 'var(--gray)' : 'var(--white)'}}>
-                            {isBudget ? 'Абонемент' : 'Платит клубу'}
-                          </span>
-                        ) : (
-                          <input type="checkbox" checked={isBudget}
-                            onChange={e => toggleBudget(p.id, e.target.checked)}
-                            style={{width:16, height:16, accentColor:'var(--red)', cursor:'pointer'}}/>
-                        )}
-                      </td>
-                      <td style={{...tdStyle, textAlign:'center'}}>
-                        {!isBudget && (
-                          (role === 'admin' || isPast) ? (
-                            <span style={{fontSize:'0.82rem', color: p.paid ? '#6cba6c' : 'var(--red)'}}>
-                              {p.paid ? 'Оплачено' : 'Не оплачено'}
-                            </span>
-                          ) : (
-                            <input type="checkbox" checked={p.paid}
-                              onChange={e => togglePaid(p.id, e.target.checked)}
-                              style={{width:16, height:16, accentColor:'#6cba6c', cursor:'pointer'}}/>
-                          )
-                        )}
-                      </td>
-                      <td style={{...tdStyle, textAlign:'center'}}>
-                        {!isBudget && p.paid && (
-                          <span style={{color:'#6cba6c', fontSize:'1.1rem'}}>✓</span>
-                        )}
-                        {!isBudget && !p.paid && (
-                          <div>
-                            <span style={{color:'var(--red)', fontWeight:700, fontSize:'0.85rem'}}>
-                              {config.fee_amount + p.debt} руб.
-                            </span>
-                            {p.debt > 0 && (
-                              <div style={{color:'var(--gray)', fontSize:'0.78rem'}}>
-                                {config.fee_amount} + {p.debt} долг
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                      <td style={tdStyle}>
-                        {(role === 'admin' || isPast) ? (
-                          <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>
-                            {p.note || ''}
-                          </span>
-                        ) : (
-                          <input
-                            type="text"
-                            className="td-input"
-                            placeholder="Комментарий..."
-                            value={localNotes[p.id] ?? p.note ?? ''}
-                            onChange={e => setLocalNotes(prev => ({...prev, [p.id]: e.target.value}))}
-                            onBlur={e => saveNote(p.id, e.target.value)}
-                            style={{width:'100%', minWidth:120}}
-                          />
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          {/* Три списка */}
+          {renderList('debtors', 'Ждём оплаты',  debtors)}
+          {renderList('paid',    'Оплатили',     paidList)}
+          {renderList('budget',  'По абонементу', budgetList)}
 
           {/* Кнопка уведомления */}
           {role !== 'admin' && !isPast && countDebtors > 0 && (
