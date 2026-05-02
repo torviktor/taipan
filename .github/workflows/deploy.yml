@@ -29,20 +29,25 @@ jobs:
           host:     ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key:      ${{ secrets.SERVER_SSH_KEY }}
+          command_timeout: 20m
           script: |
             set -e
             cd /opt/taipan
 
-            # ── 1. Удалить старый скрипт если есть
-            rm -f /opt/taipan/deploy-club-info.sh
+            # 1. Получить свежий код
+            git fetch origin main
+            git reset --hard origin/main
 
-            # ── 2. Получить свежий код (сбросить локальные изменения)
-            sudo git fetch origin main
-            sudo git reset --hard origin/main
+            # 2. Пересборка БЕЗ кэша (иначе старый код попадёт в новый образ)
+            docker compose build --no-cache
 
-            # ── 3. Пересборка и запуск
-            sudo docker compose build
-            sudo docker compose up -d --remove-orphans --force-recreate
-            sudo docker image prune -f
+            # 3. Корректное пересоздание: down + up
+            #    Это устраняет race condition с conflict имён контейнеров
+            #    при параллельном --force-recreate. Простой ~10-15 сек.
+            docker compose down
+            docker compose up -d --remove-orphans
+
+            # 4. Чистка dangling-образов
+            docker image prune -f
 
             echo "Деплой завершён"
