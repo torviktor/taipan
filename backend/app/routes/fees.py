@@ -806,17 +806,14 @@ def patch_period(
         p.paid = body.paid
         if body.paid:
             p.paid_at = datetime.utcnow()
-            p.debt    = 0
+            # debt НЕ обнуляем — он остаётся как при init,
+            # чтобы при снятии галочки восстановилось то же состояние.
         else:
             p.paid_at = None
-            unpaid_frozen = db.query(AthleteFeePeriod).filter(
-                AthleteFeePeriod.athlete_id == p.athlete_id,
-                AthleteFeePeriod.is_frozen  == True,
-                AthleteFeePeriod.paid       == False,
-                AthleteFeePeriod.is_budget  == False,
-            ).count()
-            _cfg = db.query(FeeConfig).first()
-            p.debt = unpaid_frozen * (_cfg.fee_amount if _cfg else 2000)
+            # debt тоже не пересчитываем — его значение было зафиксировано
+            # при init_periods (или 0 если периодов до этого не было).
+            # Пересчёт через unpaid_frozen приводил к "фантомным" долгам
+            # когда в БД оставались мусорные frozen-периоды.
     db.commit()
     db.refresh(p)
     return _period_out(p)
