@@ -27,6 +27,16 @@ export default function FeesTab({ token, role }) {
   const [year,        setYear]        = useState(now.getFullYear())
   const [month,       setMonth]       = useState(now.getMonth() + 1)
   const isPast = year < currentYear || (year === currentYear && month < currentMonth)
+  // Определяем за какой месяц сейчас собираются взносы:
+  // - до 25 числа текущего месяца — собираем за ПРОШЛЫЙ
+  // - с 25 числа — собираем за ТЕКУЩИЙ
+  const PAYMENT_DAY = 25
+  const today = now.getDate()
+  const isAfter25 = today >= PAYMENT_DAY
+  const billingMonthOffset = isAfter25 ? 0 : -1
+  let billingYear = currentYear
+  let billingMonth = currentMonth + billingMonthOffset
+  if (billingMonth < 1) { billingMonth = 12; billingYear-- }
   const [periods,     setPeriods]     = useState([])
   const [localNotes,  setLocalNotes]  = useState({})
   const [groupFilter, setGroupFilter] = useState('all')
@@ -35,6 +45,9 @@ export default function FeesTab({ token, role }) {
   const [loading,     setLoading]     = useState(false)
   const [notifying,   setNotifying]   = useState(false)
   const [msg,         setMsg]         = useState('')
+  const [showHistory, setShowHistory] = useState(false)
+  const [historyData, setHistoryData] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
 
   const h  = { Authorization: `Bearer ${token}` }
   const hj = { ...h, 'Content-Type': 'application/json' }
@@ -98,15 +111,6 @@ export default function FeesTab({ token, role }) {
       })
       if (r.ok) { setConfigDirty(false); setMsg('Настройки сохранены') }
     } catch {}
-  }
-
-  const prevMonth = () => {
-    if (month === 1) { setYear(y => y - 1); setMonth(12) }
-    else setMonth(m => m - 1)
-  }
-  const nextMonth = () => {
-    if (month === 12) { setYear(y => y + 1); setMonth(1) }
-    else setMonth(m => m + 1)
   }
 
   const saveNote = async (periodId, note) => {
@@ -215,6 +219,26 @@ export default function FeesTab({ token, role }) {
       }
     } catch {}
     setNotifying(false)
+  }
+
+  const loadHistory = async () => {
+    setHistoryLoading(true)
+    try {
+      const r = await fetch(`${API}/fees/periods/history`, { headers: h })
+      if (r.ok) {
+        const data = await r.json()
+        // Прячем текущий период — он показан в основной таблице
+        setHistoryData(data.filter(d =>
+          !(d.year === currentYear && d.month === currentMonth)
+        ))
+      }
+    } catch {}
+    setHistoryLoading(false)
+  }
+
+  const openHistory = async () => {
+    setShowHistory(true)
+    await loadHistory()
   }
 
   const countDebtors  = (filteredPeriods || []).filter(p => !p.is_budget && !p.paid).length
@@ -440,21 +464,21 @@ export default function FeesTab({ token, role }) {
         </div>
       )}
 
-      {/* Переключатель месяца */}
-      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
-        <button className="btn-outline" style={{padding:'6px 14px'}} onClick={prevMonth}>←</button>
-        <span style={{fontFamily:'Bebas Neue', fontSize:'1.3rem', color:'var(--white)', minWidth:160, textAlign:'center'}}>
-          {MONTHS_RU[month]} {year}
+      {/* Текущий период + надпись «Взносы за …» + кнопка «История» */}
+      <div style={{ display:'flex', alignItems:'baseline', gap:16, marginBottom:16, flexWrap:'wrap' }}>
+        <span style={{fontFamily:'Bebas Neue', fontSize:'1.4rem', color:'var(--white)', letterSpacing:'0.05em'}}>
+          {MONTHS_RU[currentMonth]} {currentYear}
+        </span>
+        <span style={{color:'var(--gray)', fontSize:'0.95rem'}}>
+          (взносы за <strong style={{color:'var(--white)'}}>{MONTHS_RU[billingMonth].toLowerCase()} {billingYear}</strong>)
         </span>
         <button
-          onClick={nextMonth}
-          disabled={year === currentYear && month === currentMonth}
+          onClick={openHistory}
           className="btn-outline"
-          style={{
-            padding:'6px 14px',
-            opacity: year === currentYear && month === currentMonth ? 0.3 : 1,
-            cursor: year === currentYear && month === currentMonth ? 'not-allowed' : 'pointer',
-          }}>→</button>
+          style={{padding:'6px 14px', marginLeft:'auto', fontSize:'0.85rem'}}
+        >
+          История
+        </button>
       </div>
 
       {msg && <div style={{color:'#6cba6c', marginBottom:12, fontSize:'0.88rem'}}>{msg}</div>}
@@ -469,16 +493,6 @@ export default function FeesTab({ token, role }) {
 
       {!loading && periods.length > 0 && filteredPeriods.length > 0 && (
         <>
-          {isPast && (
-            <div style={{
-              background:'var(--dark2)', border:'1px solid var(--gray-dim)',
-              borderRadius:6, padding:'8px 16px', marginBottom:12,
-              color:'var(--gray)', fontSize:'0.85rem',
-            }}>
-              Период закрыт — только просмотр
-            </div>
-          )}
-
           {/* Статистика — люди */}
           <div style={{ display:'flex', gap:20, marginBottom:8, flexWrap:'wrap' }}>
             <span style={{color:'var(--gray)', fontSize:'0.85rem'}}>
@@ -520,6 +534,58 @@ export default function FeesTab({ token, role }) {
             </div>
           )}
         </>
+      )}
+
+      {/* Модалка «История» */}
+      {showHistory && (
+        <div className="modal-overlay" onClick={() => setShowHistory(false)}>
+          <div className="modal-box" style={{maxWidth: 720}} onClick={e => e.stopPropagation()}>
+            <h3 style={{fontFamily:'Bebas Neue', fontSize:'1.5rem', letterSpacing:'0.06em', color:'var(--white)', marginTop:0}}>
+              История взносов
+            </h3>
+            {historyLoading ? (
+              <div style={{color:'var(--gray)', padding:20}}>Загрузка...</div>
+            ) : historyData.length === 0 ? (
+              <div style={{color:'var(--gray)', padding:20}}>Прошлых периодов пока нет</div>
+            ) : (
+              <table style={{width:'100%', borderCollapse:'collapse', marginTop:12}}>
+                <thead>
+                  <tr style={{borderBottom:'1px solid var(--gray-dim)'}}>
+                    <th style={{...thStyle, textAlign:'left'}}>Месяц</th>
+                    <th style={thStyle}>Сдали</th>
+                    <th style={thStyle}>Должники</th>
+                    <th style={thStyle}>Абонемент</th>
+                    <th style={{...thStyle, textAlign:'right'}}>Получено</th>
+                    <th style={{...thStyle, textAlign:'right'}}>Долг</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyData.map((row, idx) => (
+                    <tr key={idx} style={{borderBottom:'1px solid var(--gray-dim)'}}>
+                      <td style={{...tdStyle, color:'var(--white)'}}>
+                        {MONTHS_RU[row.month]} {row.year}
+                      </td>
+                      <td style={{...tdStyle, textAlign:'center', color:'#6cba6c'}}>{row.paid}</td>
+                      <td style={{...tdStyle, textAlign:'center', color:'var(--red)'}}>{row.debtors}</td>
+                      <td style={{...tdStyle, textAlign:'center', color:'var(--gray)'}}>{row.budget}</td>
+                      <td style={{...tdStyle, textAlign:'right', color:'#6cba6c'}}>
+                        {(row.money_paid || 0).toLocaleString('ru-RU')} ₽
+                      </td>
+                      <td style={{...tdStyle, textAlign:'right', color:'var(--red)'}}>
+                        {(row.money_debt || 0).toLocaleString('ru-RU')} ₽
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <div className="modal-btns-row" style={{marginTop:20, justifyContent:'flex-end'}}>
+              <button className="btn-outline" onClick={() => setShowHistory(false)}>
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

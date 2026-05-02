@@ -732,6 +732,17 @@ def init_periods(
     db:           Session = Depends(get_db),
     current_user: User = Depends(require_manager),
 ):
+    # Защита: init разрешён только для текущего или будущего периода.
+    # Иначе фронт-баг с навигацией в прошлое создаёт мусорные записи.
+    from datetime import date as _date
+    today = _date.today()
+    if (year, month) < (today.year, today.month):
+        raise HTTPException(
+            400,
+            "Инициализация прошлых периодов запрещена. "
+            "Используйте режим истории для просмотра."
+        )
+
     cfg = db.query(FeeConfig).first()
     fee_amount = cfg.fee_amount if cfg else 2000
 
@@ -909,3 +920,53 @@ def get_athlete_periods(
         .all()
     )
     return [_period_out(p) for p in items]
+
+
+# ── GET /fees/periods/history ─────────────────────────────────────────────
+# Сводка по прошлым месяцам: сколько в каждом сдали / должников / абонемент / сумма
+@router.get("/periods/history")
+def periods_history(
+    db:           Session = Depends(get_db),
+    current_user: User = Depends(require_manager),
+):
+    items = (
+        db.query(AthleteFeePeriod)
+        .options(joinedload(AthleteFeePeriod.athlete))
+        .all()
+    )
+    items = _apply_group_filter(items, current_user.manager_group)
+
+    cfg = db.query(FeeConfig).first()
+    fee_amount = cfg.fee_amount if cfg else 2000
+
+    from collections import defaultdict
+    buckets = defaultdict(lambda: {
+        "year": 0, "month": 0,
+        "total": 0, "paid": 0, "budget": 0, "debtors": 0,
+        "money_due": 0, "money_paid": 0, "money_debt": 0,
+    })
+    for p in items:
+        key = (p.period_year, p.period_month)
+        b = buckets[key]
+        b["year"]  = p.period_year
+        b["month"] = p.period_month
+        b["total"] += 1
+        if p.is_budget:
+            b["budget"] += 1
+        elif p.paid:
+            b["paid"]  += 1
+            amount = fee_amount + (p.debt or 0)
+            b["money_due"]  += amount
+            b["money_paid"] += amount
+        else:
+            b["debtors"] += 1
+            amount = fee_amount + (p.debt or 0)
+            b["money_due"]  += amount
+            b["money_debt"] += amount
+
+    result = sorted(
+        buckets.values(),
+        key=lambda x: (x["year"], x["month"]),
+        reverse=True,
+    )
+    return result
