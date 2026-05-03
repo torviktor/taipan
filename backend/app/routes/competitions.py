@@ -392,7 +392,7 @@ def bulk_upsert_results(comp_id: int, data: BulkResults, db: Session = Depends(g
 
 
 @router.delete("/{comp_id}/results/{athlete_id}", status_code=204)
-def delete_result(comp_id: int, athlete_id: int, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def delete_result(comp_id: int, athlete_id: int, db: Session = Depends(get_db), user: User = Depends(require_manager)):
     r = db.query(CompetitionResult).filter(
         CompetitionResult.competition_id == comp_id,
         CompetitionResult.athlete_id == athlete_id
@@ -400,6 +400,7 @@ def delete_result(comp_id: int, athlete_id: int, db: Session = Depends(get_db), 
     if not r:
         raise HTTPException(404, "Результат не найден")
     db.delete(r); db.commit()
+    log.info("delete_result user=%s comp=%s athlete=%s", user.id, comp_id, athlete_id)
 
 
 # ── Оплата взноса ────────────────────────────────────────────────────────────

@@ -2,12 +2,12 @@ import { useState } from 'react'
 import * as XLSX from 'xlsx'
 
 const DISC = [
-  { key: 'hyung',      label: 'Хъёнг',      resultKeys: ['tuli_place','tuli_perfs'],          type: 'plus'   },
-  { key: 'sparring',   label: 'Спарринг',    resultKeys: ['sparring_place','sparring_fights'],  type: 'weight' },
-  { key: 'stopball',   label: 'Стоп-балл',   resultKeys: ['stopball_place','stopball_fights'],  type: 'weight' },
-  { key: 'tegtim',     label: 'Тег-тим',     resultKeys: ['tegtim_place','tegtim_fights'],      type: 'weight' },
-  { key: 'powerbreak', label: 'Сил. разбив', resultKeys: [],                                    type: 'plus'   },
-  { key: 'spectech',   label: 'Спец. техн.', resultKeys: [],                                    type: 'plus'   },
+  { key: 'hyung',      label: 'Хъёнг',      resultKeys: ['tuli_place','tuli_perfs'],          disabled_field: 'tuli_disabled',       type: 'plus'   },
+  { key: 'sparring',   label: 'Спарринг',    resultKeys: ['sparring_place','sparring_fights'], disabled_field: 'sparring_disabled',   type: 'weight' },
+  { key: 'stopball',   label: 'Стоп-балл',   resultKeys: ['stopball_place','stopball_fights'], disabled_field: 'stopball_disabled',   type: 'weight' },
+  { key: 'tegtim',     label: 'Тег-тим',     resultKeys: ['tegtim_place','tegtim_fights'],     disabled_field: 'tegtim_disabled',     type: 'weight' },
+  { key: 'powerbreak', label: 'Сил. разбив', resultKeys: [],                                   disabled_field: 'powerbreak_disabled', is_boolean: true, bool_field: 'powerbreak', type: 'plus' },
+  { key: 'spectech',   label: 'Спец. техн.', resultKeys: [],                                   disabled_field: 'spectech_disabled',   is_boolean: true, bool_field: 'spectech',   type: 'plus' },
 ]
 
 const PLACE_OPTS = [
@@ -44,11 +44,33 @@ function sportQual(gup, dan) {
   return 'б/р'
 }
 
+function SaveIndicator({ status, onRetry }) {
+  const baseStyle = {
+    fontFamily: 'Barlow Condensed', fontSize: 11, fontWeight: 700,
+    letterSpacing: '1.5px', textTransform: 'uppercase',
+    display: 'inline-flex', alignItems: 'center', gap: 8,
+  }
+  if (status === 'error') {
+    return (
+      <span style={{ ...baseStyle, color: 'var(--red)' }}>
+        Ошибка сохранения
+        <button type="button" onClick={onRetry}
+          className="att-all-btn" style={{ padding: '2px 10px', fontSize: 11 }}>
+          Повторить
+        </button>
+      </span>
+    )
+  }
+  if (status === 'saving') return <span style={{ ...baseStyle, color: '#c8962a' }}>Сохраняется...</span>
+  if (status === 'saved')  return <span style={{ ...baseStyle, color: '#4caf50' }}>Сохранено</span>
+  return <span style={{ ...baseStyle, color: 'var(--gray-dim)' }}>Все изменения сохранены</span>
+}
+
 export default function CompApplicationMatrix({ rows, athletes, detail, token, readOnly,
-  updateRow, updateRowStatus, removeRow, calcRatingPreview }) {
+  updateRow, updateRowStatus, removeRow, calcRatingPreview,
+  enqueue, saveStatus, retryFailed }) {
 
   const [hiddenCols,    setHiddenCols]    = useState({})
-  const [disabledCells, setDisabledCells] = useState({})
   const [genMsg,        setGenMsg]        = useState('')
   const [genLoad,       setGenLoad]       = useState(false)
 
@@ -67,16 +89,20 @@ export default function CompApplicationMatrix({ rows, athletes, detail, token, r
     }
   })
 
-  const toggleCol  = (key) => setHiddenCols(h => ({ ...h, [key]: !h[key] }))
-  const toggleCell = (aid, key) => {
+  const toggleCol = (key) => setHiddenCols(h => ({ ...h, [key]: !h[key] }))
+
+  // Optimistic toggle: update local state instantly, then PATCH backend.
+  const togglePatch = (aid, fieldName, newVal) => {
     if (readOnly) return
-    const k = `${aid}_${key}`
-    setDisabledCells(d => ({ ...d, [k]: !d[k] }))
+    updateRow(aid, fieldName, newVal)
+    if (enqueue) enqueue(aid, { [fieldName]: newVal }, { immediate: true })
   }
-  const isCellOff = (aid, key) => !!disabledCells[`${aid}_${key}`]
+
+  const isCellOff = (p, disc) => !!p[disc.disabled_field]
 
   const cellVal = (p, disc) => {
-    if (isCellOff(p.athlete_id, disc.key)) return '-'
+    if (isCellOff(p, disc)) return '-'
+    if (disc.is_boolean)    return p[disc.bool_field] ? '+' : '-'
     if (disc.type === 'plus') return '+'
     return p.weight ? String(p.weight) : '—'
   }
@@ -163,7 +189,8 @@ export default function CompApplicationMatrix({ rows, athletes, detail, token, r
           <span style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)' }}>
             Матрица участия · {going.length} чел.
           </span>
-          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+          <div style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+            <SaveIndicator status={saveStatus || 'idle'} onRetry={retryFailed} />
             <button className="att-all-btn" onClick={() => generate('cfo')} disabled={genLoad}>
               Заявка ЦФО/Россия (xlsx)
             </button>
@@ -233,7 +260,7 @@ export default function CompApplicationMatrix({ rows, athletes, detail, token, r
                   <td className="td-name">{r.full_name}</td>
                   {DISC.map(d => {
                     const isHidden = hiddenCols[d.key]
-                    const off = isCellOff(r.athlete_id, d.key)
+                    const off = isCellOff(p, d)
                     const cellSt = {
                       background: isHidden ? 'rgba(0,0,0,0.4)' : off ? 'rgba(0,0,0,0.55)' : undefined,
                       opacity: off ? 0.45 : 1,
@@ -244,10 +271,26 @@ export default function CompApplicationMatrix({ rows, athletes, detail, token, r
 
                     if (isHidden) return <td key={d.key} style={cellSt}></td>
 
+                    if (d.is_boolean) {
+                      const onCellClick = () => off
+                        ? togglePatch(r.athlete_id, d.disabled_field, false)
+                        : togglePatch(r.athlete_id, d.bool_field, !p[d.bool_field])
+                      return (
+                        <td key={d.key} style={{...cellSt, textAlign:'center'}}
+                          onClick={onCellClick}>
+                          {off
+                            ? <span style={{color:'var(--gray-dim)'}}>✕</span>
+                            : p[d.bool_field]
+                              ? <span style={{color:'#4caf50',fontWeight:700}}>+</span>
+                              : <span style={{color:'var(--gray-dim)'}}>−</span>}
+                        </td>
+                      )
+                    }
+
                     if (d.resultKeys.length === 0) {
                       return (
                         <td key={d.key} style={{...cellSt, textAlign:'center'}}
-                          onClick={() => toggleCell(r.athlete_id, d.key)}>
+                          onClick={() => togglePatch(r.athlete_id, d.disabled_field, !off)}>
                           {off
                             ? <span style={{color:'var(--gray-dim)'}}>✕</span>
                             : <span style={{color:'#4caf50',fontWeight:700}}>+</span>}
@@ -257,7 +300,7 @@ export default function CompApplicationMatrix({ rows, athletes, detail, token, r
 
                     const [placeKey, fightsKey] = d.resultKeys
                     return [
-                      <td key={d.key+'_p'} style={cellSt} onClick={() => toggleCell(r.athlete_id, d.key)}>
+                      <td key={d.key+'_p'} style={cellSt} onClick={() => togglePatch(r.athlete_id, d.disabled_field, !off)}>
                         {off
                           ? <span style={{color:'var(--gray-dim)',fontSize:'11px'}}>✕</span>
                           : readOnly
@@ -269,7 +312,7 @@ export default function CompApplicationMatrix({ rows, athletes, detail, token, r
                               </select>
                         }
                       </td>,
-                      <td key={d.key+'_f'} style={cellSt} onClick={() => toggleCell(r.athlete_id, d.key)}>
+                      <td key={d.key+'_f'} style={cellSt} onClick={() => togglePatch(r.athlete_id, d.disabled_field, !off)}>
                         {off ? '' : readOnly
                           ? (r[fightsKey]||0)
                           : <input type="number" min="0" max="99" className="td-input td-input-sm"
@@ -283,12 +326,7 @@ export default function CompApplicationMatrix({ rows, athletes, detail, token, r
                   <td className="comp-rating-val">{calcRatingPreview(r, detail?.significance||1)}</td>
                   <td style={{textAlign:'center'}}>
                     {!readOnly && <input type="checkbox" checked={r.paid||false}
-                      onChange={async e => {
-                        const paid = e.target.checked
-                        updateRow(r.athlete_id,'paid',paid)
-                        await fetch(`/api/competitions/${detail.id}/results/${r.athlete_id}/paid?paid=${paid}`,
-                          {method:'PATCH',headers:{Authorization:`Bearer ${token}`}})
-                      }}/>}
+                      onChange={e => updateRow(r.athlete_id, 'paid', e.target.checked)}/>}
                     {readOnly && <span style={{color:r.paid?'#6cba6c':'var(--gray)',fontSize:'0.8rem'}}>{r.paid?'✓':'—'}</span>}
                   </td>
                   {!readOnly && (

@@ -319,6 +319,26 @@ export default function Cabinet() {
     else { loadMyAthletes(); loadFeed() }
   }, [])
 
+  // MIGRATION 2025-05-03: silent purge orphan-черновиков матрицы соревнований.
+  // Старая схема писала comp_draft_<id> на каждое нажатие клавиши. Если соревнования
+  // с таким id больше нет — ключ висит мёртвым грузом. Можно удалить через 30 дней.
+  useEffect(() => {
+    if (!token || (role !== 'admin' && role !== 'manager')) return
+    const orphanKeys = Object.keys(localStorage).filter(k => k.startsWith('comp_draft_'))
+    if (orphanKeys.length === 0) return
+    ;(async () => {
+      try {
+        const r = await fetch(`${API}/competitions`, { headers: { Authorization: `Bearer ${token}` } })
+        if (!r.ok) return
+        const valid = new Set((await r.json()).map(c => c.id))
+        orphanKeys.forEach(k => {
+          const id = Number(k.replace('comp_draft_', ''))
+          if (!valid.has(id)) { try { localStorage.removeItem(k) } catch {} }
+        })
+      } catch {}
+    })()
+  }, [token, role])
+
   useEffect(() => {
     if (role !== 'admin' && role !== 'manager') return
     const load = async () => {

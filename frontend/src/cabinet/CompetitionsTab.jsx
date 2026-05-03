@@ -4,6 +4,28 @@ import { API, currentSeason, seasonLabel } from './constants'
 import ConfirmModal from './ConfirmModal'
 import LineChart from './LineChart'
 import CompApplicationMatrix from '../pages/CompApplicationMatrix'
+import { usePatchQueue } from './usePatchQueue'
+
+// Поля результата, которые автосейв уносит на бэк через PATCH-эндпоинт.
+// Всё остальное (_inList, full_name, weight и т.п.) — локальные/derivative.
+const PERSISTED_FIELDS = new Set([
+  'sparring_place', 'sparring_fights',
+  'stopball_place', 'stopball_fights',
+  'tegtim_place',   'tegtim_fights',
+  'tuli_place',     'tuli_perfs',
+  'status', 'paid',
+  'powerbreak', 'spectech',
+  'sparring_disabled', 'stopball_disabled', 'tegtim_disabled', 'tuli_disabled',
+  'powerbreak_disabled', 'spectech_disabled',
+])
+// Toggle-поля улетают сразу (immediate), числовые — через дебаунс 700 ms.
+const IMMEDIATE_FIELDS = new Set([
+  'status', 'paid',
+  'powerbreak', 'spectech',
+  'sparring_disabled', 'stopball_disabled', 'tegtim_disabled', 'tuli_disabled',
+  'powerbreak_disabled', 'spectech_disabled',
+])
+const PLACE_FIELDS = new Set(['sparring_place','stopball_place','tegtim_place','tuli_place'])
 
 const SIG_TABLE = {
   'Местный':        { 'Фестиваль': 1.0, 'Турнир': 1.2, 'Кубок': 1.5, 'Первенство': 1.5, 'Чемпионат': 1.5 },
@@ -69,8 +91,10 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
   const [rating,         setRating]         = useState([])
   const [ratingFilter,   setRatingFilter]   = useState('all')
   const [loading,        setLoading]        = useState(false)
-  const [saving,         setSaving]         = useState(false)
   const [showForm,       setShowForm]       = useState(false)
+  // MIGRATION 2025-05-03: можно удалить через 30 дней после деплоя коммита 2/3
+  // (страховочная модалка для несинхронизированных черновиков из старой схемы).
+  const [draftConflict,  setDraftConflict]  = useState(null) // { compId, athletes: [{ athlete_id, full_name, changes }] }
   const [showAddAthlete, setShowAddAthlete] = useState(false)
   const [showChart,      setShowChart]      = useState(false)
   const [chartData,      setChartData]      = useState([])
@@ -121,6 +145,25 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
 
   const h  = { Authorization: `Bearer ${token}` }
   const hj = { ...h, 'Content-Type': 'application/json' }
+
+  // Сервер возвращает поля с null для пустого места и булевы как есть. UI хочет
+  // '' для пустого селекта; нормализуем перед мержем в rows.
+  const applyServerUpdate = (updated) => {
+    if (!updated || !updated.athlete_id) return
+    const norm = { ...updated }
+    for (const k of ['sparring_place','stopball_place','tegtim_place','tuli_place']) {
+      if (norm[k] === null) norm[k] = ''
+    }
+    setRows(prev => prev.map(row => row.athlete_id === updated.athlete_id ? { ...row, ...norm } : row))
+  }
+  const handleSaveError = (athleteId, fields, err) => {
+    console.warn('PATCH failed', { athleteId, fields, err })
+    setMsg('Ошибка автосохранения. Нажмите «Повторить» в индикаторе.')
+  }
+  const { enqueue, status: saveStatus, retryFailed } = usePatchQueue({
+    apiBase: API, compId: detail?.id, token,
+    onSuccess: applyServerUpdate, onError: handleSaveError,
+  })
 
   useEffect(() => { loadSeasons(); loadComps() }, [])
   useEffect(() => { loadComps() }, [season])
@@ -210,6 +253,14 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
           saved_rating:    ex.rating          ?? null,
           status:          ex.status          ?? 'pending',
           paid:            ex.paid            ?? false,
+          powerbreak:           ex.powerbreak           ?? false,
+          spectech:             ex.spectech             ?? false,
+          sparring_disabled:    ex.sparring_disabled    ?? false,
+          stopball_disabled:    ex.stopball_disabled    ?? false,
+          tegtim_disabled:      ex.tegtim_disabled      ?? false,
+          tuli_disabled:        ex.tuli_disabled        ?? false,
+          powerbreak_disabled:  ex.powerbreak_disabled  ?? false,
+          spectech_disabled:    ex.spectech_disabled    ?? false,
           weight:          a.weight           || null,
           birth_date:      a.birth_date       || '',
           dan:             a.dan,
@@ -217,33 +268,51 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
           _inList:         true,
         }
       })
-// Восстанавливаем черновик из кэша если есть
-      try {
-        const draft = localStorage.getItem(`comp_draft_${comp.id}`)
-        if (draft) {
-          const parsed = JSON.parse(draft)
-          // Мержим: берём статусы из БД, результаты из кэша
-          const merged = baseList.map(b => {
-            const d = parsed.find(p => p.athlete_id === b.athlete_id)
-            return d ? { ...b, sparring_place: d.sparring_place, sparring_fights: d.sparring_fights,
-              stopball_place: d.stopball_place, stopball_fights: d.stopball_fights,
-              tegtim_place: d.tegtim_place, tegtim_fights: d.tegtim_fights,
-              tuli_place: d.tuli_place, tuli_perfs: d.tuli_perfs } : b
-          })
-          setRows(merged)
-        } else {
-          setRows(baseList)
-        }
-      } catch { setRows(baseList) }
+      setRows(baseList)
       setAllAthletes(athletes)
       setCompView('detail')
       await loadFiles(comp.id)
+      // MIGRATION 2025-05-03: разовая защита для черновиков из старой схемы.
+      // Сравниваем localStorage-черновик с актуальной БД; конфликты — в модалку,
+      // совпадения — молча убираем. Можно удалить через 30 дней.
+      try {
+        const draftRaw = localStorage.getItem(`comp_draft_${comp.id}`)
+        if (!draftRaw) return
+        const parsed = JSON.parse(draftRaw)
+        const COMPARABLE = ['sparring_place','sparring_fights','stopball_place','stopball_fights',
+                            'tegtim_place','tegtim_fights','tuli_place','tuli_perfs']
+        const conflicts = []
+        parsed.forEach(d => {
+          const bd = baseList.find(b => b.athlete_id === d.athlete_id)
+          if (!bd) return
+          const changes = {}
+          COMPARABLE.forEach(f => {
+            if (String(d[f] ?? '') !== String(bd[f] ?? '')) changes[f] = d[f]
+          })
+          if (Object.keys(changes).length > 0) {
+            conflicts.push({ athlete_id: d.athlete_id, full_name: bd.full_name, changes })
+          }
+        })
+        if (conflicts.length > 0) {
+          setDraftConflict({ compId: comp.id, athletes: conflicts })
+        } else {
+          try { localStorage.removeItem(`comp_draft_${comp.id}`) } catch {}
+        }
+      } catch {}
     } catch {}
     setLoading(false)
   }
 
-  const removeRow = (athleteId) => {
-    setRows(prev => prev.filter(r => r.athlete_id !== athleteId))
+  const removeRow = async (athleteId) => {
+    if (!detail) return
+    try {
+      const r = await fetch(`${API}/competitions/${detail.id}/results/${athleteId}`, {
+        method: 'DELETE', headers: h,
+      })
+      // 204 — удалено, 404 — строки не было (ничего не сохраняли) — тоже OK.
+      if (r.status !== 204 && r.status !== 404) { setMsg('Ошибка удаления'); return }
+      setRows(prev => prev.filter(x => x.athlete_id !== athleteId))
+    } catch { setMsg('Ошибка удаления') }
   }
 
   const openAddModal = async () => {
@@ -269,41 +338,23 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
       stopball_place: '', stopball_fights: 0,
       tegtim_place: '',   tegtim_fights: 0,
       tuli_place: '',     tuli_perfs: 0,
-      saved_rating: null, _inList: true,
+      saved_rating: null,
+      status: 'pending',
+      paid: false,
+      powerbreak: false, spectech: false,
+      sparring_disabled: false, stopball_disabled: false,
+      tegtim_disabled: false, tuli_disabled: false,
+      powerbreak_disabled: false, spectech_disabled: false,
+      weight: a.weight || null, birth_date: a.birth_date || '',
+      dan: a.dan, auto_group: a.auto_group || '',
+      _inList: true,
     }])
     setAvailableToAdd(prev => prev.filter(x => x.id !== a.id))
     setShowAddAthlete(false)
-  }
-
-  const saveResults = async () => {
-    if (!detail) return
-    setSaving(true); setMsg('')
-    try {
-      // Сохраняем только тех кто подтвердил участие, не трогаем pending/declined
-      const goingRows = rows.filter(r => r.status === 'confirmed' || r.status === 'paid')
-      const payload = goingRows.map(r => ({
-        athlete_id:      r.athlete_id,
-        sparring_place:  r.sparring_place  !== '' ? Number(r.sparring_place)  : null,
-        sparring_fights: Number(r.sparring_fights) || 0,
-        stopball_place:  r.stopball_place  !== '' ? Number(r.stopball_place)  : null,
-        stopball_fights: Number(r.stopball_fights) || 0,
-        tegtim_place:    r.tegtim_place    !== '' ? Number(r.tegtim_place)    : null,
-        tegtim_fights:   Number(r.tegtim_fights)   || 0,
-        tuli_place:      r.tuli_place      !== '' ? Number(r.tuli_place)      : null,
-        tuli_perfs:      Number(r.tuli_perfs)      || 0,
-        status:          r.status,
-      }))
-      if (payload.length === 0) { setMsg('Нет подтверждённых участников'); setSaving(false); return }
-      const r = await fetch(`${API}/competitions/${detail.id}/results`, {
-        method: 'PUT', headers: hj, body: JSON.stringify({ results: payload })
-      })
-      if (r.ok) {
-        try { localStorage.removeItem(`comp_draft_${detail.id}`) } catch {}
-        setMsg('Результаты сохранены')
-        await openDetail(detail)
-      } else setMsg('Ошибка сохранения')
-    } catch { setMsg('Ошибка сохранения') }
-    setSaving(false)
+    // Создаём строку CompetitionResult на бэке (upsert), чтобы последующие PATCH'и
+    // не падали 404. Если сетевая ошибка — пользователь увидит индикатор + сможет
+    // нажать «Повторить»; локальное добавление не откатываем.
+    enqueue(a.id, { status: 'pending' }, { immediate: true })
   }
 
   const createComp = async () => {
@@ -400,38 +451,45 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
     XLSX.writeFile(wb, `${detail.name}_${detail.date}.xlsx`)
   }
 
+  // Optimistic local update + автосейв через PATCH-очередь.
+  // Не-persisted поля (например full_name) остаются только в локальном state.
   const updateRow = (athleteId, field, value) => {
-    setRows(prev => {
-      const updated = prev.map(r => r.athlete_id === athleteId ? { ...r, [field]: value } : r)
-      if (detail) {
-        try { localStorage.setItem(`comp_draft_${detail.id}`, JSON.stringify(updated)) } catch {}
-      }
-      return updated
-    })
+    setRows(prev => prev.map(r => r.athlete_id === athleteId ? { ...r, [field]: value } : r))
+    if (!detail || !PERSISTED_FIELDS.has(field)) return
+    let payloadValue = value
+    if (PLACE_FIELDS.has(field)) {
+      payloadValue = (value === '' || value === null) ? null : Number(value)
+    } else if (field.endsWith('_fights') || field === 'tuli_perfs') {
+      payloadValue = Number(value) || 0
+    }
+    enqueue(athleteId, { [field]: payloadValue }, { immediate: IMMEDIATE_FIELDS.has(field) })
   }
 
-  const updateRowStatus = async (athleteId, status) => {
-    updateRow(athleteId, 'status', status)
-    const row = rows.find(r => r.athlete_id === athleteId)
-    if (!row || !detail) return
-    try {
-      await fetch(`${API}/competitions/${detail.id}/results`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ results: [{
-          athlete_id: athleteId,
-          sparring_place: row.sparring_place !== '' ? Number(row.sparring_place) : null,
-          sparring_fights: Number(row.sparring_fights) || 0,
-          stopball_place: row.stopball_place !== '' ? Number(row.stopball_place) : null,
-          stopball_fights: Number(row.stopball_fights) || 0,
-          tegtim_place: row.tegtim_place !== '' ? Number(row.tegtim_place) : null,
-          tegtim_fights: Number(row.tegtim_fights) || 0,
-          tuli_place: row.tuli_place !== '' ? Number(row.tuli_place) : null,
-          tuli_perfs: Number(row.tuli_perfs) || 0,
-          status,
-        }]})
+  const updateRowStatus = (athleteId, status) => updateRow(athleteId, 'status', status)
+
+  // MIGRATION 2025-05-03: применить найденный черновик на сервер, потом убрать ключ.
+  const applyDraftConflict = () => {
+    if (!draftConflict) return
+    const { compId, athletes: ath } = draftConflict
+    ath.forEach(({ athlete_id, changes }) => {
+      // Optimistic local update
+      setRows(prev => prev.map(r => r.athlete_id === athlete_id ? { ...r, ...changes } : r))
+      // Нормализуем place ('' -> null) и fights в числа перед отправкой
+      const payload = {}
+      Object.entries(changes).forEach(([f, v]) => {
+        if (PLACE_FIELDS.has(f)) payload[f] = (v === '' || v === null) ? null : Number(v)
+        else if (f.endsWith('_fights') || f === 'tuli_perfs') payload[f] = Number(v) || 0
+        else payload[f] = v
       })
-    } catch {}
+      enqueue(athlete_id, payload, { immediate: true })
+    })
+    try { localStorage.removeItem(`comp_draft_${compId}`) } catch {}
+    setDraftConflict(null)
+  }
+  const discardDraftConflict = () => {
+    if (!draftConflict) return
+    try { localStorage.removeItem(`comp_draft_${draftConflict.compId}`) } catch {}
+    setDraftConflict(null)
   }
 
   const renderResultRow = (r) => {
@@ -450,11 +508,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
         <td className="comp-rating-val">{calcRatingPreview(r, detail?.significance||1)}</td>
         <td style={{textAlign:'center'}}>
           {!readOnly && <input type="checkbox" checked={r.paid||false}
-            onChange={async e => {
-              const paid = e.target.checked
-              updateRow(r.athlete_id, 'paid', paid)
-              await fetch(`${API}/competitions/${detail.id}/results/${r.athlete_id}/paid?paid=${paid}`, { method:'PATCH', headers:{Authorization:`Bearer ${token}`} })
-            }}/>}
+            onChange={e => updateRow(r.athlete_id, 'paid', e.target.checked)}/>}
           {readOnly && <span style={{color: r.paid ? '#6cba6c' : 'var(--gray)', fontSize:'0.8rem'}}>{r.paid ? '✓' : '—'}</span>}
         </td>
         {!readOnly && <td>
@@ -565,11 +619,6 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
               {!readOnly && <button className="att-all-btn" onClick={openAddModal}>+ Добавить бойца</button>}
               {!readOnly && <button className="att-all-btn" onClick={notifyComp}>Уведомить всех</button>}
               <button className="att-all-btn" onClick={exportResultsXlsx}>Экспорт xlsx</button>
-              {!readOnly && (
-                <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={saveResults} disabled={saving}>
-                  {saving ? 'Сохранение...' : 'Сохранить'}
-                </button>
-              )}
             </div>
           </div>
 
@@ -619,6 +668,9 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
   updateRowStatus={updateRowStatus}
   removeRow={removeRow}
   calcRatingPreview={calcRatingPreview}
+  enqueue={enqueue}
+  saveStatus={saveStatus}
+  retryFailed={retryFailed}
 />
 
           {/* Блок ожидают ответа */}
@@ -806,6 +858,30 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
             }
             <div className="modal-btns-row" style={{ marginTop:12 }}>
               <button className="btn-outline" onClick={() => setShowAddAthlete(false)}>Закрыть</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MIGRATION 2025-05-03: модалка для несинхронизированных черновиков из старой схемы.
+          Можно удалить через 30 дней после деплоя коммита 2/3. */}
+      {draftConflict && (
+        <div className="modal-overlay" onClick={discardDraftConflict}>
+          <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <h3>Обнаружены несохранённые данные</h3>
+            <p style={{ color: 'var(--gray)', fontSize: 14, lineHeight: 1.5 }}>
+              В вашем браузере найдены изменения по этому соревнованию,
+              которые не были отправлены на сервер ({draftConflict.athletes.length} спортсм.).
+              Применить их сейчас или отбросить?
+            </p>
+            <ul style={{ margin: '8px 0', padding: '0 0 0 18px', color: 'var(--white)', fontSize: 13, maxHeight: 180, overflowY: 'auto' }}>
+              {draftConflict.athletes.map(a => (
+                <li key={a.athlete_id}>{a.full_name}</li>
+              ))}
+            </ul>
+            <div className="modal-btns-row" style={{ marginTop: 12 }}>
+              <button className="btn-primary" onClick={applyDraftConflict}>Применить и сохранить</button>
+              <button className="btn-outline" onClick={discardDraftConflict}>Отбросить</button>
             </div>
           </div>
         </div>
