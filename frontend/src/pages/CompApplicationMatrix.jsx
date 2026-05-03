@@ -34,6 +34,7 @@ function fmtDate(s) {
 function gupLabel(gup, dan) {
   if (dan) return `${dan} дан`
   if (gup === 0) return 'б/п'
+  if (gup === 11) return '-'
   if (gup) return `${gup} гып`
   return ''
 }
