@@ -300,7 +300,9 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
         }
       } catch {}
     } catch {}
-    setLoading(false)
+    finally {
+      setLoading(false)
+    }
   }
 
   const removeRow = async (athleteId) => {
