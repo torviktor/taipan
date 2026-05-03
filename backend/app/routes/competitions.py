@@ -1,5 +1,6 @@
 # backend/app/routes/competitions.py
 
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
@@ -17,6 +18,7 @@ from app.models.certification import Notification, NotificationType
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/competitions", tags=["competitions"])
+log = logging.getLogger(__name__)
 
 
 # ── Схемы ─────────────────────────────────────────────────────────────────────
@@ -53,10 +55,52 @@ class ResultUpsert(BaseModel):
     tuli_place:      Optional[int] = Field(None, ge=1, le=3)
     tuli_perfs:      int = Field(0, ge=0)
     status:          Optional[str] = "pending"
+    # Toggle-поля матрицы заявки (опциональны для обратной совместимости — старый
+    # клиент шлёт без них; bulk_upsert обновит только если поле явно передано).
+    powerbreak:           Optional[bool] = None
+    spectech:             Optional[bool] = None
+    sparring_disabled:    Optional[bool] = None
+    stopball_disabled:    Optional[bool] = None
+    tegtim_disabled:      Optional[bool] = None
+    tuli_disabled:        Optional[bool] = None
+    powerbreak_disabled:  Optional[bool] = None
+    spectech_disabled:    Optional[bool] = None
 
 
 class BulkResults(BaseModel):
     results: list[ResultUpsert]
+
+
+class ResultPatch(BaseModel):
+    """Частичное обновление одной строки CompetitionResult.
+    Все поля опциональны; обновляются только те, что присутствуют в теле запроса
+    (отслеживаем через model_fields_set, чтобы None не путался с «не передано»)."""
+    sparring_place:  Optional[int]  = Field(None, ge=1, le=3)
+    sparring_fights: Optional[int]  = Field(None, ge=0)
+    stopball_place:  Optional[int]  = Field(None, ge=1, le=3)
+    stopball_fights: Optional[int]  = Field(None, ge=0)
+    tegtim_place:    Optional[int]  = Field(None, ge=1, le=3)
+    tegtim_fights:   Optional[int]  = Field(None, ge=0)
+    tuli_place:      Optional[int]  = Field(None, ge=1, le=3)
+    tuli_perfs:      Optional[int]  = Field(None, ge=0)
+    status:          Optional[str]  = None
+    paid:            Optional[bool] = None
+    powerbreak:           Optional[bool] = None
+    spectech:             Optional[bool] = None
+    sparring_disabled:    Optional[bool] = None
+    stopball_disabled:    Optional[bool] = None
+    tegtim_disabled:      Optional[bool] = None
+    tuli_disabled:        Optional[bool] = None
+    powerbreak_disabled:  Optional[bool] = None
+    spectech_disabled:    Optional[bool] = None
+
+
+_RATING_FIELDS = {
+    "sparring_place", "sparring_fights",
+    "stopball_place", "stopball_fights",
+    "tegtim_place",   "tegtim_fights",
+    "tuli_place",     "tuli_perfs",
+}
 
 
 # ── Права ─────────────────────────────────────────────────────────────────────
@@ -322,6 +366,16 @@ def bulk_upsert_results(comp_id: int, data: BulkResults, db: Session = Depends(g
         r.rating          = calc_result_rating(r, comp.significance)
         if item.status:
             r.status = item.status
+        # Toggle-поля: применяем только если явно переданы (старый клиент их не шлёт).
+        sent = item.model_fields_set
+        for fld in (
+            "powerbreak", "spectech",
+            "sparring_disabled", "stopball_disabled",
+            "tegtim_disabled", "tuli_disabled",
+            "powerbreak_disabled", "spectech_disabled",
+        ):
+            if fld in sent and getattr(item, fld) is not None:
+                setattr(r, fld, getattr(item, fld))
         saved.append(r)
 
     db.commit()
@@ -362,6 +416,60 @@ def update_result_paid(
     if not r: raise HTTPException(404)
     r.paid = paid
     db.commit()
+    return _result_out(r)
+
+
+# ── Частичное обновление одной строки результата (автосейв матрицы) ──────────
+
+@router.patch("/{comp_id}/results/{athlete_id}")
+def patch_result(
+    comp_id: int, athlete_id: int, data: ResultPatch,
+    db: Session = Depends(get_db), user: User = Depends(require_manager)
+):
+    sent = data.model_fields_set
+    if not sent:
+        raise HTTPException(400, "Пустое тело запроса")
+
+    comp = _get_or_404(comp_id, db)
+
+    # Row lock на строке (READ COMMITTED + FOR UPDATE) — защита от lost update
+    # при параллельных PATCH'ах на одну (comp_id, athlete_id).
+    r = db.query(CompetitionResult).filter(
+        CompetitionResult.competition_id == comp_id,
+        CompetitionResult.athlete_id == athlete_id,
+    ).with_for_update().first()
+
+    # Upsert: для атлетов, добавленных через "+ Добавить бойца", строки может
+    # не быть — создаём pending-заглушку, чтобы первый же autosave не падал 404.
+    if not r:
+        if not db.query(Athlete.id).filter(Athlete.id == athlete_id).first():
+            raise HTTPException(404, "Спортсмен не найден")
+        r = CompetitionResult(competition_id=comp_id, athlete_id=athlete_id)
+        db.add(r)
+        db.flush()
+
+    for fld in sent:
+        setattr(r, fld, getattr(data, fld))
+
+    if sent & _RATING_FIELDS:
+        r.rating = calc_result_rating(r, comp.significance)
+
+    db.commit()
+    db.refresh(r)
+
+    log.info(
+        "patch_result user=%s comp=%s athlete=%s fields=%s",
+        user.id, comp_id, athlete_id, sorted(sent),
+    )
+
+    # Автоначисление ачивок при смене результатов
+    if sent & _RATING_FIELDS:
+        try:
+            from app.routes.achievements import auto_grant
+            auto_grant(athlete_id, db)
+        except Exception as e:
+            log.warning("Achievement error for athlete=%s: %s", athlete_id, e)
+
     return _result_out(r)
 
 
@@ -493,6 +601,14 @@ def _result_out(r):
         "rating":          r.rating,
         "status":          getattr(r, 'status', 'pending') or 'pending',
         "paid":            getattr(r, 'paid', False),
+        "powerbreak":          getattr(r, 'powerbreak', False),
+        "spectech":            getattr(r, 'spectech', False),
+        "sparring_disabled":   getattr(r, 'sparring_disabled', False),
+        "stopball_disabled":   getattr(r, 'stopball_disabled', False),
+        "tegtim_disabled":     getattr(r, 'tegtim_disabled', False),
+        "tuli_disabled":       getattr(r, 'tuli_disabled', False),
+        "powerbreak_disabled": getattr(r, 'powerbreak_disabled', False),
+        "spectech_disabled":   getattr(r, 'spectech_disabled', False),
     }
 
 
