@@ -55,7 +55,15 @@ export default function CompApplicationMatrix({ rows, athletes, detail, token, r
 
   const participants = going.map(r => {
     const a = athletes.find(a => a.id === r.athlete_id) || {}
-    return { ...r, weight: a.weight||null, birth_date: a.birth_date||'', dan: a.dan, auto_group: a.auto_group||'' }
+    return {
+      ...r,
+      weight:     a.weight||null,
+      birth_date: a.birth_date||'',
+      dan:        a.dan,
+      gender:     a.gender,
+      gup:        a.gup,
+      auto_group: a.auto_group||'',
+    }
   })
 
   const toggleCol  = (key) => setHiddenCols(h => ({ ...h, [key]: !h[key] }))
