@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { API } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 import ConfirmModal from './ConfirmModal'
 import AnalyticsModal from './AnalyticsModal'
 
@@ -19,7 +20,7 @@ export default function AnalyticsAdminTab({ token, athletes }) {
   async function load() {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/analytics`, { headers: h })
+      const r = await apiFetch(`${API}/analytics`, { headers: h })
       if (r.ok) setRecords(await r.json())
     } catch {}
     setLoading(false)
@@ -31,7 +32,7 @@ export default function AnalyticsAdminTab({ token, athletes }) {
       confirmText: 'Удалить', danger: true,
       onConfirm: async () => {
         setConfirm(null)
-        await fetch(`${API}/analytics/${item.id}`, { method: 'DELETE', headers: h })
+        await apiFetch(`${API}/analytics/${item.id}`, { method: 'DELETE', headers: h })
         await load()
       }
     })
@@ -41,7 +42,7 @@ export default function AnalyticsAdminTab({ token, athletes }) {
     setExporting(athleteId)
     try {
       const tok = localStorage.getItem('token')
-      const r = await fetch(`${API}/analytics/export/${athleteId}`, { headers: { Authorization: `Bearer ${tok}` } })
+      const r = await apiFetch(`${API}/analytics/export/${athleteId}`, { headers: { Authorization: `Bearer ${tok}` } })
       if (!r.ok) { let msg = 'Ошибка'; try { const d = await r.json(); msg = d.detail || msg } catch {} alert(msg); setExporting(null); return }
       const data = await r.json()
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -108,7 +109,7 @@ export default function AnalyticsAdminTab({ token, athletes }) {
                       try {
                         const tok = localStorage.getItem('token')
                         const filename = r.file_path.split('/').pop()
-                        const res = await fetch(`${API}/analytics/download/${filename}`, { headers: { Authorization: `Bearer ${tok}` } })
+                        const res = await apiFetch(`${API}/analytics/download/${filename}`, { headers: { Authorization: `Bearer ${tok}` } })
                         if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.detail || 'Ошибка загрузки файла'); return }
                         const blob = await res.blob()
                         const url = URL.createObjectURL(blob)

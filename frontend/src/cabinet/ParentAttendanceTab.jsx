@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { API, currentSeason, seasonRange, seasonLabel } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 
 export default function ParentAttendanceTab({ token, athletes }) {
   const [data, setData]       = useState([])
@@ -8,7 +9,7 @@ export default function ParentAttendanceTab({ token, athletes }) {
   const [seasons, setSeasons] = useState([currentSeason])
 
   useEffect(() => {
-    fetch(`${API}/attendance/seasons`, { headers: { Authorization: `Bearer ${token}` } })
+    apiFetch(`${API}/attendance/seasons`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [currentSeason])
       .then(s => { const list = s.length ? s : [currentSeason]; setSeasons(list); if (list.includes(currentSeason)) setSeason(currentSeason); else setSeason(list[0]) })
       .catch(() => {})
@@ -23,7 +24,7 @@ export default function ParentAttendanceTab({ token, athletes }) {
     const months = season !== '' ? Math.ceil((new Date(end) - new Date(start)) / (30*24*60*60*1000)) : 24
     for (const a of athletes) {
       try {
-        const r = await fetch(`${API}/attendance/athlete/${a.id}?months=${months}`, {
+        const r = await apiFetch(`${API}/attendance/athlete/${a.id}?months=${months}`, {
           headers: { Authorization: `Bearer ${token}` }
         })
         if (r.ok) results.push(await r.json())

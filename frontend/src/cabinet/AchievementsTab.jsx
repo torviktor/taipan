@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { API, currentSeason, seasonRange, seasonLabel } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 import AchievementBadge from '../components/AchievementBadge'
 import { CATEGORY_LABEL } from '../components/AchievementBadge'
 
@@ -13,7 +14,7 @@ export function AchievementsLeaderboard({ token }) {
 
   useEffect(() => {
     // Загружаем доступные сезоны из соревнований
-    fetch(`${API}/competitions/seasons`, { headers: { Authorization: `Bearer ${token}` } })
+    apiFetch(`${API}/competitions/seasons`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [currentSeason])
       .then(s => {
         const list = s.length ? s : [currentSeason]
@@ -30,7 +31,7 @@ export function AchievementsLeaderboard({ token }) {
     const url = season !== ''
       ? (() => { const {start,end} = seasonRange(season); return `${API}/achievements/leaderboard?date_from=${start}&date_to=${end}` })()
       : `${API}/achievements/leaderboard`
-    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    apiFetch(url, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [])
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
@@ -82,7 +83,7 @@ export default function AchievementsTab({ token, athletes }) {
   const [seasons, setSeasons] = useState([currentSeason])
 
   useEffect(() => {
-    fetch(`${API}/competitions/seasons`, { headers: { Authorization: `Bearer ${token}` } })
+    apiFetch(`${API}/competitions/seasons`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [currentSeason])
       .then(s => { const list = s.length ? s : [currentSeason]; setSeasons(list); if (list.includes(currentSeason)) setSeason(currentSeason); else setSeason(list[0]) })
       .catch(() => {})
@@ -96,7 +97,7 @@ export default function AchievementsTab({ token, athletes }) {
     for (const a of athletes) {
       try {
         const url = season !== '' ? (() => { const {start,end} = seasonRange(season); return `${API}/achievements/athlete/${a.id}?date_from=${start}&date_to=${end}` })() : `${API}/achievements/athlete/${a.id}`
-        const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+        const r = await apiFetch(url, { headers: { Authorization: `Bearer ${token}` } })
         if (r.ok) result[a.id] = await r.json()
       } catch {}
     }

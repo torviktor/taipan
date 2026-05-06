@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API, currentSeason, seasonRange, seasonLabel } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 import ConfirmModal from './ConfirmModal'
 import '../pages/preparation/Preparation.css'
 
@@ -22,7 +23,7 @@ export default function CertificationTab({ token, athletes }) {
   const hj = { ...h, 'Content-Type': 'application/json' }
 
   useEffect(() => {
-    fetch(`${API}/certifications/seasons`, { headers: h })
+    apiFetch(`${API}/certifications/seasons`, { headers: h })
       .then(r => r.ok ? r.json() : [currentSeason])
       .then(s => { setSeasons(s.length ? s : [currentSeason]) })
       .catch(() => {})
@@ -34,7 +35,7 @@ export default function CertificationTab({ token, athletes }) {
     setLoading(true)
     try {
       const url = season !== '' ? (() => { const {start,end} = seasonRange(season); return `${API}/certifications?date_from=${start}&date_to=${end}` })() : `${API}/certifications`
-      const r = await fetch(url, { headers: h })
+      const r = await apiFetch(url, { headers: h })
       if (r.ok) setCerts(await r.json())
     } catch {}
     setLoading(false)
@@ -43,7 +44,7 @@ export default function CertificationTab({ token, athletes }) {
   const openDetail = async (cert) => {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/certifications/${cert.id}`, { headers: h })
+      const r = await apiFetch(`${API}/certifications/${cert.id}`, { headers: h })
       if (!r.ok) return
       const d = await r.json()
       setDetail(d)
@@ -64,7 +65,7 @@ export default function CertificationTab({ token, athletes }) {
         target_dan: r.target_dan || null,
         passed:     r.passed ?? null,
       }))
-      const r = await fetch(`${API}/certifications/${detail.id}/results`, {
+      const r = await apiFetch(`${API}/certifications/${detail.id}/results`, {
         method: 'PUT', headers: hj, body: JSON.stringify({ results: payload })
       })
       if (r.ok) { setMsg('Список сохранён'); await openDetail(detail) }
@@ -81,7 +82,7 @@ export default function CertificationTab({ token, athletes }) {
       onConfirm: async () => {
         setConfirm(null)
         try {
-          const r = await fetch(`${API}/certifications/${detail.id}/finalize`, { method: 'POST', headers: hj })
+          const r = await apiFetch(`${API}/certifications/${detail.id}/finalize`, { method: 'POST', headers: hj })
           if (r.ok) {
             const d = await r.json()
             setMsg(`Завершено. Обновлено спортсменов: ${d.updated_athletes}`)
@@ -95,7 +96,7 @@ export default function CertificationTab({ token, athletes }) {
   const sendNotify = async () => {
     if (!detail) return
     try {
-      const r = await fetch(`${API}/certifications/${detail.id}/notify`, { method: 'POST', headers: hj })
+      const r = await apiFetch(`${API}/certifications/${detail.id}/notify`, { method: 'POST', headers: hj })
       if (r.ok) { const d = await r.json(); setMsg(`Уведомлений отправлено: ${d.sent}`) }
     } catch { setMsg('Ошибка отправки') }
   }
@@ -103,7 +104,7 @@ export default function CertificationTab({ token, athletes }) {
   const createCert = async () => {
     if (!form.name.trim() || !form.date) { setMsg('Заполните название и дату'); return }
     try {
-      const r = await fetch(`${API}/certifications`, {
+      const r = await apiFetch(`${API}/certifications`, {
         method: 'POST', headers: hj,
         body: JSON.stringify({ name: form.name, date: form.date, location: form.location || null, notes: form.notes || null })
       })
@@ -123,7 +124,7 @@ export default function CertificationTab({ token, athletes }) {
       danger: true,
       onConfirm: async () => {
         setConfirm(null)
-        await fetch(`${API}/certifications/${id}`, { method: 'DELETE', headers: h })
+        await apiFetch(`${API}/certifications/${id}`, { method: 'DELETE', headers: h })
         if (detail?.id === id) { setDetail(null); setRows([]) }
         await loadCerts()
       }
@@ -313,7 +314,7 @@ export default function CertificationTab({ token, athletes }) {
                         onChange={async e => {
                           const paid = e.target.checked
                           updateRow(r.athlete_id, 'paid', paid)
-                          await fetch(`${API}/certifications/${detail.id}/results/${r.athlete_id}/paid?paid=${paid}`, {
+                          await apiFetch(`${API}/certifications/${detail.id}/results/${r.athlete_id}/paid?paid=${paid}`, {
                             method:'PATCH', headers:{Authorization:`Bearer ${token}`}
                           })
                         }}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { API, currentSeason, seasonRange, seasonLabel } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 import LineChart from './LineChart'
 
 export default function AttendanceTab({ token, athletes }) {
@@ -29,7 +30,7 @@ export default function AttendanceTab({ token, athletes }) {
   , [athletes, group])
 
   useEffect(() => {
-    fetch(`${API}/attendance/seasons`, { headers: { Authorization: `Bearer ${token}` } })
+    apiFetch(`${API}/attendance/seasons`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [currentSeason])
       .then(s => { setSeasons(s.length ? s : [currentSeason]) })
       .catch(() => {})
@@ -42,7 +43,7 @@ export default function AttendanceTab({ token, athletes }) {
     try {
       const { start, end } = seasonRange(season)
       const url = season !== '' ? `${API}/attendance/sessions?group_name=${group}&limit=300&date_from=${start}&date_to=${end}` : `${API}/attendance/sessions?group_name=${group}&limit=300`
-      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await apiFetch(url, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) setSessions(await r.json())
     } catch {}
   }
@@ -50,7 +51,7 @@ export default function AttendanceTab({ token, athletes }) {
   const loadChartData = async (grp) => {
     const g = grp || group
     try {
-      const r = await fetch(`${API}/attendance/sessions?group_name=${g}&limit=200`, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await apiFetch(`${API}/attendance/sessions?group_name=${g}&limit=200`, { headers: { Authorization: `Bearer ${token}` } })
       if (!r.ok) return
       const data = await r.json()
       const monthly = {}
@@ -76,7 +77,7 @@ export default function AttendanceTab({ token, athletes }) {
 
   const openSession = async (s) => {
     try {
-      const r = await fetch(`${API}/attendance/sessions/${s.id}`, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await apiFetch(`${API}/attendance/sessions/${s.id}`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) {
         const data = await r.json()
         const em = {}
@@ -92,7 +93,7 @@ export default function AttendanceTab({ token, athletes }) {
     try {
       let sid = activeSession?.id
       if (!sid) {
-        const cr = await fetch(`${API}/attendance/sessions`, {
+        const cr = await apiFetch(`${API}/attendance/sessions`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ date, group_name: group, notes })
@@ -101,7 +102,7 @@ export default function AttendanceTab({ token, athletes }) {
         sid = (await cr.json()).id
       }
       const records = Object.entries(marks).map(([athlete_id, present]) => ({ athlete_id: parseInt(athlete_id), present }))
-      const mr = await fetch(`${API}/attendance/sessions/${sid}/mark`, {
+      const mr = await apiFetch(`${API}/attendance/sessions/${sid}/mark`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ records })

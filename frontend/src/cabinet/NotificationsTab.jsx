@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { API } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 
 export default function NotificationsTab({ token }) {
   const [notifs,   setNotifs]   = useState([])
@@ -12,26 +13,26 @@ export default function NotificationsTab({ token }) {
   const loadNotifs = async () => {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/notifications`, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await apiFetch(`${API}/notifications`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) setNotifs(await r.json())
     } catch {}
     setLoading(false)
   }
 
   const markRead = async (id) => {
-    await fetch(`${API}/notifications/${id}/read`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
+    await apiFetch(`${API}/notifications/${id}/read`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
     window.dispatchEvent(new Event('notifications-read'))
   }
 
   const markAllRead = async () => {
-    await fetch(`${API}/notifications/read-all`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
+    await apiFetch(`${API}/notifications/read-all`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
     setNotifs(prev => prev.map(n => ({ ...n, is_read: true })))
     window.dispatchEvent(new Event('notifications-read'))
   }
 
   const respond = async (notifId, going) => {
-    const r = await fetch(`${API}/notifications/${notifId}/respond?going=${going}`, {
+    const r = await apiFetch(`${API}/notifications/${notifId}/respond?going=${going}`, {
       method: 'POST', headers: { Authorization: `Bearer ${token}` }
     })
     if (r.ok) {

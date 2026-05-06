@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { API, currentSeason, seasonLabel } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 import ConfirmModal from './ConfirmModal'
 import LineChart from './LineChart'
 import CompApplicationMatrix from '../pages/CompApplicationMatrix'
@@ -109,7 +110,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
 
   const loadFiles = async (compId) => {
     try {
-      const r = await fetch(`${API}/competitions/${compId}/files`, { headers: h })
+      const r = await apiFetch(`${API}/competitions/${compId}/files`, { headers: h })
       if (r.ok) setCompFiles(await r.json())
     } catch {}
   }
@@ -121,7 +122,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
     fd.append('file', file)
     setFilesLoading(true)
     try {
-      const r = await fetch(`${API}/competitions/${detail.id}/files`, {
+      const r = await apiFetch(`${API}/competitions/${detail.id}/files`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: fd
@@ -136,7 +137,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
   const deleteFile = async (fileId) => {
     if (!detail) return
     try {
-      await fetch(`${API}/competitions/${detail.id}/files/${fileId}`, {
+      await apiFetch(`${API}/competitions/${detail.id}/files/${fileId}`, {
         method: 'DELETE', headers: h
       })
       await loadFiles(detail.id)
@@ -175,7 +176,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
     const id = detail.id
     const interval = setInterval(async () => {
       try {
-        const r = await fetch(`${API}/competitions/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+        const r = await apiFetch(`${API}/competitions/${id}`, { headers: { Authorization: `Bearer ${token}` } })
         if (!r.ok) return
         const d = await r.json()
         const existingMap = {}
@@ -191,7 +192,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
 
   const loadSeasons = async () => {
     try {
-      const r = await fetch(`${API}/competitions/seasons`, { headers: h })
+      const r = await apiFetch(`${API}/competitions/seasons`, { headers: h })
       if (r.ok) {
         const years = await r.json()
         setSeasons(years)
@@ -205,7 +206,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
     setLoading(true)
     try {
       const url = season ? `${API}/competitions?season=${season}` : `${API}/competitions`
-      const r = await fetch(url, { headers: h })
+      const r = await apiFetch(url, { headers: h })
       if (r.ok) setComps(await r.json())
     } catch {}
     setLoading(false)
@@ -215,7 +216,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
     const data = []
     for (const c of comps) {
       try {
-        const r = await fetch(`${API}/competitions/${c.id}`, { headers: h })
+        const r = await apiFetch(`${API}/competitions/${c.id}`, { headers: h })
         if (r.ok) {
           const d = await r.json()
           data.push({ name: c.name.length > 18 ? c.name.substring(0,18)+'…' : c.name, date: c.date, participants: (d.results||[]).length })
@@ -228,7 +229,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
   const openDetail = async (comp) => {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/competitions/${comp.id}`, { headers: h })
+      const r = await apiFetch(`${API}/competitions/${comp.id}`, { headers: h })
       if (!r.ok) return
       const d = await r.json()
       setDetail(d)
@@ -308,7 +309,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
   const removeRow = async (athleteId) => {
     if (!detail) return
     try {
-      const r = await fetch(`${API}/competitions/${detail.id}/results/${athleteId}`, {
+      const r = await apiFetch(`${API}/competitions/${detail.id}/results/${athleteId}`, {
         method: 'DELETE', headers: h,
       })
       // 204 — удалено, 404 — строки не было (ничего не сохраняли) — тоже OK.
@@ -322,7 +323,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
     setAddLoading(true)
     setShowAddAthlete(true)
     try {
-      const r = await fetch(`${API}/users/athletes`, { headers: h })
+      const r = await apiFetch(`${API}/users/athletes`, { headers: h })
       if (r.ok) {
         const fresh = await r.json()
         const alreadyIn = new Set(rows.map(r => r.athlete_id))
@@ -362,7 +363,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
   const createComp = async () => {
     if (!form.name.trim() || !form.date) { setMsg('Заполните название и дату'); return }
     try {
-      const r = await fetch(`${API}/competitions`, {
+      const r = await apiFetch(`${API}/competitions`, {
         method: 'POST', headers: hj,
         body: JSON.stringify({ name: form.name, date: form.date, time: form.time, location: form.location || null, level: form.level, comp_type: form.comp_type, notes: form.notes || null, add_to_calendar: form.add_to_calendar })
       })
@@ -385,7 +386,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
       confirmText: 'Удалить',
       onConfirm: async () => {
         setCompConfirm(null)
-        await fetch(`${API}/competitions/${id}`, { method: 'DELETE', headers: h })
+        await apiFetch(`${API}/competitions/${id}`, { method: 'DELETE', headers: h })
         if (detail?.id === id) { setCompView('list'); setDetail(null) }
         await loadComps()
       }
@@ -395,7 +396,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
   const notifyComp = async () => {
     if (!detail) return
     try {
-      const r = await fetch(`${API}/competitions/${detail.id}/notify`, { method: 'POST', headers: hj })
+      const r = await apiFetch(`${API}/competitions/${detail.id}/notify`, { method: 'POST', headers: hj })
       if (r.ok) { const d = await r.json(); setMsg(`Уведомлений отправлено: ${d.sent}`) }
       else setMsg('Ошибка отправки')
     } catch { setMsg('Ошибка отправки') }
@@ -405,7 +406,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
     setLoading(true)
     try {
       const url = season ? `${API}/competitions/rating/overall?season=${season}` : `${API}/competitions/rating/overall`
-      const r = await fetch(url, { headers: h })
+      const r = await apiFetch(url, { headers: h })
       if (r.ok) { setRating(await r.json()); setCompView('rating') }
     } catch {}
     setLoading(false)

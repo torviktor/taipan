@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { API } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 
 export default function UnreadBadge({ token }) {
   const [count, setCount] = useState(0)
   const load = async () => {
     try {
-      const r = await fetch(`${API}/notifications/unread-count`, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await apiFetch(`${API}/notifications/unread-count`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) { const d = await r.json(); setCount(d.count) }
     } catch {}
   }

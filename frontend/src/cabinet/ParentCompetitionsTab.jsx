@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { API, currentSeason, seasonLabel } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 
 const LEVEL_BADGE = {
   'Местный':       'cbadge-local',
@@ -12,7 +13,7 @@ const LEVEL_BADGE = {
 function CompFilesBlock({ token, compId }) {
   const [files, setFiles] = useState([])
   useEffect(() => {
-    fetch(`${API}/competitions/${compId}/files`, { headers: { Authorization: `Bearer ${token}` } })
+    apiFetch(`${API}/competitions/${compId}/files`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [])
       .then(setFiles)
       .catch(() => {})
@@ -45,7 +46,7 @@ export default function ParentCompetitionsTab({ token, athletes }) {
   const [seasons, setSeasons] = useState([currentSeason])
 
   useEffect(() => {
-    fetch(`${API}/competitions/seasons`, { headers: { Authorization: `Bearer ${token}` } })
+    apiFetch(`${API}/competitions/seasons`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [currentSeason])
       .then(s => { const list = s.length ? s : [currentSeason]; setSeasons(list); if (list.includes(currentSeason)) setSeason(currentSeason); else setSeason(list[0]) })
       .catch(() => {})
@@ -59,7 +60,7 @@ export default function ParentCompetitionsTab({ token, athletes }) {
     for (const a of athletes) {
       try {
         const url = season !== '' ? `${API}/competitions/rating/athlete/${a.id}?season=${season}` : `${API}/competitions/rating/athlete/${a.id}`
-        const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+        const r = await apiFetch(url, { headers: { Authorization: `Bearer ${token}` } })
         if (r.ok) results.push(await r.json())
       } catch {}
     }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { API } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 
 export default function AnalyticsModal({ token, athletes, preselectedAthleteId, preselectedAthleteName, applicationId, onClose, onSuccess }) {
   const [athleteId, setAthleteId] = useState(preselectedAthleteId || '')
@@ -21,7 +22,7 @@ export default function AnalyticsModal({ token, athletes, preselectedAthleteId, 
       if (applicationId) fd.append('application_id', applicationId)
       if (file) fd.append('file', file)
 
-      const r = await fetch(`${API}/analytics`, {
+      const r = await apiFetch(`${API}/analytics`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: fd,

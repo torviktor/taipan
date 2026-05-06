@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { API } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 
 const STATUS = {
   paid:       { bg: '#1a2e1a', color: '#4caf50',       label: 'ОПЛАЧЕНО' },
@@ -18,7 +19,7 @@ export default function MyFeesTab({ token }) {
   const loadFees = async () => {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/fees/my`, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await apiFetch(`${API}/fees/my`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) setFees(await r.json())
     } catch {}
     setLoading(false)

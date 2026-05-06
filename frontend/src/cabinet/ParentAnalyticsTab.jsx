@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { API } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 
 export default function ParentAnalyticsTab({ token, athletes: myAthletes }) {
   const [records, setRecords] = useState([])
@@ -18,7 +19,7 @@ export default function ParentAnalyticsTab({ token, athletes: myAthletes }) {
   async function load() {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/analytics`, { headers: h })
+      const r = await apiFetch(`${API}/analytics`, { headers: h })
       if (r.ok) setRecords(await r.json())
     } catch {}
     setLoading(false)
@@ -32,7 +33,7 @@ export default function ParentAnalyticsTab({ token, athletes: myAthletes }) {
       fd.append('athlete_id', selectedId)
       fd.append('title', `Заявка на аналитику`)
       fd.append('comment', comment || 'Запрос от родителя')
-      const r = await fetch(`${API}/applications/`, {
+      const r = await apiFetch(`${API}/applications/`, {
         method: 'POST', headers: hj,
         body: JSON.stringify({
           full_name: myAthletes.find(a => a.id === Number(selectedId))?.full_name || '',
@@ -75,7 +76,7 @@ export default function ParentAnalyticsTab({ token, athletes: myAthletes }) {
                     <button className="btn-outline" style={{ padding:'6px 16px', fontSize:'13px', cursor:'pointer' }}
                       onClick={async () => {
                         const filename = rep.file_path.split('/').pop()
-                        const r = await fetch(`/api/analytics/download/${filename}`, { headers: { Authorization: `Bearer ${token}` } })
+                        const r = await apiFetch(`/api/analytics/download/${filename}`, { headers: { Authorization: `Bearer ${token}` } })
                         if (r.ok) { const blob = await r.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url) }
                       }}>
                       Скачать файл

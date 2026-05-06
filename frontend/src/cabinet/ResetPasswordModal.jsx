@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { API } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 
 export default function ResetPasswordModal({ user, token, onClose }) {
   const [pwd, setPwd] = useState('')
@@ -8,7 +9,7 @@ export default function ResetPasswordModal({ user, token, onClose }) {
   const save = async () => {
     if (pwd.length < 4) { setMsg('Минимум 4 символа'); return }
     setLoading(true)
-    const r = await fetch(`${API}/users/${user.user_id}/reset-password`, {
+    const r = await apiFetch(`${API}/users/${user.user_id}/reset-password`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ new_password: pwd }),

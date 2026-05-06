@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { API } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 
 export default function InsuranceAdminTab({ token, athletes }) {
   const [data, setData]     = useState([])
@@ -16,7 +17,7 @@ export default function InsuranceAdminTab({ token, athletes }) {
   const load = async () => {
     setLoad(true)
     try {
-      const r = await fetch(`${API}/insurance-strategy/insurance`, { headers: h })
+      const r = await apiFetch(`${API}/insurance-strategy/insurance`, { headers: h })
       if (r.ok) setData(await r.json())
       else {
         // Если эндпоинт ещё не готов — используем список спортсменов
@@ -31,7 +32,7 @@ export default function InsuranceAdminTab({ token, athletes }) {
   const save = async (athleteId, expiry) => {
     setSaving(athleteId)
     try {
-      const r = await fetch(`${API}/insurance-strategy/insurance`, {
+      const r = await apiFetch(`${API}/insurance-strategy/insurance`, {
         method: 'PATCH', headers: hj,
         body: JSON.stringify({ athlete_id: athleteId, insurance_expiry: expiry || null })
       })

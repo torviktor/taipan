@@ -7,6 +7,7 @@ import CompApplicationMatrix from './CompApplicationMatrix'
 import InsuranceTab from './InsuranceTab'
 import StrategyTab  from './StrategyTab'
 import { API, GROUPS, getSeason, seasonLabel, currentSeason, currentSeasonLabel, seasonRange } from '../cabinet/constants'
+import { apiFetch } from '../utils/apiFetch'
 import { useSorted, SortIcon, Th, ColFilter } from '../cabinet/tableUtils'
 import ResetPasswordModal from '../cabinet/ResetPasswordModal'
 import { getBirthdayStatus } from '../cabinet/birthdayUtils'
@@ -78,7 +79,7 @@ function IndividualTrainingTab({ token, role, athletes }) {
 
   const loadRequests = async () => {
     try {
-      const r = await fetch(`${API_URL}/individual-training/requests`, {
+      const r = await apiFetch(`${API_URL}/individual-training/requests`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (r.ok) setRequests(await r.json())
@@ -92,7 +93,7 @@ function IndividualTrainingTab({ token, role, athletes }) {
     if (!athleteId && athletes && athletes.length > 1) { setError('Выберите спортсмена'); return }
     setSending(true)
     try {
-      const r = await fetch(`${API_URL}/individual-training/request`, {
+      const r = await apiFetch(`${API_URL}/individual-training/request`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ athlete_id: athleteId || null, format, preferred_time: prefTime, comment }),
@@ -110,7 +111,7 @@ function IndividualTrainingTab({ token, role, athletes }) {
   }
 
   const handleStatus = async (id, status) => {
-    await fetch(`${API_URL}/individual-training/requests/${id}`, {
+    await apiFetch(`${API_URL}/individual-training/requests/${id}`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
@@ -262,7 +263,7 @@ export default function Cabinet() {
 
   const loadIndivRequests = async () => {
     try {
-      const r = await fetch(`${API}/individual-training/requests`, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await apiFetch(`${API}/individual-training/requests`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) setIndivRequests(await r.json())
     } catch {}
   }
@@ -270,12 +271,12 @@ export default function Cabinet() {
   const openShareModal = async (athlete) => {
     try {
       const [invRes, viewRes] = await Promise.all([
-        fetch(`${API}/invite/generate`, {
+        apiFetch(`${API}/invite/generate`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ athlete_id: athlete.id }),
         }),
-        fetch(`${API}/invite/my-viewers/${athlete.id}`, {
+        apiFetch(`${API}/invite/my-viewers/${athlete.id}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ])
@@ -294,7 +295,7 @@ export default function Cabinet() {
   const revokeShare = async (athleteId) => {
     setShareModal(prev => prev ? { ...prev, revoking: true } : prev)
     try {
-      await fetch(`${API}/invite/revoke/${athleteId}`, {
+      await apiFetch(`${API}/invite/revoke/${athleteId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -305,7 +306,7 @@ export default function Cabinet() {
   }
 
   const updateIndivStatus = async (id, status) => {
-    await fetch(`${API}/individual-training/requests/${id}`, {
+    await apiFetch(`${API}/individual-training/requests/${id}`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
@@ -328,7 +329,7 @@ export default function Cabinet() {
     if (orphanKeys.length === 0) return
     ;(async () => {
       try {
-        const r = await fetch(`${API}/competitions`, { headers: { Authorization: `Bearer ${token}` } })
+        const r = await apiFetch(`${API}/competitions`, { headers: { Authorization: `Bearer ${token}` } })
         if (!r.ok) return
         const valid = new Set((await r.json()).map(c => c.id))
         orphanKeys.forEach(k => {
@@ -343,7 +344,7 @@ export default function Cabinet() {
     if (role !== 'admin' && role !== 'manager') return
     const load = async () => {
       try {
-        const r = await fetch(`${API}/fees/overdue-count`, { headers: { Authorization: `Bearer ${token}` } })
+        const r = await apiFetch(`${API}/fees/overdue-count`, { headers: { Authorization: `Bearer ${token}` } })
         if (r.ok) { const d = await r.json(); setOverdueCount(d.count) }
       } catch {}
     }
@@ -355,7 +356,7 @@ export default function Cabinet() {
   const loadFeed = async () => {
     setFeedLoading(true)
     try {
-      const r = await fetch(`${API}/users/my-feed`, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await apiFetch(`${API}/users/my-feed`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) setFeed(await r.json())
     } catch {}
     setFeedLoading(false)
@@ -363,7 +364,7 @@ export default function Cabinet() {
 
   const loadActivity = async () => {
     try {
-      const r = await fetch(`${API}/users/activity`, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await apiFetch(`${API}/users/activity`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) {
         const data = await r.json()
         const map = {}
@@ -375,7 +376,7 @@ export default function Cabinet() {
 
   const loadViewers = async () => {
     try {
-      const r = await fetch(`${API}/users/viewers`, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await apiFetch(`${API}/users/viewers`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) setViewers(await r.json())
     } catch {}
   }
@@ -388,7 +389,7 @@ export default function Cabinet() {
     if (!revokeViewerModal) return
     const { viewerId, athleteId } = revokeViewerModal
     try {
-      const r = await fetch(`${API}/users/viewers/${viewerId}/athlete/${athleteId}`, {
+      const r = await apiFetch(`${API}/users/viewers/${viewerId}/athlete/${athleteId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -404,7 +405,7 @@ export default function Cabinet() {
 
   const loadUserRoles = async () => {
     try {
-      const r = await fetch(`${API}/users/`, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await apiFetch(`${API}/users/`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) {
         const data = await r.json()
         const map = {}
@@ -416,7 +417,7 @@ export default function Cabinet() {
 
   const changeUserRole = async (userId, newRole) => {
     try {
-      const r = await fetch(`${API}/users/${userId}/role`, {
+      const r = await apiFetch(`${API}/users/${userId}/role`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole }),
@@ -433,7 +434,7 @@ export default function Cabinet() {
   const loadAthletes = async () => {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/users/athletes`, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await apiFetch(`${API}/users/athletes`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) setAthletes(await r.json())
     } catch {}
     setLoading(false)
@@ -441,7 +442,7 @@ export default function Cabinet() {
 
   const loadApplications = async () => {
     try {
-      const r = await fetch(`${API}/applications/`, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await apiFetch(`${API}/applications/`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) setApplications(await r.json())
     } catch {}
   }
@@ -449,7 +450,7 @@ export default function Cabinet() {
   const loadMyAthletes = async () => {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/users/my-athletes`, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await apiFetch(`${API}/users/my-athletes`, { headers: { Authorization: `Bearer ${token}` } })
       if (r.ok) setMyAthletes(await r.json())
     } catch {}
     setLoading(false)
@@ -466,7 +467,7 @@ export default function Cabinet() {
     if (editData.group)  body.group  = editData.group
     if (editData.gup)    body.gup    = parseInt(editData.gup)
     if (editData.dan)    body.dan    = parseInt(editData.dan)
-    await fetch(`${API}/users/athletes/${id}`, {
+    await apiFetch(`${API}/users/athletes/${id}`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -476,7 +477,7 @@ export default function Cabinet() {
 
   const deleteAthlete = async (id) => {
     if (!window.confirm('Удалить спортсмена из базы безвозвратно?')) return
-    await fetch(`${API}/users/athletes/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+    await apiFetch(`${API}/users/athletes/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
     loadAthletes()
   }
 
@@ -499,10 +500,10 @@ export default function Cabinet() {
 
   const doArchiveAthlete = async (athlete_id, also_archive_parent) => {
     setArchiveAthleteModal(null)
-    await fetch(`${API}/users/athletes/${athlete_id}/archive`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
+    await apiFetch(`${API}/users/athletes/${athlete_id}/archive`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
     if (also_archive_parent) {
       const athlete = athletes.find(a => a.id === athlete_id)
-      if (athlete) await fetch(`${API}/users/parents/${athlete.user_id}/archive`, {
+      if (athlete) await apiFetch(`${API}/users/parents/${athlete.user_id}/archive`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ archive_children: false })
@@ -512,14 +513,14 @@ export default function Cabinet() {
   }
 
   const restoreAthlete = async (id) => {
-    await fetch(`${API}/users/athletes/${id}/restore`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
+    await apiFetch(`${API}/users/athletes/${id}/restore`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
     loadAthletes()
   }
 
   const [archiveParentModal, setArchiveParentModal] = useState(null) // { user_id, parent_name, children }
 
   const archiveParent = async (user_id, archiveChildren) => {
-    const r = await fetch(`${API}/users/parents/${user_id}/archive`, {
+    const r = await apiFetch(`${API}/users/parents/${user_id}/archive`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ archive_children: archiveChildren })
@@ -536,14 +537,14 @@ export default function Cabinet() {
   }
 
   const restoreParent = async (user_id) => {
-    await fetch(`${API}/users/parents/${user_id}/restore?restore_children=true`, {
+    await apiFetch(`${API}/users/parents/${user_id}/restore?restore_children=true`, {
       method: 'PATCH', headers: { Authorization: `Bearer ${token}` }
     })
     loadAthletes()
   }
 
   const updateAppStatus = async (id, status) => {
-    await fetch(`${API}/applications/${id}/status`, {
+    await apiFetch(`${API}/applications/${id}/status`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
@@ -552,7 +553,7 @@ export default function Cabinet() {
   }
 
   const deleteApplication = async (id) => {
-    await fetch(`${API}/applications/${id}`, {
+    await apiFetch(`${API}/applications/${id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -1378,7 +1379,7 @@ export default function Cabinet() {
                         if (!matched) return null
                         return <button className="td-btn" style={{color:'#c8962a', borderColor:'#c8962a'}} onClick={async () => {
                           try {
-                            const r = await fetch(`${API}/analytics/export/${matched.id}`, { headers: { Authorization: `Bearer ${token}` } })
+                            const r = await apiFetch(`${API}/analytics/export/${matched.id}`, { headers: { Authorization: `Bearer ${token}` } })
                             if (!r.ok) { alert('Ошибка'); return }
                             const data = await r.json()
                             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })

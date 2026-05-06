@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { apiFetch } from '../utils/apiFetch'
 
 // Per-athlete batched PATCH queue for competition matrix autosave.
 // One in-flight PATCH per athleteId at a time; new fields accumulate while a
@@ -51,7 +52,7 @@ export function usePatchQueue({ apiBase, compId, token, onSuccess, onError }) {
 
     const promise = (async () => {
       try {
-        const r = await fetch(`${apiBase}/competitions/${cId}/results/${athleteId}`, {
+        const r = await apiFetch(`${apiBase}/competitions/${cId}/results/${athleteId}`, {
           method: 'PATCH',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify(fields),

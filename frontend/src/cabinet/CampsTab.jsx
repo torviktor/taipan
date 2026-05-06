@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { API, currentSeason, seasonLabel } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 import ConfirmModal from './ConfirmModal'
 
 const CAMP_STATUS = {
@@ -28,7 +29,7 @@ export default function CampsTab({ token, athletes }) {
   const hj = { ...h, 'Content-Type': 'application/json' }
 
   useEffect(() => {
-    fetch(`${API}/camps/seasons`, { headers: h })
+    apiFetch(`${API}/camps/seasons`, { headers: h })
       .then(r => r.ok ? r.json() : [currentSeason])
       .then(s => setSeasons(s.length ? s : [currentSeason]))
       .catch(() => {})
@@ -43,7 +44,7 @@ export default function CampsTab({ token, athletes }) {
     const hdr = { Authorization: `Bearer ${token}` }
     const interval = setInterval(async () => {
       try {
-        const r = await fetch(`${API}/camps/${campId}`, { headers: hdr })
+        const r = await apiFetch(`${API}/camps/${campId}`, { headers: hdr })
         if (r.ok) {
           const d = await r.json()
           setDetail(d)
@@ -56,14 +57,14 @@ export default function CampsTab({ token, athletes }) {
 
   const loadCamps = async () => {
     setLoading(true)
-    try { const r = await fetch(`${API}/camps`, { headers: h }); if (r.ok) setCamps(await r.json()) } catch {}
+    try { const r = await apiFetch(`${API}/camps`, { headers: h }); if (r.ok) setCamps(await r.json()) } catch {}
     setLoading(false)
   }
 
   const openDetail = async (camp) => {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/camps/${camp.id}`, { headers: h })
+      const r = await apiFetch(`${API}/camps/${camp.id}`, { headers: h })
       if (r.ok) { const d = await r.json(); setDetail(d); setParts(d.participants || []) }
     } catch {}
     setLoading(false)
@@ -72,7 +73,7 @@ export default function CampsTab({ token, athletes }) {
   const createCamp = async () => {
     if (!form.name || !form.date_start || !form.date_end) { setMsg('Заполните название и даты'); return }
     try {
-      const r = await fetch(`${API}/camps`, {
+      const r = await apiFetch(`${API}/camps`, {
         method: 'POST', headers: hj,
         body: JSON.stringify({ name: form.name, date_start: form.date_start, date_end: form.date_end, location: form.location || null, price: form.price ? parseFloat(form.price) : null, notes: form.notes || null })
       })
@@ -94,7 +95,7 @@ export default function CampsTab({ token, athletes }) {
       confirmText: 'Удалить',
       onConfirm: async () => {
         setCampConfirm(null)
-        await fetch(`${API}/camps/${id}`, { method: 'DELETE', headers: h })
+        await apiFetch(`${API}/camps/${id}`, { method: 'DELETE', headers: h })
         if (detail?.id === id) { setDetail(null); setParts([]) }
         await loadCamps()
       }
@@ -105,14 +106,14 @@ export default function CampsTab({ token, athletes }) {
     if (!detail) return
     setSaving(true)
     try {
-      const r = await fetch(`${API}/camps/${detail.id}/participants`, {
+      const r = await apiFetch(`${API}/camps/${detail.id}/participants`, {
         method: 'PUT', headers: hj,
         body: JSON.stringify({ athlete_ids: parts.map(p => p.athlete_id) })
       })
       if (r.ok) {
         // Не перезаписываем parts — статусы уже правильные в локальном стейте
         // Обновляем только detail (счётчики)
-        const d = await (await fetch(`${API}/camps/${detail.id}`, { headers: h })).json()
+        const d = await (await apiFetch(`${API}/camps/${detail.id}`, { headers: h })).json()
         setDetail(d)
         setMsg('Список сохранён')
       }
@@ -148,7 +149,7 @@ export default function CampsTab({ token, athletes }) {
   const updateStatus = async (athlete_id, status, paid) => {
     if (!detail) return
     try {
-      const r = await fetch(`${API}/camps/${detail.id}/participants/${athlete_id}`, {
+      const r = await apiFetch(`${API}/camps/${detail.id}/participants/${athlete_id}`, {
         method: 'PATCH', headers: hj,
         body: JSON.stringify({ status, paid: paid ?? undefined })
       })
@@ -159,7 +160,7 @@ export default function CampsTab({ token, athletes }) {
   const notifyCamp = async () => {
     if (!detail) return
     try {
-      const r = await fetch(`${API}/camps/${detail.id}/notify`, { method: 'POST', headers: hj })
+      const r = await apiFetch(`${API}/camps/${detail.id}/notify`, { method: 'POST', headers: hj })
       if (r.ok) { const d = await r.json(); setMsg(`Уведомлений отправлено: ${d.sent}`) }
     } catch { setMsg('Ошибка') }
   }

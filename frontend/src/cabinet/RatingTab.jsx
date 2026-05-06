@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { API, currentSeason, seasonLabel } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 
 export default function RatingTab({ token, myAthleteIds = [] }) {
   const [rating,       setRating]       = useState([])
@@ -16,7 +17,7 @@ export default function RatingTab({ token, myAthleteIds = [] }) {
 
   const loadSeasons = async () => {
     try {
-      const r = await fetch(`${API}/competitions/seasons`, { headers: h })
+      const r = await apiFetch(`${API}/competitions/seasons`, { headers: h })
       if (r.ok) {
         const years = await r.json()
         setSeasons(years)
@@ -31,7 +32,7 @@ export default function RatingTab({ token, myAthleteIds = [] }) {
     setLoading(true)
     try {
       const url = season !== '' ? `${API}/competitions/rating/overall?season=${season}` : `${API}/competitions/rating/overall`
-      const r = await fetch(url, { headers: h }); if (r.ok) setRating(await r.json())
+      const r = await apiFetch(url, { headers: h }); if (r.ok) setRating(await r.json())
     } catch {}
     setLoading(false)
   }

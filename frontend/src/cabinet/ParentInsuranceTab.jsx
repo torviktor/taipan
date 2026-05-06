@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { API } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 
 export function InsuranceStatus({ athleteId, token }) {
   const [expiry, setExpiry] = useState(null)
   const today = new Date().toISOString().slice(0,10)
 
   useEffect(() => {
-    fetch(`${API}/insurance-strategy/insurance`, { headers: { Authorization: `Bearer ${token}` } })
+    apiFetch(`${API}/insurance-strategy/insurance`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [])
       .then(data => {
         const found = data.find(x => x.athlete_id === athleteId)
@@ -43,7 +44,7 @@ function ParentInsuranceDates({ token, athletes }) {
 
   const load = async () => {
     try {
-      const r = await fetch(`${API}/insurance-strategy/insurance`, { headers: h })
+      const r = await apiFetch(`${API}/insurance-strategy/insurance`, { headers: h })
       if (r.ok) {
         const server = await r.json()
         const merged = athletes.map(a => {
@@ -62,7 +63,7 @@ function ParentInsuranceDates({ token, athletes }) {
   const save = async (athleteId, expiry) => {
     setSaving(athleteId)
     try {
-      const r = await fetch(`${API}/insurance-strategy/insurance`, {
+      const r = await apiFetch(`${API}/insurance-strategy/insurance`, {
         method: 'PATCH', headers: hj,
         body: JSON.stringify({ athlete_id: athleteId, insurance_expiry: expiry || null })
       })

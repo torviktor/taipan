@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { API, seasonRange } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 
 export default function ParentCampsTab({ token, athletes }) {
   const [camps,   setCamps]   = useState([])
@@ -15,7 +16,7 @@ export default function ParentCampsTab({ token, athletes }) {
     setLoading(true)
     try {
       const url = season !== '' ? (() => { const {start,end} = seasonRange(season); return `${API}/camps?date_from=${start}&date_to=${end}` })() : `${API}/camps`
-      const r = await fetch(url, { headers: h })
+      const r = await apiFetch(url, { headers: h })
       if (r.ok) setCamps(await r.json())
     } catch {}
     setLoading(false)
@@ -23,7 +24,7 @@ export default function ParentCampsTab({ token, athletes }) {
 
   const respond = async (campId, going) => {
     try {
-      const r = await fetch(`${API}/camps/${campId}/respond?going=${going}`, { method: 'POST', headers: hj })
+      const r = await apiFetch(`${API}/camps/${campId}/respond?going=${going}`, { method: 'POST', headers: hj })
       if (r.ok) { setMsg(going ? 'Подтверждено участие' : 'Отказ зафиксирован'); await loadCamps() }
     } catch { setMsg('Ошибка') }
   }

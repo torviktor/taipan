@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { API } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 
 export default function NewsTab({ token }) {
   const h   = { Authorization: `Bearer ${token}` }
@@ -26,7 +27,7 @@ export default function NewsTab({ token }) {
   const loadNews = async () => {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/news?limit=50`, { headers: h })
+      const r = await apiFetch(`${API}/news?limit=50`, { headers: h })
       if (r.ok) { const d = await r.json(); setItems(d.items) }
     } catch {}
     setLoading(false)
@@ -34,21 +35,21 @@ export default function NewsTab({ token }) {
 
   const loadComps = async () => {
     try {
-      const r = await fetch(`${API}/competitions`, { headers: h })
+      const r = await apiFetch(`${API}/competitions`, { headers: h })
       if (r.ok) setComps(await r.json())
     } catch {}
   }
 
   const loadCerts = async () => {
     try {
-      const r = await fetch(`${API}/certifications`, { headers: h })
+      const r = await apiFetch(`${API}/certifications`, { headers: h })
       if (r.ok) { const d = await r.json(); setCerts(d) }
     } catch {}
   }
 
   const loadCamps = async () => {
     try {
-      const r = await fetch(`${API}/camps`, { headers: h })
+      const r = await apiFetch(`${API}/camps`, { headers: h })
       if (r.ok) { const d = await r.json(); setCamps(d) }
     } catch {}
   }
@@ -57,12 +58,12 @@ export default function NewsTab({ token }) {
     if (!form.title.trim() || !form.body.trim()) { setMsg('Заполните заголовок и текст'); return }
     setSaving(true); setMsg('')
     try {
-      const r = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify(form) })
+      const r = await apiFetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify(form) })
       if (!r.ok) { const d = await r.json(); setMsg(d.detail || 'Ошибка'); setSaving(false); return }
       const created = await r.json()
       if (photoFile) {
         const fd = new FormData(); fd.append('file', photoFile)
-        await fetch(`${API}/news/${created.id}/photo`, { method: 'POST', headers: h, body: fd })
+        await apiFetch(`${API}/news/${created.id}/photo`, { method: 'POST', headers: h, body: fd })
       }
       setShowForm(false); setForm({ title: '', body: '' }); setPhotoFile(null)
       setMsg('Новость опубликована'); await loadNews()
@@ -72,7 +73,7 @@ export default function NewsTab({ token }) {
 
   const deleteNews = async (id) => {
     try {
-      await fetch(`${API}/news/${id}`, { method: 'DELETE', headers: h })
+      await apiFetch(`${API}/news/${id}`, { method: 'DELETE', headers: h })
       await loadNews(); setConfirm(null)
     } catch {}
   }
@@ -81,13 +82,13 @@ export default function NewsTab({ token }) {
     if (!editingId) return
     setSaving(true); setMsg('')
     try {
-      const r = await fetch(`${API}/news/${editingId}`, {
+      const r = await apiFetch(`${API}/news/${editingId}`, {
         method: 'PATCH', headers: hj, body: JSON.stringify(editForm)
       })
       if (!r.ok) { setMsg('Ошибка сохранения'); setSaving(false); return }
       if (editPhoto) {
         const fd = new FormData(); fd.append('file', editPhoto)
-        await fetch(`${API}/news/${editingId}/photo`, { method: 'POST', headers: h, body: fd })
+        await apiFetch(`${API}/news/${editingId}/photo`, { method: 'POST', headers: h, body: fd })
       }
       setEditingId(null); setEditPhoto(null); await loadNews()
     } catch { setMsg('Ошибка') }
@@ -96,7 +97,7 @@ export default function NewsTab({ token }) {
 
   const deletePhoto = async (newsId) => {
     try {
-      await fetch(`${API}/news/${newsId}/photo`, { method: 'DELETE', headers: h })
+      await apiFetch(`${API}/news/${newsId}/photo`, { method: 'DELETE', headers: h })
       setEditHasPhoto(false); await loadNews()
     } catch {}
   }
@@ -104,7 +105,7 @@ export default function NewsTab({ token }) {
   const generateWithGPT = async (compId) => {
     setSaving(true); setMsg('')
     try {
-      const r = await fetch(`${API}/news-admin/generate-comp-news`, {
+      const r = await apiFetch(`${API}/news-admin/generate-comp-news`, {
         method: 'POST', headers: hj, body: JSON.stringify({ comp_id: compId })
       })
       const d = await r.json()
@@ -117,7 +118,7 @@ export default function NewsTab({ token }) {
   const publishFromComp = async (compId) => {
     setSaving(true); setMsg('')
     try {
-      const r = await fetch(`${API}/news/from-competition/${compId}`, { method: 'POST', headers: h })
+      const r = await apiFetch(`${API}/news/from-competition/${compId}`, { method: 'POST', headers: h })
       if (r.ok) { setMsg('Новость опубликована'); await loadNews() }
       else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
@@ -130,7 +131,7 @@ export default function NewsTab({ token }) {
       const dateStr = new Date(certDate).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
       const title = `${certName} — ${dateStr}`
       const body  = `${dateStr} в клубе «Тайпан» прошла аттестация: ${certName}.\n\nПоздравляем всех участников с получением новых поясов! Каждый пояс — это результат упорного труда, дисциплины и преданности тхэквондо ГТФ.\n\nПродолжаем расти и совершенствоваться!`
-      const r = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title, body, certification_id: certId }) })
+      const r = await apiFetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title, body, certification_id: certId }) })
       if (r.ok) { setMsg('Новость об аттестации опубликована'); await loadNews() }
       else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
@@ -143,7 +144,7 @@ export default function NewsTab({ token }) {
     try {
       const dateStr = new Date(certDate).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
       const prompt = `Напиши новость об аттестации по тхэквондо ГТФ для сайта клуба «Тайпан».\n\nДанные:\nНазвание аттестации: ${certName}\nДата: ${dateStr}\nКлуб: Тайпан, г. Павловский Посад\nФедерация: ГТФ (GTF)\n\nСтиль — торжественный, поддерживающий, гордый. Не используй эмодзи. Зал называется доянг. Пояса — гыпы (ученические) и даны (мастерские).\nОбъём 100-180 слов.\nВерни:\nЗАГОЛОВОК: [заголовок]\nТЕКСТ: [текст]`
-      const rGpt = await fetch(`${API}/ai/chat`, { method: 'POST', headers: hj, body: JSON.stringify({ message: prompt, history: [] }) })
+      const rGpt = await apiFetch(`${API}/ai/chat`, { method: 'POST', headers: hj, body: JSON.stringify({ message: prompt, history: [] }) })
       if (!rGpt.ok) { setMsg('Ошибка YandexGPT'); setSaving(false); return }
       const gptData = await rGpt.json()
       const reply = gptData.reply || ''
@@ -154,7 +155,7 @@ export default function NewsTab({ token }) {
         title = parts[0].replace('ЗАГОЛОВОК:', '').trim() || title
         body  = parts[1].trim()
       }
-      const rSave = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title: title.slice(0,255), body, certification_id: certId }) })
+      const rSave = await apiFetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title: title.slice(0,255), body, certification_id: certId }) })
       if (rSave.ok) { setMsg('Новость об аттестации сгенерирована YandexGPT'); await loadNews() }
       else { const d = await rSave.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
@@ -170,7 +171,7 @@ export default function NewsTab({ token }) {
       const loc = campLocation ? ` в ${campLocation}` : ''
       const title = `Учебно-тренировочные сборы «${campName}» — ${ds}–${de}`
       const body  = `С ${ds} по ${de} наши спортсмены приняли участие в учебно-тренировочных сборах «${campName}»${loc}.\n\nСборы — важная часть подготовки каждого спортсмена. Интенсивные тренировки, работа над техникой хъёнгов и массоги, командный дух и взаимная поддержка — всё это делает наших бойцов сильнее.\n\nБлагодарим всех участников за старание и самоотдачу!`
-      const r = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title, body, camp_id: campId }) })
+      const r = await apiFetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title, body, camp_id: campId }) })
       if (r.ok) { setMsg('Новость о сборах опубликована'); await loadNews() }
       else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
@@ -185,7 +186,7 @@ export default function NewsTab({ token }) {
       const de = new Date(campDateEnd).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
       const loc = campLocation ? `, место: ${campLocation}` : ''
       const prompt = `Напиши новость об учебно-тренировочных сборах по тхэквондо ГТФ для сайта клуба «Тайпан».\n\nДанные:\nНазвание: ${campName}\nДаты: ${ds}–${de}${loc}\nКлуб: Тайпан, г. Павловский Посад\nФедерация: ГТФ (GTF)\n\nСтиль — живой, мотивирующий, командный. Не используй эмодзи. Зал называется доянг, техника — хъёнги и массоги.\nОбъём 120-200 слов.\nВерни:\nЗАГОЛОВОК: [заголовок]\nТЕКСТ: [текст]`
-      const rGpt = await fetch(`${API}/ai/chat`, { method: 'POST', headers: hj, body: JSON.stringify({ message: prompt, history: [] }) })
+      const rGpt = await apiFetch(`${API}/ai/chat`, { method: 'POST', headers: hj, body: JSON.stringify({ message: prompt, history: [] }) })
       if (!rGpt.ok) { setMsg('Ошибка YandexGPT'); setSaving(false); return }
       const gptData = await rGpt.json()
       const reply = gptData.reply || ''
@@ -196,7 +197,7 @@ export default function NewsTab({ token }) {
         title = parts[0].replace('ЗАГОЛОВОК:', '').trim() || title
         body  = parts[1].trim()
       }
-      const rSave = await fetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title: title.slice(0,255), body, camp_id: campId }) })
+      const rSave = await apiFetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title: title.slice(0,255), body, camp_id: campId }) })
       if (rSave.ok) { setMsg('Новость о сборах сгенерирована YandexGPT'); await loadNews() }
       else { const d = await rSave.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
@@ -235,7 +236,7 @@ export default function NewsTab({ token }) {
             onClick={async () => {
               setSaving(true); setMsg('')
               try {
-                const r = await fetch(`${API}/news-admin/generate-announcement`, { method:'POST', headers:hj })
+                const r = await apiFetch(`${API}/news-admin/generate-announcement`, { method:'POST', headers:hj })
                 const d = await r.json()
                 setMsg(d.message || 'Готово')
                 if (r.ok) await loadNews()

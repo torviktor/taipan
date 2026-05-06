@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { API } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 import ConfirmModal from './ConfirmModal'
 
 function PhotoPositioner({ item, onClose, onSave }) {
@@ -132,7 +133,7 @@ export default function HallOfFameAdmin({ token }) {
 
   const load = async () => {
     setLoading(true)
-    try { const r = await fetch(`${API}/hall-of-fame`, { headers: h }); if (r.ok) setItems(await r.json()) } catch {}
+    try { const r = await apiFetch(`${API}/hall-of-fame`, { headers: h }); if (r.ok) setItems(await r.json()) } catch {}
     setLoading(false)
   }
 
@@ -144,7 +145,7 @@ export default function HallOfFameAdmin({ token }) {
     try {
       const method = editing.id ? 'PATCH' : 'POST'
       const url    = editing.id ? `${API}/hall-of-fame/${editing.id}` : `${API}/hall-of-fame`
-      const r = await fetch(url, { method, headers: hj, body: JSON.stringify({
+      const r = await apiFetch(url, { method, headers: hj, body: JSON.stringify({
         full_name:    editing.full_name.trim(),
         achievements: editing.achievements || null,
         gup:          (editing.gup !== '' && !isNaN(Number(editing.gup)) && Number(editing.gup) > 0) ? Number(editing.gup) : 0,
@@ -166,7 +167,7 @@ export default function HallOfFameAdmin({ token }) {
       danger: true,
       onConfirm: async () => {
         setConfirm(null)
-        await fetch(`${API}/hall-of-fame/${item.id}`, { method: 'DELETE', headers: h })
+        await apiFetch(`${API}/hall-of-fame/${item.id}`, { method: 'DELETE', headers: h })
         await load()
       }
     })
@@ -176,7 +177,7 @@ export default function HallOfFameAdmin({ token }) {
     setUploading(id)
     const fd = new FormData(); fd.append('file', file)
     try {
-      const r = await fetch(`${API}/hall-of-fame/${id}/photo`, { method: 'POST', headers: h, body: fd })
+      const r = await apiFetch(`${API}/hall-of-fame/${id}/photo`, { method: 'POST', headers: h, body: fd })
       if (r.ok) await load()
     } catch {}
     setUploading(null)
@@ -184,7 +185,7 @@ export default function HallOfFameAdmin({ token }) {
 
   const savePosition = async (id, position) => {
     try {
-      const r = await fetch(`${API}/hall-of-fame/${id}/position`, {
+      const r = await apiFetch(`${API}/hall-of-fame/${id}/position`, {
         method: 'PATCH',
         headers: hj,
         body: JSON.stringify({ photo_position: position })

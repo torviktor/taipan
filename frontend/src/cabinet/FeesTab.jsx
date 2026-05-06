@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import './FeesTab.css'
 import { API } from './constants'
+import { apiFetch } from '../utils/apiFetch'
 
 const MONTHS_RU = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
                    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
@@ -53,13 +54,13 @@ export default function FeesTab({ token, role }) {
   const hj = { ...h, 'Content-Type': 'application/json' }
 
   useEffect(() => {
-    fetch(`${API}/fees/config`, { headers: h })
+    apiFetch(`${API}/fees/config`, { headers: h })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setConfig(d) })
       .catch(() => {})
 
     if (role === 'manager') {
-      fetch(`${API}/users/me`, { headers: h })
+      apiFetch(`${API}/users/me`, { headers: h })
         .then(r => r.ok ? r.json() : null)
         .then(d => { if (d?.manager_group) setGroupFilter(d.manager_group) })
         .catch(() => {})
@@ -72,7 +73,7 @@ export default function FeesTab({ token, role }) {
     try {
       // Backend идемпотентен: если записи уже есть — пропустит, если нет — создаст.
       // Это гарантирует что недавно добавленные спортсмены попадут в текущий период.
-      const initRes = await fetch(
+      const initRes = await apiFetch(
         `${API}/fees/periods/init?year=${year}&month=${month}`,
         { method: 'POST', headers: h }
       )
@@ -81,7 +82,7 @@ export default function FeesTab({ token, role }) {
         setMsg('Ошибка инициализации: ' + initText)
       }
 
-      const res = await fetch(
+      const res = await apiFetch(
         `${API}/fees/periods?year=${year}&month=${month}`,
         { headers: h }
       )
@@ -104,7 +105,7 @@ export default function FeesTab({ token, role }) {
 
   const saveConfig = async () => {
     try {
-      const r = await fetch(`${API}/fees/config`, {
+      const r = await apiFetch(`${API}/fees/config`, {
         method: 'POST',
         headers: hj,
         body: JSON.stringify({ fee_amount: config.fee_amount }),
@@ -115,7 +116,7 @@ export default function FeesTab({ token, role }) {
 
   const saveNote = async (periodId, note) => {
     try {
-      const r = await fetch(`${API}/fees/periods/${periodId}`, {
+      const r = await apiFetch(`${API}/fees/periods/${periodId}`, {
         method: 'PATCH',
         headers: hj,
         body: JSON.stringify({ note }),
@@ -129,7 +130,7 @@ export default function FeesTab({ token, role }) {
 
   const togglePaid = async (periodId, paid) => {
     try {
-      const r = await fetch(`${API}/fees/periods/${periodId}`, {
+      const r = await apiFetch(`${API}/fees/periods/${periodId}`, {
         method: 'PATCH',
         headers: hj,
         body: JSON.stringify({ paid }),
@@ -143,7 +144,7 @@ export default function FeesTab({ token, role }) {
 
   const toggleBudget = async (periodId, isBudget) => {
     try {
-      const r = await fetch(`${API}/fees/periods/${periodId}`, {
+      const r = await apiFetch(`${API}/fees/periods/${periodId}`, {
         method: 'PATCH',
         headers: hj,
         body: JSON.stringify({ is_budget: isBudget }),
@@ -159,7 +160,7 @@ export default function FeesTab({ token, role }) {
     setGroupFilter(gid)
     setGroupSaving(true)
     try {
-      await fetch(`${API}/users/me/group`, {
+      await apiFetch(`${API}/users/me/group`, {
         method: 'PATCH',
         headers: hj,
         body: JSON.stringify({ manager_group: gid === 'all' ? null : gid }),
@@ -208,7 +209,7 @@ export default function FeesTab({ token, role }) {
   const notifyDebtors = async () => {
     setNotifying(true)
     try {
-      const r = await fetch(`${API}/fees/periods/save-and-notify?year=${year}&month=${month}`, {
+      const r = await apiFetch(`${API}/fees/periods/save-and-notify?year=${year}&month=${month}`, {
         method: 'POST',
         headers: hj,
         body: JSON.stringify([]),  // пустой массив — ничего не меняем, только шлём уведомления
@@ -224,7 +225,7 @@ export default function FeesTab({ token, role }) {
   const loadHistory = async () => {
     setHistoryLoading(true)
     try {
-      const r = await fetch(`${API}/fees/periods/history`, { headers: h })
+      const r = await apiFetch(`${API}/fees/periods/history`, { headers: h })
       if (r.ok) {
         const data = await r.json()
         // Прячем текущий период — он показан в основной таблице
