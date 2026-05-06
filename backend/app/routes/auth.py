@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
@@ -57,6 +58,25 @@ def calc_age(birth_date: date) -> int:
     today = date.today()
     return today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
 
+def normalize_name(name: str) -> str:
+    """Убирает trailing/leading и схлопывает множественные пробелы внутри ФИО."""
+    return " ".join(name.split())
+
+def _check_duplicate_athlete(db: Session, full_name: str, birth_date: date) -> None:
+    """Защита от создания второй athlete-записи на того же ребёнка
+    (ФИО совпадает с точностью до пробелов и регистра + ДР совпадает + не в архиве).
+    Параметр full_name должен быть уже нормализован через normalize_name()."""
+    existing = db.query(Athlete).filter(
+        func.lower(func.trim(Athlete.full_name)) == full_name.lower(),
+        Athlete.birth_date == birth_date,
+        Athlete.is_archived == False,
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail="Такой спортсмен уже зарегистрирован в клубе. Попросите его первого родителя сгенерировать вам ссылку-приглашение через свой кабинет (вкладка Спортсмены → карточка ребёнка → кнопка «Поделиться доступом»)."
+        )
+
 # ─── Проверка телефона (до регистрации) ───────────────────────────────────────
 # Фронтенд вызывает этот роут когда пользователь вводит телефон.
 # Если телефон уже есть — сообщаем сколько детей уже зарегистрировано.
@@ -77,6 +97,9 @@ def check_phone(request: Request, phone: str, db: Session = Depends(get_db)):
 @router.post("/register", response_model=TokenResponse)
 @limiter.limit("10/minute")
 def register(request: Request, data: RegisterRequest, db: Session = Depends(get_db)):
+    data.full_name         = normalize_name(data.full_name)
+    data.athlete.full_name = normalize_name(data.athlete.full_name)
+
     # Запрет регистрации как спортсмен для детей до 11 лет
     if data.role == UserRole.athlete:
         age = calc_age(data.athlete.birth_date)
@@ -92,6 +115,8 @@ def register(request: Request, data: RegisterRequest, db: Session = Depends(get_
             status_code=400,
             detail="Телефон уже зарегистрирован. Используйте 'Добавить ребёнка' если хотите добавить второго ребёнка."
         )
+
+    _check_duplicate_athlete(db, data.athlete.full_name, data.athlete.birth_date)
 
     user = User(
         full_name = data.full_name,
@@ -124,6 +149,8 @@ def register(request: Request, data: RegisterRequest, db: Session = Depends(get_
 # Проверяем пароль, добавляем спортсмена. Лимит: 5 детей на аккаунт.
 @router.post("/add-athlete", response_model=TokenResponse)
 def add_athlete(data: AddAthleteRequest, db: Session = Depends(get_db)):
+    data.athlete.full_name = normalize_name(data.athlete.full_name)
+
     user = db.query(User).filter(User.phone == data.phone).first()
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
@@ -134,6 +161,8 @@ def add_athlete(data: AddAthleteRequest, db: Session = Depends(get_db)):
     count = db.query(Athlete).filter(Athlete.user_id == user.id).count()
     if count >= 5:
         raise HTTPException(status_code=400, detail="Достигнут лимит: максимум 5 спортсменов на аккаунт")
+
+    _check_duplicate_athlete(db, data.athlete.full_name, data.athlete.birth_date)
 
     athlete = Athlete(
         user_id    = user.id,
@@ -162,6 +191,8 @@ class RegisterByInviteRequest(BaseModel):
 def register_by_invite(request: Request, data: RegisterByInviteRequest, db: Session = Depends(get_db)):
     from datetime import datetime
     from app.models.invite import AthleteInvite, AthleteViewer
+
+    data.full_name = normalize_name(data.full_name)
 
     inv = db.query(AthleteInvite).filter(AthleteInvite.token == data.token).first()
     if not inv or not inv.is_active or inv.expires_at < datetime.utcnow():
