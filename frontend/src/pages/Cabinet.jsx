@@ -743,7 +743,7 @@ export default function Cabinet() {
                       </div>
                       <BeltDisplay gup={a.gup} dan={a.dan}/>
                       {!a.is_viewer && <InsuranceStatus athleteId={a.id} token={token} />}
-                      {!a.is_viewer && role === 'parent' && (
+                      {!a.is_viewer && (role === 'parent' || role === 'manager' || role === 'admin') && (
                         <button
                           className="btn-outline"
                           style={{ marginTop:10, fontSize:'0.8rem', padding:'6px 14px' }}
