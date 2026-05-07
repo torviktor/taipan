@@ -1,0 +1,109 @@
+.pwa-install-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 9100;
+  width: calc(100% - 24px);
+  max-width: 480px;
+  padding: 16px 20px 18px;
+  background: var(--dark2);
+  border: 1px solid var(--gray-dim);
+  border-radius: 4px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+
+  transform: translate(-50%, calc(100% + 40px));
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.pwa-install-prompt.is-in {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+.pwa-install-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--gray);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.pwa-install-close:hover {
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pwa-install-body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-right: 24px;
+}
+
+.pwa-install-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  display: block;
+}
+
+.pwa-install-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.pwa-install-title {
+  margin: 0 0 4px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--white);
+  line-height: 1.2;
+}
+
+.pwa-install-sub {
+  margin: 0;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--gray);
+}
+
+.pwa-install-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.pwa-install-btn {
+  flex: 1;
+  padding: 10px 16px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.pwa-install-btn-wide {
+  flex: 1;
+}
+
+@media (max-width: 600px) {
+  .pwa-install-prompt {
+    bottom: 12px;
+    width: calc(100% - 24px);
+    padding: 14px 16px 16px;
+  }
+  .pwa-install-actions { gap: 8px; }
+  .pwa-install-btn { flex: 1 1 50%; padding: 10px 8px; }
+}

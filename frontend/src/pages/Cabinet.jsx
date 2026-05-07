@@ -27,6 +27,7 @@ import InsuranceAdminTab from '../cabinet/InsuranceAdminTab'
 import { AchievementBadge, AchievementsLeaderboard } from '../cabinet/AchievementsTab'
 import AchievementsTab from '../cabinet/AchievementsTab'
 import AnalyticsModal from '../cabinet/AnalyticsModal'
+import PWAInstallPrompt from '../components/PWAInstallPrompt'
 const CertificationTab  = lazy(() => import('../cabinet/CertificationTab'))
 const HallOfFameAdmin   = lazy(() => import('../cabinet/HallOfFameAdmin'))
 const CampsTab          = lazy(() => import('../cabinet/CampsTab'))
@@ -1449,6 +1450,7 @@ export default function Cabinet() {
         )}
       </div>
     </div>
+    <PWAInstallPrompt />
     </main>
     </Suspense>
     </CabinetErrorBoundary>

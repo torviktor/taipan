@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import './Home.css'
+import PWAInstallPrompt from '../components/PWAInstallPrompt'
 
 /* ── COUNTER ─────────────────────────────────────────────────────────── */
 function Counter({ target, suffix = '', duration = 2000 }) {
@@ -309,6 +310,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <PWAInstallPrompt />
 
     </main>
   )
