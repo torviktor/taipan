@@ -1,0 +1,17 @@
+{
+  "name": "Тайпан — Спортивный клуб тхэквондо",
+  "short_name": "Тайпан",
+  "description": "Личный кабинет родителя клуба тхэквондо Тайпан, г. Павловский Посад",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080808",
+  "theme_color": "#080808",
+  "lang": "ru",
+  "icons": [
+    { "src": "/icons/pwa-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/pwa-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/pwa-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
