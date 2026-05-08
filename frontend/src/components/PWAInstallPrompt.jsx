@@ -6,13 +6,13 @@ const STORAGE_POSTPONED = 'pwa_install_postponed'
 const POSTPONE_MS = 7 * 24 * 60 * 60 * 1000
 const SHOW_DELAY_MS = 2000
 
-function isIosSafari() {
-  if (typeof navigator === 'undefined' || typeof window === 'undefined') return false
+function detectIos() {
+  if (typeof navigator === 'undefined' || typeof window === 'undefined') return null
   const ua = navigator.userAgent || ''
   const isIos = /iPad|iPhone|iPod/.test(ua) && !window.MSStream
-  if (!isIos) return false
-  const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua)
-  return isSafari
+  if (!isIos) return null
+  const isNonSafari = /CriOS|FxiOS|YaBrowser|OPiOS|EdgiOS/.test(ua)
+  return isNonSafari ? 'other' : 'safari'
 }
 
 function isStandalone() {
@@ -33,11 +33,16 @@ function isSuppressed() {
   return false
 }
 
+function setPostponed() {
+  try { localStorage.setItem(STORAGE_POSTPONED, String(Date.now())) } catch {}
+}
+
 export default function PWAInstallPrompt() {
   const [promptEvent, setPromptEvent] = useState(null)
-  const [showIos, setShowIos] = useState(false)
+  const [iosKind, setIosKind] = useState(null) // null | 'safari' | 'other'
   const [visible, setVisible] = useState(false)
   const [animatedIn, setAnimatedIn] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (isStandalone() || isSuppressed()) return
@@ -54,7 +59,7 @@ export default function PWAInstallPrompt() {
     }
     window.addEventListener('appinstalled', handleInstalled)
 
-    if (isIosSafari()) setShowIos(true)
+    setIosKind(detectIos())
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall)
@@ -63,13 +68,13 @@ export default function PWAInstallPrompt() {
   }, [])
 
   useEffect(() => {
-    if (!promptEvent && !showIos) return
+    if (!promptEvent && !iosKind) return
     const t = setTimeout(() => {
       setVisible(true)
       requestAnimationFrame(() => setAnimatedIn(true))
     }, SHOW_DELAY_MS)
     return () => clearTimeout(t)
-  }, [promptEvent, showIos])
+  }, [promptEvent, iosKind])
 
   const dismissForever = () => {
     try { localStorage.setItem(STORAGE_DISMISSED, '1') } catch {}
@@ -77,28 +82,49 @@ export default function PWAInstallPrompt() {
   }
 
   const postpone = () => {
-    try { localStorage.setItem(STORAGE_POSTPONED, String(Date.now())) } catch {}
+    setPostponed()
     setVisible(false)
   }
 
-  const install = async () => {
-    if (!promptEvent) return
+  const install = () => {
+    const evt = promptEvent
+    if (!evt) return
+    // Спрятать баннер немедленно — система покажет свой диалог поверх
+    setVisible(false)
+    setPromptEvent(null)
     try {
-      promptEvent.prompt()
-      const choice = await promptEvent.userChoice
-      if (choice && choice.outcome === 'accepted') {
-        setVisible(false)
-        setPromptEvent(null)
-      }
+      evt.prompt()
+      Promise.resolve(evt.userChoice).then((choice) => {
+        if (choice && choice.outcome === 'dismissed') setPostponed()
+      }).catch(() => {})
     } catch {
-      // ignore — баннер останется, пользователь сможет закрыть вручную
+      setPostponed()
+    }
+  }
+
+  const copyUrl = async () => {
+    const url = (typeof window !== 'undefined' && window.location && window.location.origin) || 'https://taipan-tkd.ru'
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {
+      // navigator.clipboard может быть недоступен — молча игнорируем
     }
   }
 
   if (!visible) return null
 
+  const isAndroid    = !iosKind && !!promptEvent
+  const isIosSafari  = iosKind === 'safari'
+  const isIosOther   = iosKind === 'other'
+
   return (
-    <div className={`pwa-install-prompt${animatedIn ? ' is-in' : ''}`} role="dialog" aria-label="Установить приложение">
+    <div
+      className={`pwa-install-prompt${animatedIn ? ' is-in' : ''}${isIosSafari ? ' is-tall' : ''}`}
+      role="dialog"
+      aria-label="Установить приложение"
+    >
       <button
         type="button"
         className="pwa-install-close"
@@ -113,16 +139,79 @@ export default function PWAInstallPrompt() {
       <div className="pwa-install-body">
         <img src="/icons/pwa-192.png" alt="" className="pwa-install-icon" />
         <div className="pwa-install-text">
-          <p className="pwa-install-title">Установить приложение</p>
+          <p className="pwa-install-title">
+            {isIosOther ? 'Откройте в Safari' : 'Установить приложение'}
+          </p>
           <p className="pwa-install-sub">
-            {showIos && !promptEvent
-              ? 'Нажмите кнопку «Поделиться» внизу экрана и выберите «На экран Домой»'
-              : 'Быстрый доступ к личному кабинету с экрана Домой'}
+            {isAndroid   && 'Быстрый доступ к личному кабинету с экрана Домой'}
+            {isIosSafari && 'Чтобы добавить иконку на экран Домой:'}
+            {isIosOther  && 'Установка приложения работает только в Safari. Скопируйте адрес и откройте через Safari.'}
           </p>
         </div>
       </div>
 
-      {!showIos && promptEvent && (
+      {isIosSafari && (
+        <>
+          <div className="pwa-install-guide" aria-hidden="true">
+            <svg className="pwa-install-guide-svg" viewBox="0 0 280 160" xmlns="http://www.w3.org/2000/svg">
+              <text x="140" y="14" textAnchor="middle" className="ig-label" fontSize="11">
+                НАЖМИТЕ ЗДЕСЬ
+              </text>
+              <path d="M 140 22 L 140 68" className="ig-pointer" strokeWidth="1.5" />
+              <path d="M 134 62 L 140 70 L 146 62" className="ig-pointer" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+
+              <rect x="10" y="80" width="260" height="60" rx="8" className="ig-bar" strokeWidth="1" />
+
+              <g transform="translate(36, 110)">
+                <path d="M 6 -8 L -6 0 L 6 8" className="ig-dim" strokeWidth="1.5" />
+              </g>
+              <g transform="translate(88, 110)">
+                <path d="M -6 -8 L 6 0 L -6 8" className="ig-dim" strokeWidth="1.5" />
+              </g>
+
+              <rect x="126" y="96" width="28" height="28" rx="4" className="ig-highlight" strokeWidth="1.5" />
+
+              <g transform="translate(140, 110)">
+                <path d="M 0 -8 L 0 6" className="ig-share" strokeWidth="1.5" />
+                <path d="M -4 -4 L 0 -8 L 4 -4" className="ig-share" strokeWidth="1.5" />
+                <path d="M -7 -2 L -7 8 L 7 8 L 7 -2" className="ig-share" strokeWidth="1.5" />
+              </g>
+
+              <g transform="translate(192, 110)">
+                <path d="M -5 -8 L -5 8 L 0 4 L 5 8 L 5 -8 Z" className="ig-dim" strokeWidth="1.5" />
+              </g>
+
+              <g transform="translate(244, 110)">
+                <rect x="-7" y="-6" width="10" height="10" rx="1.5" className="ig-dim" strokeWidth="1.5" />
+                <rect x="-3" y="-3" width="10" height="10" rx="1.5" className="ig-dim ig-tab-front" strokeWidth="1.5" />
+              </g>
+            </svg>
+          </div>
+
+          <ol className="pwa-install-steps">
+            <li className="pwa-install-step">
+              <span className="pwa-install-step-num">1</span>
+              <span className="pwa-install-step-text">Нажмите кнопку «Поделиться» внизу экрана</span>
+            </li>
+            <li className="pwa-install-step">
+              <span className="pwa-install-step-num">2</span>
+              <span className="pwa-install-step-text">Прокрутите меню и выберите «На экран „Домой“»</span>
+            </li>
+            <li className="pwa-install-step">
+              <span className="pwa-install-step-num">3</span>
+              <span className="pwa-install-step-text">Нажмите «Добавить» в правом верхнем углу</span>
+            </li>
+          </ol>
+
+          <div className="pwa-install-actions">
+            <button type="button" className="btn-primary pwa-install-btn pwa-install-btn-wide" onClick={postpone}>
+              Понятно
+            </button>
+          </div>
+        </>
+      )}
+
+      {isAndroid && (
         <div className="pwa-install-actions">
           <button type="button" className="btn-primary pwa-install-btn" onClick={install}>
             Установить
@@ -133,10 +222,13 @@ export default function PWAInstallPrompt() {
         </div>
       )}
 
-      {showIos && !promptEvent && (
+      {isIosOther && (
         <div className="pwa-install-actions">
-          <button type="button" className="btn-outline pwa-install-btn pwa-install-btn-wide" onClick={postpone}>
-            Понятно
+          <button type="button" className="btn-primary pwa-install-btn" onClick={copyUrl}>
+            {copied ? 'Скопировано' : 'Скопировать адрес'}
+          </button>
+          <button type="button" className="btn-outline pwa-install-btn" onClick={postpone}>
+            Закрыть
           </button>
         </div>
       )}
