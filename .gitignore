@@ -1,3 +1,6 @@
-.env 
-.env 
-.env 
+.env
+.env
+.env
+
+# QR-poster fonts (downloaded locally; SIL OFL but binary, no need in repo)
+scripts/fonts/
