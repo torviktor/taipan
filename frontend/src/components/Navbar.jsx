@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import PwaInstallButton from './PwaInstallButton'
 import './Navbar.css'
 
 const STATIC_INDEX = [
@@ -203,6 +204,7 @@ export default function Navbar() {
           ? <Link to="/cabinet" className="mobile-menu-cabinet">Кабинет</Link>
           : <Link to="/login"   className="mobile-menu-cabinet">Войти</Link>
         }
+        <PwaInstallButton variant="mobile" />
       </div>
     </nav>
   )
