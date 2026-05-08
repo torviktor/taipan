@@ -365,3 +365,26 @@
     display: none !important;
   }
 }
+
+/* ── Сетка фото в разделе "members" — фиксированный aspect-ratio ── */
+.members-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 32px;
+}
+.members-grid img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  object-position: center center;
+  display: block;
+}
+@media (max-width: 600px) {
+  .members-grid {
+    gap: 3px;
+  }
+  .members-grid img {
+    aspect-ratio: 3 / 4;
+  }
+}

@@ -154,11 +154,11 @@ members: (
   <div className="about-body">
 
     {/* ── 4 фото вверху раздела (мальчики) ── */}
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:32 }}>
-      <img src="/members1.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', objectPosition:'center 30%', display:'block' }} />
-      <img src="/members2.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', objectPosition:'center 30%', display:'block' }} />
-      <img src="/members3.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', objectPosition:'center top', display:'block' }} />
-      <img src="/members4.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', objectPosition:'center top', display:'block' }} />
+    <div className="members-grid">
+      <img src="/members1.webp" alt="" />
+      <img src="/members2.webp" alt="" />
+      <img src="/members3.webp" alt="" />
+      <img src="/members4.webp" alt="" />
     </div>
 
     <div className="about-lead">
@@ -169,11 +169,11 @@ members: (
     </div>
 
     {/* ── 4 фото перед блоком "Каждый участник клуба" (девушки) ── */}
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:32 }}>
-      <img src="/athletes1.webp" alt="" className="athletes-photo athletes-photo--shift-right" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
-      <img src="/athletes2.webp" alt="" className="athletes-photo athletes-photo--shift-right" style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
-      <img src="/athletes3.webp" alt="" className="athletes-photo athletes-photo--shift-left"  style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
-      <img src="/athletes4.webp" alt="" className="athletes-photo"                              style={{ width:'100%', height:260, objectFit:'cover', display:'block' }} />
+    <div className="members-grid">
+      <img src="/athletes1.webp" alt="" className="athletes-photo athletes-photo--shift-right" />
+      <img src="/athletes2.webp" alt="" className="athletes-photo athletes-photo--shift-right" />
+      <img src="/athletes3.webp" alt="" className="athletes-photo athletes-photo--shift-left" />
+      <img src="/athletes4.webp" alt="" className="athletes-photo" />
     </div>
 
     <h3>Каждый участник клуба</h3>
@@ -189,9 +189,9 @@ members: (
     <p>Занятия в клубе подразумевают, что ты (или твои родители) принимаешь цели клуба и готов идти по пути тхэквондо вместе со всеми.</p>
 
     {/* ── 2 фото перед блоком родителей ── */}
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:32 }}>
-      <img src="/photo8.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', objectPosition:'center top', display:'block' }} />
-      <img src="/photo9.webp" alt="" style={{ width:'100%', height:260, objectFit:'cover', objectPosition:'center 20%', display:'block' }} />
+    <div className="members-grid">
+      <img src="/photo8.webp" alt="" />
+      <img src="/photo9.webp" alt="" />
     </div>
 
     <h3>Родители — наши самые важные партнёры</h3>
