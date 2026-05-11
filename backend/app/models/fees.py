@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime, date as date_type
-from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Numeric, Text, Boolean
+from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Numeric, Text, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -16,6 +16,12 @@ class FeeConfig(Base):
 
 class AthleteFeePeriod(Base):
     __tablename__ = "athlete_fee_periods"
+    __table_args__ = (
+        UniqueConstraint(
+            "athlete_id", "period_year", "period_month",
+            name="ux_afp_athlete_period",
+        ),
+    )
     id           = Column(Integer, primary_key=True)
     athlete_id   = Column(Integer, ForeignKey("athletes.id"))
     period_year  = Column(Integer)

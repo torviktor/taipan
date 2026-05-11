@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import or_, and_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
@@ -756,14 +757,18 @@ def init_periods(
     elif mg == 'senior':
         athletes = [a for a in athletes if a.group in SENIOR_GROUPS]
 
+    # UPDATE предыдущего месяца фиксируем отдельной транзакцией:
+    # дальше в цикле возможен rollback по IntegrityError, и он не должен
+    # откатывать эту операцию.
     db.query(AthleteFeePeriod).filter(
         AthleteFeePeriod.period_year  == prev_year,
         AthleteFeePeriod.period_month == prev_month,
     ).update({AthleteFeePeriod.is_frozen: True})
-    db.flush()
+    db.commit()
 
-    created = 0
-    skipped = 0
+    created   = 0
+    skipped   = 0
+    conflicts = 0
     for athlete in athletes:
         exists = db.query(AthleteFeePeriod).filter(
             AthleteFeePeriod.athlete_id   == athlete.id,
@@ -789,10 +794,16 @@ def init_periods(
             period_month=month,
             debt=debt,
         ))
-        created += 1
+        try:
+            db.commit()
+            created += 1
+        except IntegrityError:
+            # Параллельный init успел вставить эту же запись — пропускаем
+            # конкретного атлета, остальная пачка продолжает работу.
+            db.rollback()
+            conflicts += 1
 
-    db.commit()
-    return {"created": created, "skipped": skipped}
+    return {"created": created, "skipped": skipped, "conflicts": conflicts}
 
 
 # ── PATCH /fees/periods/{period_id} ──────────────────────────────────────────
