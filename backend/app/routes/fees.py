@@ -6,7 +6,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, tuple_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -766,6 +766,29 @@ def init_periods(
     ).update({AthleteFeePeriod.is_frozen: True})
     db.commit()
 
+    # Carry-over is_budget: один запрос на всех атлетов, без N+1.
+    # Берём последний существующий период каждого атлета строго раньше
+    # создаваемого (DISTINCT ON по PostgreSQL).
+    athlete_ids = [a.id for a in athletes]
+    prev_budget_map: dict = {}
+    if athlete_ids:
+        rows = (
+            db.query(AthleteFeePeriod.athlete_id, AthleteFeePeriod.is_budget)
+            .filter(
+                AthleteFeePeriod.athlete_id.in_(athlete_ids),
+                tuple_(AthleteFeePeriod.period_year, AthleteFeePeriod.period_month)
+                    < tuple_(year, month),
+            )
+            .distinct(AthleteFeePeriod.athlete_id)
+            .order_by(
+                AthleteFeePeriod.athlete_id,
+                AthleteFeePeriod.period_year.desc(),
+                AthleteFeePeriod.period_month.desc(),
+            )
+            .all()
+        )
+        prev_budget_map = {aid: bool(ib) for aid, ib in rows}
+
     created   = 0
     skipped   = 0
     conflicts = 0
@@ -792,6 +815,7 @@ def init_periods(
             athlete_id=athlete.id,
             period_year=year,
             period_month=month,
+            is_budget=prev_budget_map.get(athlete.id, False),
             debt=debt,
         ))
         try:
