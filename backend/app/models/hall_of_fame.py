@@ -16,6 +16,8 @@ class HallOfFame(Base):
     sort_order     = Column(Integer, default=0, nullable=False)
     is_featured        = Column(Boolean, default=False, nullable=False)
     photo_position     = Column(String(50), nullable=True, default="50% 20%")
+    # DEPRECATED: legacy season-best flags, replaced by SeasonBestAthlete;
+    # remove with hall_of_fame cleanup session.
     season_best_senior = Column(Boolean, default=False, nullable=False)
     season_best_junior = Column(Boolean, default=False, nullable=False)
     created_at         = Column(DateTime, default=datetime.utcnow)

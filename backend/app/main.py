@@ -20,11 +20,13 @@ from app.routes.insurance_strategy import router as insurance_strategy_router
 from app.routes.analytics import router as analytics_router
 from app.routes.competition_files import router as competition_files_router
 from app.routes.fees import router as fees_router
+from app.routes.season_best import router as season_best_router
 from app.models import user, event, attendance, competition, certification, achievement, camp
 from app.models import hall_of_fame, analytics, news, competition_file
 from app.models import fees as fees_model
 from app.models import individual_training
 from app.models import invite as invite_model
+from app.models import season_best as season_best_model
 from app.routes.individual_training import router as individual_training_router
 from app.routes.invite import router as invite_router
 from app.routes.preparation import router as preparation_router
@@ -77,35 +79,7 @@ app.include_router(fees_router,              prefix="/api/fees",         tags=["
 app.include_router(individual_training_router, prefix="/api",            tags=["Индивидуальные тренировки"])
 app.include_router(invite_router,              prefix="/api",            tags=["Приглашения"])
 app.include_router(preparation_router,         prefix="/api",            tags=["Подготовка к аттестации"])
-
-@app.on_event("startup")
-async def ensure_season_best_slots():
-    db = SessionLocal()
-    try:
-        from app.models.hall_of_fame import HallOfFame
-        senior = db.query(HallOfFame).filter(HallOfFame.season_best_senior == True).first()
-        if not senior:
-            db.add(HallOfFame(
-                full_name="Лучший спортсмен сезона",
-                achievements="Старшая группа",
-                sort_order=-2,
-                season_best_senior=True,
-                is_featured=False,
-            ))
-        junior = db.query(HallOfFame).filter(HallOfFame.season_best_junior == True).first()
-        if not junior:
-            db.add(HallOfFame(
-                full_name="Лучший спортсмен сезона",
-                achievements="Младшая группа",
-                sort_order=-1,
-                season_best_junior=True,
-                is_featured=False,
-            ))
-        db.commit()
-    except Exception as e:
-        print(f"Season best slots error: {e}")
-    finally:
-        db.close()
+app.include_router(season_best_router,         prefix="/api",            tags=["Лучшие сезона"])
 
 
 @app.get("/health")

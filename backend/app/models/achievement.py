@@ -140,6 +140,40 @@ ACHIEVEMENTS = [
         "icon":        "combo",
     },
 
+    # ── Лучший сезона (выдаётся вручную через season-best-роуты, не auto_grant) ──
+    {
+        "code":        "season_best_junior_boy",
+        "name":        "Лучший спортсмен сезона",
+        "description": "Лучший спортсмен младшей группы (мальчики) по итогам сезона",
+        "category":    "season_best",
+        "tier":        "legendary",
+        "icon":        "trophy_gold",
+    },
+    {
+        "code":        "season_best_junior_girl",
+        "name":        "Лучшая спортсменка сезона",
+        "description": "Лучшая спортсменка младшей группы (девочки) по итогам сезона",
+        "category":    "season_best",
+        "tier":        "legendary",
+        "icon":        "trophy_gold",
+    },
+    {
+        "code":        "season_best_senior_boy",
+        "name":        "Лучший спортсмен сезона",
+        "description": "Лучший спортсмен старшей группы (мальчики) по итогам сезона",
+        "category":    "season_best",
+        "tier":        "legendary",
+        "icon":        "trophy_gold",
+    },
+    {
+        "code":        "season_best_senior_girl",
+        "name":        "Лучшая спортсменка сезона",
+        "description": "Лучшая спортсменка старшей группы (девочки) по итогам сезона",
+        "category":    "season_best",
+        "tier":        "legendary",
+        "icon":        "trophy_gold",
+    },
+
     # ── За ачивки ─────────────────────────────────────────────────────────────
     {
         "code":        "meta_5",
