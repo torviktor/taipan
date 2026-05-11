@@ -181,7 +181,7 @@
 
 .season-best-current-title {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(28px, 4vw, 40px);
+  font-size: clamp(24px, 3vw, 32px);
   letter-spacing: 0.08em;
   color: var(--white);
   text-align: center;
@@ -189,10 +189,11 @@
   text-transform: uppercase;
 }
 
+/* Решётка идентична .champions-grid — карточки слотов того же размера,
+   что и обычные HoF-карточки. Отличие — только плашка-лейбл и красная рамка. */
 .champions-grid--season-best {
-  grid-template-columns: repeat(auto-fit, minmax(240px, 320px));
-  justify-content: center;
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 2px;
   margin-bottom: 0;
 }
 
@@ -204,7 +205,9 @@
   text-transform: uppercase; z-index: 2;
 }
 
-/* Placeholder с инициалами (фото у Athlete не хранится). */
+/* Placeholder с инициалами (фото у Athlete не хранится).
+   TODO: после реализации Athlete.photo_url — этот блок становится фоном
+   только для случая отсутствия фото. */
 .season-best-initials {
   position: absolute;
   inset: 0;
@@ -212,8 +215,8 @@
   align-items: center;
   justify-content: center;
   font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(56px, 9vw, 96px);
-  letter-spacing: 6px;
+  font-size: clamp(40px, 6vw, 64px);
+  letter-spacing: 4px;
   color: var(--white);
   background: linear-gradient(135deg, var(--dark2) 0%, var(--dark) 100%);
   text-shadow: 0 2px 8px rgba(0,0,0,0.6);
@@ -251,6 +254,17 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.season-best-history-empty {
+  margin-top: 16px;
+  padding: 24px 20px;
+  text-align: center;
+  color: var(--gray);
+  font-size: 14px;
+  font-style: italic;
+  background: var(--dark);
+  border-left: 3px solid var(--gray-dim);
 }
 
 .season-best-history-season {

@@ -79,6 +79,7 @@ function SeasonBestCard({ slot, entry, compact = false }) {
     <div className={cls} style={{ border: '2px solid var(--red)' }}>
       <div className="champion-img-wrap">
         <div className="season-best-label">{SLOT_LABEL[slot]}</div>
+        {/* TODO: после реализации Athlete.photo_url — заменить инициалы на <img src={entry.photo_url}> */}
         <div className="season-best-initials">
           {entry ? getInitials(entry.athlete_name) : '—'}
         </div>
@@ -245,13 +246,18 @@ export default function Champions() {
             </div>
           )}
 
-          {!loading && seasons.length > 0 && (
+          {!loading && (
             <div className="season-best-history">
               <button className="season-best-history-toggle"
                 onClick={() => setHistoryOpen(v => !v)}>
                 {historyOpen ? '▾' : '▸'}  История лучших по сезонам
               </button>
-              {historyOpen && (
+              {historyOpen && seasons.length === 0 && (
+                <div className="season-best-history-empty">
+                  История пока пуста. Появится после завершения текущего сезона.
+                </div>
+              )}
+              {historyOpen && seasons.length > 0 && (
                 <div className="season-best-history-list">
                   {seasons.map(s => {
                     const isOpen = !!openSeasons[s.season]
