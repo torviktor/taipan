@@ -108,6 +108,12 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
   const [availableToAdd, setAvailableToAdd] = useState([])
   const [addLoading,     setAddLoading]     = useState(false)
 
+  // Скрытые столбцы матрицы — общий state с CompApplicationMatrix и xlsx-экспортом
+  // результатов. Заявки организаторам (genExcel в CompApplicationMatrix) hiddenCols
+  // НЕ учитывают: у форм ЦФО/Ивантеевки жёсткая структура столбцов.
+  const [hiddenCols, setHiddenCols] = useState({})
+  const toggleCol = (key) => setHiddenCols(h => ({ ...h, [key]: !h[key] }))
+
   const loadFiles = async (compId) => {
     try {
       const r = await apiFetch(`${API}/competitions/${compId}/files`, { headers: h })
@@ -436,18 +442,30 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
     XLSX.writeFile(wb, `Рейтинг_Тайпан_${season || 'все'}.xlsx`)
   }
 
+  // Колонки выгрузки результатов — keys соответствуют hiddenCols из CompApplicationMatrix.
+  // hyung — это поля tuli_* (UI-переименование, БД-поля исторически tuli_*).
+  const RESULT_XLSX_COLS = [
+    { key: 'sparring', labels: ['Спарринг место', 'Спарринг бои'],
+      getCells: r => [r.sparring_place || '', r.sparring_fights ?? ''] },
+    { key: 'stopball', labels: ['Стоп-балл место', 'Стоп-балл бои'],
+      getCells: r => [r.stopball_place || '', r.stopball_fights ?? ''] },
+    { key: 'tegtim',   labels: ['Тег-тим место', 'Тег-тим бои'],
+      getCells: r => [r.tegtim_place || '',   r.tegtim_fights ?? ''] },
+    { key: 'hyung',    labels: ['Тули место', 'Тули выступлений'],
+      getCells: r => [r.tuli_place || '',     r.tuli_perfs ?? ''] },
+  ]
+
   const exportResultsXlsx = () => {
     if (!detail) return
+    const visibleCols = RESULT_XLSX_COLS.filter(c => !hiddenCols[c.key])
+    const header = ['Спортсмен', ...visibleCols.flatMap(c => c.labels), 'Рейтинг']
     const wsData = [
-      ['Спортсмен', 'Спарринг место', 'Спарринг бои', 'Стоп-балл место', 'Стоп-балл бои', 'Тег-тим место', 'Тег-тим бои', 'Тули место', 'Тули выступлений', 'Рейтинг'],
+      header,
       ...rows.map(r => [
         r.full_name,
-        r.sparring_place || '—', r.sparring_fights,
-        r.stopball_place || '—', r.stopball_fights,
-        r.tegtim_place   || '—', r.tegtim_fights,
-        r.tuli_place     || '—', r.tuli_perfs,
-        calcRatingPreview(r, detail.significance || 1)
-      ])
+        ...visibleCols.flatMap(c => c.getCells(r)),
+        calcRatingPreview(r, detail.significance || 1),
+      ]),
     ]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), 'Результаты')
@@ -674,6 +692,8 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
   enqueue={enqueue}
   saveStatus={saveStatus}
   retryFailed={retryFailed}
+  hiddenCols={hiddenCols}
+  toggleCol={toggleCol}
 />
 
           {/* Блок ожидают ответа */}

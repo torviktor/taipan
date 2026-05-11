@@ -68,9 +68,9 @@ function SaveIndicator({ status, onRetry }) {
 
 export default function CompApplicationMatrix({ rows, athletes, detail, token, readOnly,
   updateRow, updateRowStatus, removeRow, calcRatingPreview,
-  enqueue, saveStatus, retryFailed }) {
+  enqueue, saveStatus, retryFailed,
+  hiddenCols, toggleCol }) {
 
-  const [hiddenCols,    setHiddenCols]    = useState({})
   const [genMsg,        setGenMsg]        = useState('')
   const [genLoad,       setGenLoad]       = useState(false)
 
@@ -88,8 +88,6 @@ export default function CompApplicationMatrix({ rows, athletes, detail, token, r
       auto_group: a.auto_group||'',
     }
   })
-
-  const toggleCol = (key) => setHiddenCols(h => ({ ...h, [key]: !h[key] }))
 
   // Optimistic toggle: update local state instantly, then PATCH backend.
   const togglePatch = (aid, fieldName, newVal) => {
@@ -237,7 +235,24 @@ export default function CompApplicationMatrix({ rows, athletes, detail, token, r
                 )
               })}
               <th rowSpan="2">Рейтинг</th>
-              <th rowSpan="2">Взнос</th>
+              {hiddenCols.fees ? (
+                <th rowSpan="2" onClick={() => toggleCol('fees')}
+                  title="Показать столбец «Взнос»"
+                  style={{ cursor:'pointer', color:'var(--gray-dim)', fontSize:'10px',
+                    fontFamily:'Barlow Condensed', letterSpacing:'1px',
+                    background:'rgba(0,0,0,0.4)', padding:'4px 6px', userSelect:'none',
+                    writingMode:'vertical-rl', minWidth:20 }}>
+                  Взнос
+                </th>
+              ) : (
+                <th rowSpan="2" onClick={() => toggleCol('fees')}
+                  title="Клик — скрыть столбец «Взнос»"
+                  style={{ cursor:'pointer', userSelect:'none', background:'var(--dark2)',
+                    color:'var(--red)', fontFamily:'Barlow Condensed', fontSize:'11px',
+                    letterSpacing:'1px', transition:'all 0.2s', whiteSpace:'nowrap' }}>
+                  Взнос ▾
+                </th>
+              )}
               {!readOnly && <th rowSpan="2">Статус</th>}
               {!readOnly && <th rowSpan="2"></th>}
             </tr>
@@ -324,11 +339,15 @@ export default function CompApplicationMatrix({ rows, athletes, detail, token, r
                     ]
                   })}
                   <td className="comp-rating-val">{calcRatingPreview(r, detail?.significance||1)}</td>
-                  <td style={{textAlign:'center'}}>
-                    {!readOnly && <input type="checkbox" checked={r.paid||false}
-                      onChange={e => updateRow(r.athlete_id, 'paid', e.target.checked)}/>}
-                    {readOnly && <span style={{color:r.paid?'#6cba6c':'var(--gray)',fontSize:'0.8rem'}}>{r.paid?'✓':'—'}</span>}
-                  </td>
+                  {hiddenCols.fees ? (
+                    <td style={{ background:'rgba(0,0,0,0.4)' }}></td>
+                  ) : (
+                    <td style={{textAlign:'center'}}>
+                      {!readOnly && <input type="checkbox" checked={r.paid||false}
+                        onChange={e => updateRow(r.athlete_id, 'paid', e.target.checked)}/>}
+                      {readOnly && <span style={{color:r.paid?'#6cba6c':'var(--gray)',fontSize:'0.8rem'}}>{r.paid?'✓':'—'}</span>}
+                    </td>
+                  )}
                   {!readOnly && (
                     <td>
                       <select className="td-input td-input-sm" value={r.status||'confirmed'}
@@ -350,7 +369,7 @@ export default function CompApplicationMatrix({ rows, athletes, detail, token, r
 
       {!readOnly && (
         <p style={{ marginTop:8, color:'var(--gray)', fontSize:'12px', fontStyle:'italic' }}>
-          Клик по ячейке — не участвует. Клик по заголовку столбца — скрыть дисциплину.
+          Клик по ячейке — не участвует. Клик по заголовку столбца — скрыть дисциплину или «Взнос». Скрытые столбцы исключаются и из xlsx-экспорта результатов.
         </p>
       )}
     </div>
