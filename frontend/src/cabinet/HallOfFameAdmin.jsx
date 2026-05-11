@@ -116,6 +116,241 @@ function PhotoPositioner({ item, onClose, onSave }) {
   )
 }
 
+// ── «Лучшие сезона» — секция админки ────────────────────────────────────────
+
+const SLOT_DEFS = [
+  { key: 'junior_boy',  label: 'Лучший младшей группы',  groups: ['Младшая группа (6–10 лет)'], gender: 'male' },
+  { key: 'junior_girl', label: 'Лучшая младшей группы',  groups: ['Младшая группа (6–10 лет)'], gender: 'female' },
+  { key: 'senior_boy',  label: 'Лучший старшей группы',  groups: ['Старшая группа (11+)', 'Взрослые (18+)'], gender: 'male' },
+  { key: 'senior_girl', label: 'Лучшая старшей группы',  groups: ['Старшая группа (11+)', 'Взрослые (18+)'], gender: 'female' },
+]
+
+function SeasonBestSection({ token }) {
+  const h  = { Authorization: `Bearer ${token}` }
+  const hj = { ...h, 'Content-Type': 'application/json' }
+
+  const [season,      setSeason]      = useState(null)
+  const [seasonLabel, setSeasonLabel] = useState('')
+  const [seasons,     setSeasons]     = useState([])
+  const [slots,       setSlots]       = useState({})
+  const [athletes,    setAthletes]    = useState([])
+  const [picked,      setPicked]      = useState({})
+  const [suggest,     setSuggest]     = useState({})
+  const [confirm,     setConfirm]     = useState(null)
+  const [msg,         setMsg]         = useState('')
+
+  useEffect(() => {
+    loadAthletes()
+    init()
+  }, [])
+
+  useEffect(() => {
+    if (season !== null) loadSlotsFor(season)
+  }, [season])
+
+  const init = async () => {
+    try {
+      const r = await apiFetch(`${API}/season-best`, { headers: h })
+      if (r.ok) {
+        const data = await r.json()
+        setSeason(data.season)
+        setSeasonLabel(data.season_label)
+        const m = {}
+        for (const s of data.slots) m[s.slot] = s
+        setSlots(m)
+      }
+      const rs = await apiFetch(`${API}/season-best/seasons`, { headers: h })
+      if (rs.ok) setSeasons(await rs.json())
+    } catch {}
+  }
+
+  const loadSlotsFor = async (s) => {
+    try {
+      const r = await apiFetch(`${API}/season-best?season=${s}`, { headers: h })
+      if (r.ok) {
+        const data = await r.json()
+        setSeasonLabel(data.season_label)
+        const m = {}
+        for (const sl of data.slots) m[sl.slot] = sl
+        setSlots(m)
+        setPicked({})
+        setSuggest({})
+      }
+    } catch {}
+  }
+
+  const loadAthletes = async () => {
+    try {
+      const r = await apiFetch(`${API}/users/athletes`, { headers: h })
+      if (r.ok) setAthletes(await r.json())
+    } catch {}
+  }
+
+  const filterPool = (slotKey) => {
+    const def = SLOT_DEFS.find(s => s.key === slotKey)
+    if (!def) return []
+    return athletes.filter(a =>
+      !a.is_archived &&
+      def.groups.includes(a.group) &&
+      a.gender === def.gender
+    )
+  }
+
+  const fetchSuggest = async (slotKey) => {
+    try {
+      const r = await apiFetch(`${API}/season-best/suggest?slot=${slotKey}&season=${season}`, { headers: h })
+      if (r.ok) {
+        const data = await r.json()
+        setSuggest(prev => ({ ...prev, [slotKey]: data.candidates }))
+        if (data.candidates[0]) {
+          setPicked(prev => ({ ...prev, [slotKey]: data.candidates[0].athlete_id }))
+        }
+      }
+    } catch {}
+  }
+
+  const assign = async (slotKey) => {
+    const athlete_id = picked[slotKey]
+    if (!athlete_id) { setMsg('Выберите спортсмена'); return }
+    try {
+      const r = await apiFetch(`${API}/season-best`, {
+        method: 'POST', headers: hj,
+        body: JSON.stringify({ athlete_id, slot: slotKey, season }),
+      })
+      if (r.ok) {
+        setMsg('Назначено')
+        await loadSlotsFor(season)
+        setTimeout(() => setMsg(''), 2500)
+        return
+      }
+      if (r.status === 409) {
+        const data = await r.json()
+        const cur  = data?.detail?.current
+        const cand = data?.detail?.candidate
+        const slotLabel = SLOT_DEFS.find(s => s.key === slotKey)?.label || slotKey
+        if (!cur || !cand) { setMsg('Слот занят, обновите страницу'); return }
+        setConfirm({
+          message: `Вы хотите заменить ${cur.athlete_name} на ${cand.athlete_name} в слоте «${slotLabel} ${cur.season_label}». ${cur.athlete_name} потеряет легендарную ачивку. Подтвердить?`,
+          confirmText: 'Заменить',
+          danger: true,
+          onConfirm: async () => {
+            setConfirm(null)
+            const rr = await apiFetch(`${API}/season-best/replace`, {
+              method: 'POST', headers: hj,
+              body: JSON.stringify({ athlete_id, slot: slotKey, season }),
+            })
+            if (rr.ok) {
+              setMsg('Заменено')
+              await loadSlotsFor(season)
+              setTimeout(() => setMsg(''), 2500)
+            } else {
+              setMsg('Ошибка замены')
+            }
+          },
+        })
+      } else {
+        setMsg('Ошибка назначения')
+      }
+    } catch {
+      setMsg('Ошибка сети')
+    }
+  }
+
+  const removeEntry = (entry) => {
+    const slotLabel = SLOT_DEFS.find(s => s.key === entry.slot)?.label || entry.slot
+    setConfirm({
+      message: `Снять ${entry.athlete_name} со слота «${slotLabel}»? Легендарная ачивка будет отозвана.`,
+      confirmText: 'Снять',
+      danger: true,
+      onConfirm: async () => {
+        setConfirm(null)
+        await apiFetch(`${API}/season-best/${entry.id}`, { method: 'DELETE', headers: h })
+        await loadSlotsFor(season)
+      },
+    })
+  }
+
+  if (season === null) return null
+
+  const seasonOptions = [...seasons]
+  if (!seasonOptions.find(s => s.season === season)) {
+    seasonOptions.unshift({ season, season_label: seasonLabel })
+  }
+
+  return (
+    <div style={{ marginBottom: 32, padding: 20, background: 'var(--dark2)', border: '1px solid var(--gray-dim)', borderRadius: 10 }}>
+      {confirm && <ConfirmModal message={confirm.message} confirmText={confirm.confirmText} danger={confirm.danger} onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)}/>}
+
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12, marginBottom:16 }}>
+        <h3 style={{ fontFamily:'Bebas Neue', fontSize:'1.5rem', letterSpacing:'0.06em', color:'var(--white)', margin:0 }}>
+          Лучшие сезона — {seasonLabel}
+        </h3>
+        <div>
+          <label style={{ color:'var(--gray)', fontSize:'0.78rem', letterSpacing:'0.08em', textTransform:'uppercase', marginRight:8 }}>Сезон</label>
+          <select value={season} onChange={e => setSeason(Number(e.target.value))}
+            style={{ background:'var(--dark)', border:'1px solid var(--gray-dim)', color:'var(--white)', padding:'6px 10px', borderRadius:6, fontSize:'0.9rem' }}>
+            {seasonOptions.map(s => <option key={s.season} value={s.season}>{s.season_label}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {msg && <div style={{ marginBottom:12, color:'var(--white)', fontSize:'0.85rem' }}>{msg}</div>}
+
+      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+        {SLOT_DEFS.map(def => {
+          const entry      = slots[def.key]
+          const pool       = filterPool(def.key)
+          const candidates = suggest[def.key] || []
+          return (
+            <div key={def.key} style={{ padding:14, background:'var(--dark)', borderLeft:'3px solid var(--red)', display:'flex', flexDirection:'column', gap:10 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
+                <div style={{ fontFamily:'Barlow Condensed', fontSize:'14px', fontWeight:700, letterSpacing:'1.5px', textTransform:'uppercase', color:'var(--white)' }}>
+                  {def.label}
+                </div>
+                {entry && (
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <span style={{ color:'var(--white)', fontSize:'0.9rem' }}>{entry.athlete_name}</span>
+                    <button className="btn-outline" style={{ padding:'4px 12px', fontSize:'12px' }}
+                      onClick={() => removeEntry(entry)}>Снять</button>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                <select value={picked[def.key] || ''}
+                  onChange={e => setPicked(prev => ({ ...prev, [def.key]: e.target.value ? Number(e.target.value) : '' }))}
+                  style={{ flex:'1 1 220px', background:'var(--dark)', border:'1px solid var(--gray-dim)', color:'var(--white)', padding:'6px 10px', borderRadius:6, fontSize:'0.85rem' }}>
+                  <option value="">— выберите спортсмена —</option>
+                  {pool.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
+                </select>
+                <button className="btn-outline" style={{ padding:'6px 12px', fontSize:'12px' }}
+                  onClick={() => fetchSuggest(def.key)}>Автопредложение</button>
+                <button className="btn-primary" style={{ padding:'6px 14px', fontSize:'12px' }}
+                  onClick={() => assign(def.key)}>Назначить</button>
+              </div>
+
+              {candidates.length > 0 && (
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', fontFamily:'Barlow Condensed', fontSize:'11px', letterSpacing:'0.05em' }}>
+                  <span style={{ color:'var(--gray)', alignSelf:'center', marginRight:4 }}>Топ-3:</span>
+                  {candidates.map((c, i) => (
+                    <button key={c.athlete_id}
+                      className={picked[def.key] === c.athlete_id ? 'btn-primary' : 'btn-outline'}
+                      style={{ padding:'4px 10px', fontSize:'11px' }}
+                      onClick={() => setPicked(prev => ({ ...prev, [def.key]: c.athlete_id }))}>
+                      #{i+1} {c.full_name} ({c.total_rating})
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+
 export default function HallOfFameAdmin({ token }) {
   const [items,       setItems]       = useState([])
   const [loading,     setLoading]     = useState(false)
@@ -292,6 +527,8 @@ export default function HallOfFameAdmin({ token }) {
         </div>
       )}
 
+      <SeasonBestSection token={token}/>
+
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20}}>
         <span style={{color:'var(--gray)', fontSize:'0.9rem'}}>Записей в Зале Славы: {items.length}</span>
         <button className="btn-primary" style={{padding:'8px 18px', fontSize:'14px'}} onClick={openNew}>
@@ -308,12 +545,9 @@ export default function HallOfFameAdmin({ token }) {
         {items.map(item => (
           <div key={item.id} style={{
             background:'var(--dark2)',
-            border: (item.season_best_senior || item.season_best_junior)
-              ? '2px solid var(--red)'
-              : item.is_featured ? '2px solid #c8962a' : '1px solid var(--gray-dim)',
+            border: item.is_featured ? '2px solid #c8962a' : '1px solid var(--gray-dim)',
             borderRadius:10, overflow:'hidden',
-            boxShadow: item.is_featured && !item.season_best_senior && !item.season_best_junior
-              ? '0 0 16px rgba(200,150,42,0.3)' : 'none'
+            boxShadow: item.is_featured ? '0 0 16px rgba(200,150,42,0.3)' : 'none'
           }}>
             {/* Фото */}
             <div style={{position:'relative', height:220, background:'var(--dark)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden'}}>
@@ -359,11 +593,6 @@ export default function HallOfFameAdmin({ token }) {
             </div>
             {/* Данные */}
             <div style={{padding:'14px 16px'}}>
-              {(item.season_best_senior || item.season_best_junior) && (
-                <div style={{display:'inline-block', background:'var(--red)', color:'#fff', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:'0.68rem', letterSpacing:'0.08em', textTransform:'uppercase', padding:'2px 8px', borderRadius:3, marginBottom:6}}>
-                  {item.season_best_senior ? 'Лучший сезона — Старшая' : 'Лучший сезона — Младшая'}
-                </div>
-              )}
               <div style={{fontFamily:'Bebas Neue', fontSize:'1.2rem', letterSpacing:'0.05em', color:'var(--white)', marginBottom:2}}>
                 {item.full_name}
               </div>
@@ -377,9 +606,7 @@ export default function HallOfFameAdmin({ token }) {
               )}
               <div style={{display:'flex', gap:8}}>
                 <button className="td-btn td-btn-edit" onClick={() => openEdit(item)}>Ред.</button>
-                {!item.season_best_senior && !item.season_best_junior && (
-                  <button className="td-btn td-btn-del" onClick={() => remove(item)}>Удал.</button>
-                )}
+                <button className="td-btn td-btn-del" onClick={() => remove(item)}>Удал.</button>
               </div>
             </div>
           </div>

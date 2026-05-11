@@ -173,15 +173,27 @@
 }
 
 /* ── Лучшие сезона ───────────────────────────────────────────────────── */
-.season-best-row {
-  margin-bottom: 32px;
-  padding-bottom: 32px;
+.season-best-current-block {
+  margin-bottom: 60px;
+  padding-bottom: 40px;
   border-bottom: 1px solid var(--gray-dim);
 }
 
+.season-best-current-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(28px, 4vw, 40px);
+  letter-spacing: 0.08em;
+  color: var(--white);
+  text-align: center;
+  margin: 0 0 32px;
+  text-transform: uppercase;
+}
+
 .champions-grid--season-best {
-  grid-template-columns: repeat(auto-fit, minmax(280px, 340px));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 320px));
   justify-content: center;
+  gap: 12px;
+  margin-bottom: 0;
 }
 
 .season-best-label {
@@ -191,6 +203,104 @@
   font-weight: 700; letter-spacing: 0.08em; padding: 3px 8px;
   text-transform: uppercase; z-index: 2;
 }
+
+/* Placeholder с инициалами (фото у Athlete не хранится). */
+.season-best-initials {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(56px, 9vw, 96px);
+  letter-spacing: 6px;
+  color: var(--white);
+  background: linear-gradient(135deg, var(--dark2) 0%, var(--dark) 100%);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+}
+
+/* ── История лучших по сезонам (аккордеон) ─────────────────────────── */
+.season-best-history {
+  margin-top: 60px;
+  padding-top: 24px;
+  border-top: 1px solid var(--gray-dim);
+}
+
+.season-best-history-toggle {
+  background: none;
+  border: 1px solid var(--gray-dim);
+  color: var(--white);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 12px 20px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: border-color 0.2s, color 0.2s;
+}
+.season-best-history-toggle:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.season-best-history-list {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.season-best-history-season {
+  background: var(--dark);
+  border-left: 3px solid var(--red);
+}
+
+.season-best-history-season-head {
+  background: none;
+  border: none;
+  color: var(--white);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 14px 20px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: color 0.2s;
+}
+.season-best-history-season-head:hover { color: var(--red); }
+
+.season-best-history-loading {
+  padding: 16px 20px;
+  color: var(--gray);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.season-best-history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 240px));
+  gap: 10px;
+  padding: 8px 20px 24px;
+  justify-content: center;
+}
+
+/* Компактный вариант карточки в истории. */
+.champion-card--compact .champion-img-wrap {
+  height: 160px;
+}
+.champion-card--compact .season-best-initials {
+  font-size: clamp(36px, 6vw, 56px);
+  letter-spacing: 4px;
+}
+.champion-card--compact .champion-info { padding: 12px 14px; }
+.champion-card--compact .champion-name { font-size: 16px; margin-bottom: 6px; }
+.champion-card--compact .champion-achievements li { font-size: 12px; }
 
 .champion-belt-badge {
   position: absolute;
