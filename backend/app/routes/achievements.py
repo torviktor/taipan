@@ -47,7 +47,17 @@ def get_athlete_achievements(
             if athlete.user_id != current_user.id:
                 raise HTTPException(403)
         elif role == "parent":
-            ids = [a.id for a in db.query(Athlete).filter(Athlete.user_id == current_user.id).all()]
+            # TODO: extract get_accessible_athlete_ids(user) helper —
+            # same pattern used in routes/users.py (my-feed, my-athletes) and here.
+            from app.models.invite import AthleteViewer
+            own_ids = [
+                a.id for a in db.query(Athlete).filter(Athlete.user_id == current_user.id).all()
+            ]
+            viewer_ids = [
+                v.athlete_id for v in db.query(AthleteViewer)
+                    .filter(AthleteViewer.viewer_id == current_user.id).all()
+            ]
+            ids = set(own_ids + viewer_ids)
             if athlete_id not in ids:
                 raise HTTPException(403)
         else:
