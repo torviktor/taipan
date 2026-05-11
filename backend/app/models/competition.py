@@ -48,16 +48,16 @@ class CompetitionResult(Base):
     athlete_id     = Column(Integer, ForeignKey("athletes.id",     ondelete="CASCADE"), nullable=False)
 
     sparring_place  = Column(Integer, nullable=True)
-    sparring_fights = Column(Integer, nullable=False, default=0)
+    sparring_fights = Column(Integer, nullable=True, default=None)
 
     stopball_place  = Column(Integer, nullable=True)
-    stopball_fights = Column(Integer, nullable=False, default=0)
+    stopball_fights = Column(Integer, nullable=True, default=None)
 
     tegtim_place    = Column(Integer, nullable=True)
-    tegtim_fights   = Column(Integer, nullable=False, default=0)
+    tegtim_fights   = Column(Integer, nullable=True, default=None)
 
     tuli_place      = Column(Integer, nullable=True)
-    tuli_perfs      = Column(Integer, nullable=False, default=0)
+    tuli_perfs      = Column(Integer, nullable=True, default=None)
 
     rating         = Column(Float, nullable=False, default=0.0)
     status         = Column(String(20), nullable=True, default="pending")

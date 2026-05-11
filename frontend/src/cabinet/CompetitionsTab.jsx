@@ -250,13 +250,13 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
           athlete_id:      a.id,
           full_name:       a.full_name,
           sparring_place:  ex.sparring_place  ?? '',
-          sparring_fights: ex.sparring_fights ?? 0,
+          sparring_fights: ex.sparring_fights ?? null,
           stopball_place:  ex.stopball_place  ?? '',
-          stopball_fights: ex.stopball_fights ?? 0,
+          stopball_fights: ex.stopball_fights ?? null,
           tegtim_place:    ex.tegtim_place    ?? '',
-          tegtim_fights:   ex.tegtim_fights   ?? 0,
+          tegtim_fights:   ex.tegtim_fights   ?? null,
           tuli_place:      ex.tuli_place      ?? '',
-          tuli_perfs:      ex.tuli_perfs      ?? 0,
+          tuli_perfs:      ex.tuli_perfs      ?? null,
           saved_rating:    ex.rating          ?? null,
           status:          ex.status          ?? 'pending',
           paid:            ex.paid            ?? false,
@@ -343,10 +343,10 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
     if (rows.find(r => r.athlete_id === a.id)) return
     setRows(prev => [...prev, {
       athlete_id: a.id, full_name: a.full_name,
-      sparring_place: '', sparring_fights: 0,
-      stopball_place: '', stopball_fights: 0,
-      tegtim_place: '',   tegtim_fights: 0,
-      tuli_place: '',     tuli_perfs: 0,
+      sparring_place: '', sparring_fights: null,
+      stopball_place: '', stopball_fights: null,
+      tegtim_place: '',   tegtim_fights: null,
+      tuli_place: '',     tuli_perfs: null,
       saved_rating: null,
       status: 'pending',
       paid: false,
@@ -481,7 +481,14 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
     if (PLACE_FIELDS.has(field)) {
       payloadValue = (value === '' || value === null) ? null : Number(value)
     } else if (field.endsWith('_fights') || field === 'tuli_perfs') {
-      payloadValue = Number(value) || 0
+      // Пустое поле — это «не заполнено» (null), а не «реально 0».
+      // Явно введённый 0 сохраняется как 0.
+      if (value === '' || value === null || value === undefined) {
+        payloadValue = null
+      } else {
+        const n = Number(value)
+        payloadValue = Number.isNaN(n) ? null : n
+      }
     }
     enqueue(athleteId, { [field]: payloadValue }, { immediate: IMMEDIATE_FIELDS.has(field) })
   }
@@ -495,12 +502,21 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
     ath.forEach(({ athlete_id, changes }) => {
       // Optimistic local update
       setRows(prev => prev.map(r => r.athlete_id === athlete_id ? { ...r, ...changes } : r))
-      // Нормализуем place ('' -> null) и fights в числа перед отправкой
+      // Нормализуем place ('' -> null) и fights/perfs (пусто -> null, число -> число) перед отправкой
       const payload = {}
       Object.entries(changes).forEach(([f, v]) => {
-        if (PLACE_FIELDS.has(f)) payload[f] = (v === '' || v === null) ? null : Number(v)
-        else if (f.endsWith('_fights') || f === 'tuli_perfs') payload[f] = Number(v) || 0
-        else payload[f] = v
+        if (PLACE_FIELDS.has(f)) {
+          payload[f] = (v === '' || v === null) ? null : Number(v)
+        } else if (f.endsWith('_fights') || f === 'tuli_perfs') {
+          if (v === '' || v === null || v === undefined) {
+            payload[f] = null
+          } else {
+            const n = Number(v)
+            payload[f] = Number.isNaN(n) ? null : n
+          }
+        } else {
+          payload[f] = v
+        }
       })
       enqueue(athlete_id, payload, { immediate: true })
     })

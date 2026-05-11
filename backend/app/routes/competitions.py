@@ -47,13 +47,13 @@ class CompetitionUpdate(BaseModel):
 class ResultUpsert(BaseModel):
     athlete_id:      int
     sparring_place:  Optional[int] = Field(None, ge=1, le=3)
-    sparring_fights: int = Field(0, ge=0)
+    sparring_fights: Optional[int] = Field(None, ge=0)
     stopball_place:  Optional[int] = Field(None, ge=1, le=3)
-    stopball_fights: int = Field(0, ge=0)
+    stopball_fights: Optional[int] = Field(None, ge=0)
     tegtim_place:    Optional[int] = Field(None, ge=1, le=3)
-    tegtim_fights:   int = Field(0, ge=0)
+    tegtim_fights:   Optional[int] = Field(None, ge=0)
     tuli_place:      Optional[int] = Field(None, ge=1, le=3)
-    tuli_perfs:      int = Field(0, ge=0)
+    tuli_perfs:      Optional[int] = Field(None, ge=0)
     status:          Optional[str] = "pending"
     # Toggle-поля матрицы заявки (опциональны для обратной совместимости — старый
     # клиент шлёт без них; bulk_upsert обновит только если поле явно передано).
@@ -142,10 +142,10 @@ def create_competition(
     for a in athletes:
         db.add(CompetitionResult(
             competition_id=comp.id, athlete_id=a.id,
-            sparring_place=None, sparring_fights=0,
-            stopball_place=None, stopball_fights=0,
-            tegtim_place=None, tegtim_fights=0,
-            tuli_place=None, tuli_perfs=0,
+            sparring_place=None, sparring_fights=None,
+            stopball_place=None, stopball_fights=None,
+            tegtim_place=None, tegtim_fights=None,
+            tuli_place=None, tuli_perfs=None,
             rating=0, status="pending"
         ))
 
@@ -541,10 +541,10 @@ def respond_competition(
         for aid in athlete_ids:
             db.add(CompetitionResult(
                 competition_id=comp_id, athlete_id=aid,
-                sparring_place=None, sparring_fights=0,
-                stopball_place=None, stopball_fights=0,
-                tegtim_place=None, tegtim_fights=0,
-                tuli_place=None, tuli_perfs=0,
+                sparring_place=None, sparring_fights=None,
+                stopball_place=None, stopball_fights=None,
+                tegtim_place=None, tegtim_fights=None,
+                tuli_place=None, tuli_perfs=None,
                 rating=0, status="confirmed" if going else "declined"
             ))
         db.commit()

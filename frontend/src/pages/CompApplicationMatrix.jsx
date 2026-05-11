@@ -329,9 +329,9 @@ export default function CompApplicationMatrix({ rows, athletes, detail, token, r
                       </td>,
                       <td key={d.key+'_f'} style={cellSt} onClick={() => togglePatch(r.athlete_id, d.disabled_field, !off)}>
                         {off ? '' : readOnly
-                          ? (r[fightsKey]||0)
+                          ? (r[fightsKey] ?? '')
                           : <input type="number" min="0" max="99" className="td-input td-input-sm"
-                              value={r[fightsKey]||0}
+                              value={r[fightsKey] ?? ''}
                               onClick={e=>e.stopPropagation()}
                               onChange={e=>updateRow(r.athlete_id,fightsKey,e.target.value)}/>
                         }
