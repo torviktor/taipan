@@ -49,7 +49,7 @@ export default function Login() {
         {error && <div className="login-error">{error}</div>}
 
         <form className="login-form" onSubmit={handleSubmit}>
-          <div className="form-group">
+          <div className="login-field">
             <label>Телефон</label>
             <input
               type="text"
@@ -59,7 +59,7 @@ export default function Login() {
               required
             />
           </div>
-          <div className="form-group">
+          <div className="login-field">
             <label>Пароль</label>
             <input
               type="password"
