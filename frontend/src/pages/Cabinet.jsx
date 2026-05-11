@@ -689,7 +689,7 @@ export default function Cabinet() {
       <main className="cabinet-page">
         <div className="container cabinet-container">
           <div className="cabinet-header">
-            <div>
+            <div className="cabinet-header-main">
               <p className="section-label">Личный кабинет</p>
               <h1 className="cabinet-title">{name}</h1>
             </div>
