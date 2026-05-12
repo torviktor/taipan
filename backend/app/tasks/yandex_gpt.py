@@ -165,7 +165,7 @@ def run_competition_news(comp_id: int) -> bool:
         # Проверяем не публиковали ли уже
         existing = db.query(News).filter(
             News.competition_id == comp_id,
-            News.is_published   == True
+            News.status         == 'published'
         ).first()
         if existing:
             print(f"[YaGPT] Новость о соревновании {comp_id} уже существует")

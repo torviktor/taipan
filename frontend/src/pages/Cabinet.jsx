@@ -14,6 +14,7 @@ import { getBirthdayStatus } from '../cabinet/birthdayUtils'
 import LineChart from '../cabinet/LineChart'
 import ConfirmModal from '../cabinet/ConfirmModal'
 import UnreadBadge from '../cabinet/UnreadBadge'
+import DraftsBadge from '../cabinet/DraftsBadge'
 import BeltDisplay from '../cabinet/BeltDisplay'
 import ParentCampsTab from '../cabinet/ParentCampsTab'
 import ParentAttendanceTab from '../cabinet/ParentAttendanceTab'
@@ -353,6 +354,10 @@ export default function Cabinet() {
     const interval = setInterval(load, 300000)
     return () => clearInterval(interval)
   }, [token])
+
+  useEffect(() => {
+    if (view === 'news') window.dispatchEvent(new Event('news-drafts-changed'))
+  }, [view])
 
   const loadFeed = async () => {
     setFeedLoading(true)
@@ -955,7 +960,7 @@ export default function Cabinet() {
       <button className={`cabinet-tab ${view==='competitions'?'active':''}`} onClick={() => setView('competitions')}>Соревнования</button>
       <button className={`cabinet-tab ${view==='certification'?'active':''}`} onClick={() => setView('certification')}>Аттестация</button>
       <button className={`cabinet-tab ${view==='camps'?'active':''}`} onClick={() => setView('camps')}>Сборы</button>
-      <button className={`cabinet-tab ${view==='news'?'active':''}`} onClick={() => setView('news')}>Новости</button>
+      <button className={`cabinet-tab ${view==='news'?'active':''}`} onClick={() => setView('news')}>Новости<DraftsBadge token={token}/></button>
     </div>
   </div>
 </div>

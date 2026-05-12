@@ -103,7 +103,7 @@ async def process_telegram_update(update: dict):
         elif text == "/news":
             from app.models.news import News
             news_list = db.query(News).filter(
-                News.is_published == True
+                News.status == 'published'
             ).order_by(News.published_at.desc()).limit(3).all()
             if not news_list:
                 reply = "📰 Новостей пока нет."

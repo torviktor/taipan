@@ -159,7 +159,7 @@ def generate_cert_news(
     cert = db.query(Certification).filter(Certification.id == data.cert_id).first()
     if not cert: raise HTTPException(404, "Аттестация не найдена")
 
-    existing = db.query(News).filter(News.certification_id == data.cert_id, News.is_published == True).first()
+    existing = db.query(News).filter(News.certification_id == data.cert_id, News.status == 'published').first()
     if existing: return {"ok": False, "message": "Новость об этой аттестации уже опубликована"}
 
     mode     = _resolve_mode(data.mode, cert.date)
@@ -252,7 +252,7 @@ def generate_camp_news(
     camp = db.query(Camp).filter(Camp.id == data.camp_id).first()
     if not camp: raise HTTPException(404, "Сборы не найдены")
 
-    existing = db.query(News).filter(News.camp_id == data.camp_id, News.is_published == True).first()
+    existing = db.query(News).filter(News.camp_id == data.camp_id, News.status == 'published').first()
     if existing: return {"ok": False, "message": "Новость об этих сборах уже опубликована"}
 
     today = date_type.today()

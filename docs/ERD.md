@@ -297,7 +297,7 @@ erDiagram
     varchar title
     text body
     varchar photo_url
-    boolean is_published
+    varchar status
     int created_by FK
     int competition_id FK
     int certification_id FK

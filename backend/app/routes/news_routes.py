@@ -94,14 +94,19 @@ def _resolve_mode(mode: str, event_date: date_type) -> str:
 
 @router.get("")
 def list_news(limit: int = 20, offset: int = 0, db: Session = Depends(get_db)):
-    items = db.query(News).filter(News.is_published == True).order_by(News.published_at.desc()).offset(offset).limit(limit).all()
-    total = db.query(News).filter(News.is_published == True).count()
+    items = db.query(News).filter(News.status == 'published').order_by(News.published_at.desc()).offset(offset).limit(limit).all()
+    total = db.query(News).filter(News.status == 'published').count()
     return {"items": [_out(n) for n in items], "total": total}
+
+
+@router.get("/drafts/count")
+def drafts_count(db: Session = Depends(get_db), _: User = Depends(require_manager)):
+    return {"count": db.query(News).filter(News.status == 'draft').count()}
 
 
 @router.get("/{news_id}")
 def get_news(news_id: int, db: Session = Depends(get_db)):
-    n = db.query(News).filter(News.id == news_id, News.is_published == True).first()
+    n = db.query(News).filter(News.id == news_id, News.status == 'published').first()
     if not n: raise HTTPException(404, "Новость не найдена")
     return _out(n)
 
@@ -109,13 +114,13 @@ def get_news(news_id: int, db: Session = Depends(get_db)):
 @router.post("", status_code=201)
 def create_news(data: NewsCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), user: User = Depends(require_manager)):
     if data.competition_id:
-        existing = db.query(News).filter(News.competition_id == data.competition_id, News.is_published == True).first()
+        existing = db.query(News).filter(News.competition_id == data.competition_id, News.status == 'published').first()
         if existing: raise HTTPException(400, "Новость об этом соревновании уже опубликована")
     if data.certification_id:
-        existing = db.query(News).filter(News.certification_id == data.certification_id, News.is_published == True).first()
+        existing = db.query(News).filter(News.certification_id == data.certification_id, News.status == 'published').first()
         if existing: raise HTTPException(400, "Новость об этой аттестации уже опубликована")
     if data.camp_id:
-        existing = db.query(News).filter(News.camp_id == data.camp_id, News.is_published == True).first()
+        existing = db.query(News).filter(News.camp_id == data.camp_id, News.status == 'published').first()
         if existing: raise HTTPException(400, "Новость об этих сборах уже опубликована")
 
     n = News(
@@ -198,7 +203,7 @@ def news_from_competition(
     comp = db.query(Competition).filter(Competition.id == comp_id).first()
     if not comp: raise HTTPException(404, "Соревнование не найдено")
 
-    existing = db.query(News).filter(News.competition_id == comp_id, News.is_published == True).first()
+    existing = db.query(News).filter(News.competition_id == comp_id, News.status == 'published').first()
     if existing: raise HTTPException(400, "Новость об этом соревновании уже опубликована")
 
     mode     = _resolve_mode(data.mode, comp.date)
@@ -301,7 +306,7 @@ def news_from_certification(
     cert = db.query(Certification).filter(Certification.id == cert_id).first()
     if not cert: raise HTTPException(404, "Аттестация не найдена")
 
-    existing = db.query(News).filter(News.certification_id == cert_id, News.is_published == True).first()
+    existing = db.query(News).filter(News.certification_id == cert_id, News.status == 'published').first()
     if existing: raise HTTPException(400, "Новость об этой аттестации уже опубликована")
 
     mode         = _resolve_mode(data.mode, cert.date)
@@ -390,7 +395,7 @@ def news_from_camp(
     camp = db.query(Camp).filter(Camp.id == camp_id).first()
     if not camp: raise HTTPException(404, "Сборы не найдены")
 
-    existing = db.query(News).filter(News.camp_id == camp_id, News.is_published == True).first()
+    existing = db.query(News).filter(News.camp_id == camp_id, News.status == 'published').first()
     if existing: raise HTTPException(400, "Новость об этих сборах уже опубликована")
 
     # Для сборов auto-логика по date_start / date_end
