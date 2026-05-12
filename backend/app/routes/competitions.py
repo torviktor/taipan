@@ -15,6 +15,8 @@ from app.models.competition import (
     SIGNIFICANCE_TABLE, get_significance, calc_result_rating
 )
 from app.models.certification import Notification, NotificationType
+from app.models.news import News
+from app.services.news_drafts import build_competition_anons, create_event_draft
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/competitions", tags=["competitions"])
@@ -155,7 +157,13 @@ def create_competition(
     # Уведомляем всех при создании
     _notify_all_about_competition(comp, db)
 
-    return _comp_out(comp)
+    # Автодрафт «Анонс соревнования» (не валит основную операцию)
+    title, body = build_competition_anons(comp)
+    draft = create_event_draft(
+        db, source='auto_competition_anons',
+        entity_id=comp.id, title=title, body=body, created_by=user.id,
+    )
+    return _comp_out(comp, draft_created=bool(draft))
 
 
 @router.get("")
@@ -335,6 +343,14 @@ def delete_competition(comp_id: int, db: Session = Depends(get_db), _: User = De
             db.delete(event)
     except Exception:
         pass
+    # Удаляем автодрафты-черновики, привязанные к этому соревнованию.
+    # Опубликованные новости и ручные черновики остаются (FK обнулится
+    # через ondelete=SET NULL).
+    db.query(News).filter(
+        News.competition_id == comp_id,
+        News.status == 'draft',
+        News.source.like('auto_%'),
+    ).delete(synchronize_session=False)
     db.delete(comp); db.commit()
 
 
@@ -582,12 +598,13 @@ def _age_category(age):
     return "18+"
 
 
-def _comp_out(c):
+def _comp_out(c, *, draft_created: bool = False):
     return {
         "id": c.id, "name": c.name, "date": str(c.date),
         "location": c.location, "level": c.level, "comp_type": c.comp_type,
         "significance": c.significance, "notes": c.notes,
         "season": c.season, "created_by": c.created_by,
+        "draft_created": draft_created,
     }
 
 
