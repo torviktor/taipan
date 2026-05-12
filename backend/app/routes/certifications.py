@@ -12,6 +12,8 @@ from app.models.certification import (
     Certification, CertificationResult, Notification,
     CertificationStatus, NotificationType
 )
+from app.models.news import News
+from app.services.news_drafts import build_certification_anons, create_event_draft
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/certifications", tags=["certifications"])
@@ -68,7 +70,14 @@ def create_certification(
         created_by=user.id
     )
     db.add(cert); db.commit(); db.refresh(cert)
-    return _cert_out(cert)
+
+    # Автодрафт «Анонс аттестации» (не валит основную операцию)
+    title, body = build_certification_anons(cert)
+    draft = create_event_draft(
+        db, source='auto_certification_anons',
+        entity_id=cert.id, title=title, body=body, created_by=user.id,
+    )
+    return _cert_out(cert, draft_created=bool(draft))
 
 
 @router.get("/seasons")
@@ -124,6 +133,12 @@ def update_certification(
 @router.delete("/{cert_id}", status_code=204)
 def delete_certification(cert_id: int, db: Session = Depends(get_db), _: User = Depends(require_manager)):
     cert = _get_or_404(cert_id, db)
+    # Удаляем автодрафты-черновики, привязанные к этой аттестации.
+    db.query(News).filter(
+        News.certification_id == cert_id,
+        News.status == 'draft',
+        News.source.like('auto_%'),
+    ).delete(synchronize_session=False)
     db.delete(cert); db.commit()
 
 
@@ -389,12 +404,13 @@ def _get_or_404(cert_id, db):
     return c
 
 
-def _cert_out(c):
+def _cert_out(c, *, draft_created: bool = False):
     return {
         "id": c.id, "name": c.name, "date": str(c.date),
         "location": c.location, "notes": c.notes,
         "status": c.status, "notify_sent": c.notify_sent,
         "created_by": c.created_by,
+        "draft_created": draft_created,
     }
 
 
