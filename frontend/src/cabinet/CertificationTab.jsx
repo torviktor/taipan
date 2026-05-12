@@ -109,6 +109,9 @@ export default function CertificationTab({ token, athletes }) {
         body: JSON.stringify({ name: form.name, date: form.date, location: form.location || null, notes: form.notes || null })
       })
       if (r.ok) {
+        let created = null
+        try { created = await r.json() } catch {}
+        if (created && created.draft_created) window.dispatchEvent(new Event('news-drafts-changed'))
         setShowForm(false)
         setForm({ name: '', date: '', location: '', notes: '' })
         await loadCerts()

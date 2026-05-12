@@ -79,6 +79,7 @@ export default function CampsTab({ token, athletes }) {
       })
       if (r.ok) {
         const created = await r.json()
+        if (created.draft_created) window.dispatchEvent(new Event('news-drafts-changed'))
         setShowForm(false)
         setForm({ name:'', date_start:'', date_end:'', location:'', price:'', notes:'' })
         await loadCamps()

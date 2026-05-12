@@ -375,6 +375,7 @@ export default function CompetitionsTab({ token, athletes, readOnly = false }) {
       })
       if (r.ok) {
         const created = await r.json()
+        if (created.draft_created) window.dispatchEvent(new Event('news-drafts-changed'))
         setShowForm(false)
         setForm({ name:'', date:'', time:'09:00', location:'', level:'Местный', comp_type:'Турнир', notes:'', add_to_calendar: false })
         setMsg('')
