@@ -11,6 +11,8 @@ from app.core.security import get_current_user
 from app.models.user import User, Athlete
 from app.models.camp import Camp, CampParticipant
 from app.models.certification import Notification, NotificationType
+from app.models.news import News
+from app.services.news_drafts import build_camp_anons, create_event_draft
 
 router = APIRouter(prefix="/camps", tags=["camps"])
 
@@ -65,7 +67,13 @@ def create_camp(data: CampCreate, db: Session = Depends(get_db), user: User = De
     # Уведомляем всех пользователей сразу при создании
     _notify_all_users(camp, db)
 
-    return _camp_out(camp)
+    # Автодрафт «Анонс сборов» (не валит основную операцию)
+    title, body = build_camp_anons(camp)
+    draft = create_event_draft(
+        db, source='auto_camp_anons',
+        entity_id=camp.id, title=title, body=body, created_by=user.id,
+    )
+    return _camp_out(camp, draft_created=bool(draft))
 
 
 @router.get("/seasons")
@@ -103,6 +111,12 @@ def get_camp(camp_id: int, db: Session = Depends(get_db), _: User = Depends(get_
 @router.delete("/{camp_id}", status_code=204)
 def delete_camp(camp_id: int, db: Session = Depends(get_db), _: User = Depends(require_manager)):
     camp = _get_or_404(camp_id, db)
+    # Удаляем автодрафты-черновики, привязанные к этим сборам.
+    db.query(News).filter(
+        News.camp_id == camp_id,
+        News.status == 'draft',
+        News.source.like('auto_%'),
+    ).delete(synchronize_session=False)
     db.delete(camp); db.commit()
 
 
@@ -272,7 +286,7 @@ def _get_or_404(camp_id, db):
     return c
 
 
-def _camp_out(c):
+def _camp_out(c, *, draft_created: bool = False):
     confirmed = sum(1 for p in c.participants if p.status in ("confirmed", "paid"))
     paid      = sum(1 for p in c.participants if p.paid)
     return {
@@ -281,6 +295,7 @@ def _camp_out(c):
         "location": c.location, "price": float(c.price) if c.price else None,
         "notes": c.notes, "notify_sent": c.notify_sent,
         "total": len(c.participants), "confirmed": confirmed, "paid": paid,
+        "draft_created": draft_created,
     }
 
 
