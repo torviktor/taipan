@@ -15,6 +15,7 @@ class News(Base):
     published_at     = Column(DateTime(timezone=True), server_default=func.now())
     created_by       = Column(Integer, ForeignKey("users.id"), nullable=False)
     status           = Column(String(16), nullable=False, server_default='published')
+    source           = Column(String(32), nullable=True)
     competition_id   = Column(Integer, ForeignKey("competitions.id",   ondelete="SET NULL"), nullable=True)
     certification_id = Column(Integer, ForeignKey("certifications.id", ondelete="SET NULL"), nullable=True)
     camp_id          = Column(Integer, ForeignKey("camps.id",          ondelete="SET NULL"), nullable=True)
