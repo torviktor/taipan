@@ -25,6 +25,25 @@ _DISCIPLINES = [
 ]
 
 
+def _pluralize_ru(n: int, one: str, few: str, many: str) -> str:
+    """Русские числительные.
+
+    one  — для 1, 21, 31, ... (кроме 11)
+    few  — для 2-4, 22-24, ... (кроме 12-14)
+    many — для 0, 5-20, 25-30, ...
+    """
+    n_abs = abs(n)
+    mod100 = n_abs % 100
+    mod10 = n_abs % 10
+    if 11 <= mod100 <= 14:
+        return many
+    if mod10 == 1:
+        return one
+    if 2 <= mod10 <= 4:
+        return few
+    return many
+
+
 def get_msk_week_range(now_utc: datetime) -> Tuple[datetime, datetime]:
     """UTC-границы московской календарной недели для момента now_utc.
 
@@ -244,9 +263,12 @@ def build_weekly_digest(
     attendance_rate    = stats["attendance_rate"]
 
     if trainings_count > 0:
+        trainings_word = _pluralize_ru(
+            trainings_count, "тренировка", "тренировки", "тренировок",
+        )
         lines = [
             "## Тренировки",
-            f"За неделю проведено {trainings_count} тренировок.",
+            f"За неделю проведено {trainings_count} {trainings_word}.",
         ]
         if attendance_total > 0:
             lines.append(
@@ -266,10 +288,13 @@ def build_weekly_digest(
         for comp in stats["competitions"]:
             d = comp["date"]
             lines.append(f"### {comp['name']} ({d:%d.%m})")
-            for m in comp["medals"]:
-                lines.append(
-                    f"- {m['place']} место: {m['athlete_name']} ({m['discipline']})"
-                )
+            if comp["medals"]:
+                for m in comp["medals"]:
+                    lines.append(
+                        f"- {m['place']} место: {m['athlete_name']} ({m['discipline']})"
+                    )
+            else:
+                lines.append("_Результаты будут добавлены позже._")
         sections.append("\n".join(lines))
 
     if stats["certifications"]:
