@@ -45,6 +45,11 @@ celery_app.conf.update(
             "task":     "app.tasks.weekly_digest",
             "schedule": crontab(hour=18, minute=0, day_of_week=0),
         },
+        # Еженедельный новостной дайджест (черновик News) — воскресенье 20:00 МСК
+        "weekly-news-digest": {
+            "task":     "app.tasks.weekly_news_digest",
+            "schedule": crontab(hour=20, minute=0, day_of_week=0),
+        },
         # Уведомление должников — ежедневно в 10:00
         "notify-overdue-fees": {
             "task":     "app.tasks.notify_overdue_fees",
@@ -205,5 +210,46 @@ def recompute_achievements_task():
                 print(f"[recompute_achievements] error for athlete {a.id}: {e}")
         print(f"[recompute_achievements] обработано {len(athletes)} спортсменов, начислено новых ачивок: {total_granted}")
         return total_granted
+    finally:
+        db.close()
+
+
+@celery_app.task(name="app.tasks.weekly_news_digest")
+def weekly_news_digest_task():
+    """Воскресенье 20:00 МСК — черновик News с итогами недели."""
+    from datetime import datetime, timezone
+    from app.core.database import SessionLocal
+    from app.services.weekly_digest import (
+        get_msk_week_range, collect_week_stats, build_weekly_digest,
+    )
+    from app.services.news_drafts import create_weekly_digest_draft
+    from app.tasks.news_fetcher import get_system_user
+    import logging
+    log = logging.getLogger(__name__)
+
+    db = SessionLocal()
+    try:
+        now_utc = datetime.now(timezone.utc)
+        week_start_utc, week_end_utc = get_msk_week_range(now_utc)
+        stats = collect_week_stats(db, week_start_utc, week_end_utc)
+        title, body = build_weekly_digest(stats, week_start_utc, week_end_utc)
+        created_by = get_system_user(db)
+        draft = create_weekly_digest_draft(
+            db,
+            week_start_utc=week_start_utc,
+            week_end_utc=week_end_utc,
+            title=title,
+            body=body,
+            created_by=created_by,
+        )
+        if draft:
+            log.info(
+                "weekly_news_digest: draft id=%s for week %s..%s",
+                draft.id, week_start_utc, week_end_utc,
+            )
+        else:
+            log.warning("weekly_news_digest: no draft created")
+    except Exception:
+        log.exception("weekly_news_digest failed")
     finally:
         db.close()

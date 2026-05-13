@@ -5,7 +5,7 @@ from typing import Tuple
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from sqlalchemy import func
 
 from app.models.attendance import TrainingSession, Attendance
 from app.models.achievement import AthleteAchievement, ACHIEVEMENT_MAP
