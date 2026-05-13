@@ -1,7 +1,7 @@
 # backend/app/services/news_drafts.py
 
 import logging
-from datetime import date as date_type
+from datetime import date as date_type, datetime
 from typing import Literal, Optional
 
 from sqlalchemy.orm import Session
@@ -24,6 +24,7 @@ Source = Literal[
     'vk',
     'gtf_telegram',
     'ai',
+    'auto_weekly_digest',
 ]
 
 
@@ -79,6 +80,46 @@ def build_camp_anons(c: Camp) -> tuple[str, str]:
     return title, body
 
 
+def _create_news_draft(
+    db: Session,
+    *,
+    source: Source,
+    title: str,
+    body: str,
+    created_by: int,
+    **fk_kwargs,
+) -> Optional[News]:
+    """
+    Низкоуровневое создание черновика News(status='draft').
+
+    НЕ делает дедуп и НЕ проверяет FK — это ответственность вызывающего.
+    На исключении: log.exception, db.rollback, return None.
+    """
+    try:
+        news = News(
+            title=title[:255],
+            body=body,
+            status='draft',
+            source=source,
+            created_by=created_by,
+            **fk_kwargs,
+        )
+        db.add(news)
+        db.commit()
+        db.refresh(news)
+        return news
+    except Exception:
+        log.exception(
+            "_create_news_draft failed (source=%s, fk_kwargs=%s)",
+            source, fk_kwargs,
+        )
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return None
+
+
 def create_event_draft(
     db: Session,
     *,
@@ -95,12 +136,12 @@ def create_event_draft(
     уже существует. Падения логирует и проглатывает (тоже None) —
     не валит основную операцию caller'а.
     """
-    try:
-        fk_field = _FK_BY_SOURCE.get(source)
-        if not fk_field:
-            log.error("create_event_draft: unknown source %r", source)
-            return None
+    fk_field = _FK_BY_SOURCE.get(source)
+    if not fk_field:
+        log.error("create_event_draft: unknown source %r", source)
+        return None
 
+    try:
         existing = db.query(News).filter(
             News.source == source,
             getattr(News, fk_field) == entity_id,
@@ -108,22 +149,9 @@ def create_event_draft(
         ).first()
         if existing:
             return None
-
-        news = News(
-            title=title[:255],
-            body=body,
-            status='draft',
-            source=source,
-            created_by=created_by,
-            **{fk_field: entity_id},
-        )
-        db.add(news)
-        db.commit()
-        db.refresh(news)
-        return news
     except Exception:
         log.exception(
-            "create_event_draft failed (source=%s, entity_id=%s)",
+            "create_event_draft dedup query failed (source=%s, entity_id=%s)",
             source, entity_id,
         )
         try:
@@ -131,3 +159,63 @@ def create_event_draft(
         except Exception:
             pass
         return None
+
+    return _create_news_draft(
+        db,
+        source=source,
+        title=title,
+        body=body,
+        created_by=created_by,
+        **{fk_field: entity_id},
+    )
+
+
+def create_weekly_digest_draft(
+    db: Session,
+    *,
+    week_start_utc: datetime,
+    week_end_utc: datetime,
+    title: str,
+    body: str,
+    created_by: int,
+) -> Optional[News]:
+    """
+    Создать черновик еженедельного дайджеста (source='auto_weekly_digest').
+
+    Дедуп: один draft на неделю — ищем существующий с
+    published_at >= week_start_utc (для draft published_at = момент
+    создания записи, server_default=func.now()).
+
+    week_end_utc передаётся для логирования и единообразия сигнатуры —
+    внутри для дедупа не используется.
+    """
+    try:
+        existing = db.query(News).filter(
+            News.source == 'auto_weekly_digest',
+            News.status == 'draft',
+            News.published_at >= week_start_utc,
+        ).first()
+        if existing:
+            log.info(
+                "weekly digest draft already exists for week %s..%s (id=%s)",
+                week_start_utc, week_end_utc, existing.id,
+            )
+            return existing
+    except Exception:
+        log.exception(
+            "create_weekly_digest_draft dedup query failed (week %s..%s)",
+            week_start_utc, week_end_utc,
+        )
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return None
+
+    return _create_news_draft(
+        db,
+        source='auto_weekly_digest',
+        title=title,
+        body=body,
+        created_by=created_by,
+    )
