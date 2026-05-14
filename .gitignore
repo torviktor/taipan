@@ -4,3 +4,6 @@
 
 # QR-poster fonts (downloaded locally; SIL OFL but binary, no need in repo)
 scripts/fonts/
+
+# Personal Claude Code permissions — local-only, do not commit
+.claude/settings.local.json
