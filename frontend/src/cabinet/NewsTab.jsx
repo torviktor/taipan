@@ -2,6 +2,17 @@ import { useState, useEffect } from 'react'
 import { API } from './constants'
 import { apiFetch } from '../utils/apiFetch'
 
+const SOURCE_LABELS = {
+  nadezhda:                 'Дворец Надежда',
+  auto_weekly_digest:       'Авто-сводка',
+  auto_competition_anons:   'Анонс соревнования',
+  auto_certification_anons: 'Анонс аттестации',
+  auto_camp_anons:          'Анонс сборов',
+  ai:                       'AI-генерация',
+  vk:                       'VK',
+  gtf_telegram:             'Telegram ГТФ',
+}
+
 export default function NewsTab({ token }) {
   const h   = { Authorization: `Bearer ${token}` }
   const hj  = { ...h, 'Content-Type': 'application/json' }
@@ -20,14 +31,19 @@ export default function NewsTab({ token }) {
   const [editPhoto,    setEditPhoto]    = useState(null)
   const [editHasPhoto, setEditHasPhoto] = useState(false)
   const [confirm,      setConfirm]      = useState(null)
+  const [tab,          setTab]          = useState('drafts')  // 'drafts' | 'published'
   const [form, setForm] = useState({ title: '', body: '' })
 
-  useEffect(() => { loadNews(); loadComps(); loadCerts(); loadCamps() }, [])
+  useEffect(() => { loadNews() }, [tab])
+  useEffect(() => { loadComps(); loadCerts(); loadCamps() }, [])
 
   const loadNews = async () => {
     setLoading(true)
     try {
-      const r = await apiFetch(`${API}/news?limit=50`, { headers: h })
+      const url = tab === 'drafts'
+        ? `${API}/news/drafts?limit=50`
+        : `${API}/news?limit=50`
+      const r = await apiFetch(url, { headers: h })
       if (r.ok) { const d = await r.json(); setItems(d.items) }
     } catch {}
     setLoading(false)
@@ -66,7 +82,8 @@ export default function NewsTab({ token }) {
         await apiFetch(`${API}/news/${created.id}/photo`, { method: 'POST', headers: h, body: fd })
       }
       setShowForm(false); setForm({ title: '', body: '' }); setPhotoFile(null)
-      setMsg('Новость опубликована'); await loadNews()
+      setMsg('Черновик создан'); await loadNews()
+      window.dispatchEvent(new Event('news-drafts-changed'))
     } catch { setMsg('Ошибка') }
     setSaving(false)
   }
@@ -74,8 +91,26 @@ export default function NewsTab({ token }) {
   const deleteNews = async (id) => {
     try {
       await apiFetch(`${API}/news/${id}`, { method: 'DELETE', headers: h })
-      await loadNews(); setConfirm(null)
+      await loadNews()
+      setConfirm(null)
+      window.dispatchEvent(new Event('news-drafts-changed'))
     } catch {}
+  }
+
+  const publishDraft = async (id) => {
+    setSaving(true); setMsg('')
+    try {
+      const r = await apiFetch(`${API}/news/${id}/publish`, { method: 'POST', headers: h })
+      if (r.ok) {
+        setMsg('Новость опубликована')
+        await loadNews()
+        window.dispatchEvent(new Event('news-drafts-changed'))
+      } else {
+        const d = await r.json().catch(() => ({}))
+        setMsg(d.detail || 'Ошибка публикации')
+      }
+    } catch { setMsg('Ошибка') }
+    setSaving(false)
   }
 
   const saveEdit = async () => {
@@ -91,6 +126,7 @@ export default function NewsTab({ token }) {
         await apiFetch(`${API}/news/${editingId}/photo`, { method: 'POST', headers: h, body: fd })
       }
       setEditingId(null); setEditPhoto(null); await loadNews()
+      window.dispatchEvent(new Event('news-drafts-changed'))
     } catch { setMsg('Ошибка') }
     setSaving(false)
   }
@@ -109,8 +145,8 @@ export default function NewsTab({ token }) {
         method: 'POST', headers: hj, body: JSON.stringify({ comp_id: compId })
       })
       const d = await r.json()
-      setMsg(d.message || (r.ok ? 'Готово' : 'Ошибка'))
-      if (r.ok) await loadNews()
+      setMsg(d.message || (r.ok ? 'Черновик создан' : 'Ошибка'))
+      if (r.ok) { await loadNews(); window.dispatchEvent(new Event('news-drafts-changed')) }
     } catch { setMsg('Ошибка') }
     setSaving(false)
   }
@@ -119,7 +155,7 @@ export default function NewsTab({ token }) {
     setSaving(true); setMsg('')
     try {
       const r = await apiFetch(`${API}/news/from-competition/${compId}`, { method: 'POST', headers: h })
-      if (r.ok) { setMsg('Новость опубликована'); await loadNews() }
+      if (r.ok) { setMsg('Черновик соревнования создан'); await loadNews(); window.dispatchEvent(new Event('news-drafts-changed')) }
       else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
     setSaving(false)
@@ -132,7 +168,7 @@ export default function NewsTab({ token }) {
       const title = `${certName} — ${dateStr}`
       const body  = `${dateStr} в клубе «Тайпан» прошла аттестация: ${certName}.\n\nПоздравляем всех участников с получением новых поясов! Каждый пояс — это результат упорного труда, дисциплины и преданности тхэквондо ГТФ.\n\nПродолжаем расти и совершенствоваться!`
       const r = await apiFetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title, body, certification_id: certId }) })
-      if (r.ok) { setMsg('Новость об аттестации опубликована'); await loadNews() }
+      if (r.ok) { setMsg('Черновик аттестации создан'); await loadNews(); window.dispatchEvent(new Event('news-drafts-changed')) }
       else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
     setSaving(false)
@@ -156,7 +192,7 @@ export default function NewsTab({ token }) {
         body  = parts[1].trim()
       }
       const rSave = await apiFetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title: title.slice(0,255), body, certification_id: certId }) })
-      if (rSave.ok) { setMsg('Новость об аттестации сгенерирована YandexGPT'); await loadNews() }
+      if (rSave.ok) { setMsg('Черновик аттестации сгенерирован YandexGPT'); await loadNews(); window.dispatchEvent(new Event('news-drafts-changed')) }
       else { const d = await rSave.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
     setSaving(false)
@@ -172,7 +208,7 @@ export default function NewsTab({ token }) {
       const title = `Учебно-тренировочные сборы «${campName}» — ${ds}–${de}`
       const body  = `С ${ds} по ${de} наши спортсмены приняли участие в учебно-тренировочных сборах «${campName}»${loc}.\n\nСборы — важная часть подготовки каждого спортсмена. Интенсивные тренировки, работа над техникой хъёнгов и массоги, командный дух и взаимная поддержка — всё это делает наших бойцов сильнее.\n\nБлагодарим всех участников за старание и самоотдачу!`
       const r = await apiFetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title, body, camp_id: campId }) })
-      if (r.ok) { setMsg('Новость о сборах опубликована'); await loadNews() }
+      if (r.ok) { setMsg('Черновик сборов создан'); await loadNews(); window.dispatchEvent(new Event('news-drafts-changed')) }
       else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
     setSaving(false)
@@ -198,7 +234,7 @@ export default function NewsTab({ token }) {
         body  = parts[1].trim()
       }
       const rSave = await apiFetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title: title.slice(0,255), body, camp_id: campId }) })
-      if (rSave.ok) { setMsg('Новость о сборах сгенерирована YandexGPT'); await loadNews() }
+      if (rSave.ok) { setMsg('Черновик сборов сгенерирован YandexGPT'); await loadNews(); window.dispatchEvent(new Event('news-drafts-changed')) }
       else { const d = await rSave.json(); setMsg(d.detail || 'Ошибка') }
     } catch { setMsg('Ошибка') }
     setSaving(false)
@@ -228,9 +264,35 @@ export default function NewsTab({ token }) {
       )}
 
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, flexWrap:'wrap', gap:8 }}>
-        <span style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.06em', color:'var(--white)' }}>
-          Новости клуба
-        </span>
+        <div style={{ display:'flex', alignItems:'center', gap:16 }}>
+          <span style={{ fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.06em', color:'var(--white)' }}>
+            Новости клуба
+          </span>
+          <div style={{ display:'flex', gap:0, border:'1px solid var(--gray-dim)' }}>
+            <button
+              onClick={() => setTab('drafts')}
+              style={{
+                padding:'6px 14px', fontSize:'13px',
+                background: tab === 'drafts' ? 'var(--red)' : 'transparent',
+                color: tab === 'drafts' ? 'var(--white)' : 'var(--gray)',
+                border:'none', cursor:'pointer',
+                fontFamily:'Barlow Condensed', letterSpacing:'1px', textTransform:'uppercase'
+              }}>
+              Черновики
+            </button>
+            <button
+              onClick={() => setTab('published')}
+              style={{
+                padding:'6px 14px', fontSize:'13px',
+                background: tab === 'published' ? 'var(--red)' : 'transparent',
+                color: tab === 'published' ? 'var(--white)' : 'var(--gray)',
+                border:'none', cursor:'pointer',
+                fontFamily:'Barlow Condensed', letterSpacing:'1px', textTransform:'uppercase'
+              }}>
+              Опубликованные
+            </button>
+          </div>
+        </div>
         <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
           <button className="att-all-btn" style={{ fontSize:'13px' }}
             onClick={async () => {
@@ -239,7 +301,7 @@ export default function NewsTab({ token }) {
                 const r = await apiFetch(`${API}/news-admin/generate-announcement`, { method:'POST', headers:hj })
                 const d = await r.json()
                 setMsg(d.message || 'Готово')
-                if (r.ok) await loadNews()
+                if (r.ok) { await loadNews(); window.dispatchEvent(new Event('news-drafts-changed')) }
               } catch { setMsg('Ошибка') }
               setSaving(false)
             }} disabled={saving}>
@@ -254,7 +316,7 @@ export default function NewsTab({ token }) {
       {msg && <div className="att-msg" style={{ marginBottom:12 }}>{msg}</div>}
 
       {/* Соревнования без новости */}
-      {compsWithoutNews.length > 0 && (
+      {tab === 'drafts' && compsWithoutNews.length > 0 && (
         <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', padding:'16px 20px', marginBottom:12 }}>
           <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
             Соревнования без новости
@@ -278,7 +340,7 @@ export default function NewsTab({ token }) {
       )}
 
       {/* Аттестации */}
-      {recentCerts.length > 0 && (
+      {tab === 'drafts' && recentCerts.length > 0 && (
         <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid #c8962a', padding:'16px 20px', marginBottom:12 }}>
           <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
             Аттестации без новости
@@ -302,7 +364,7 @@ export default function NewsTab({ token }) {
       )}
 
       {/* Сборы */}
-      {recentCamps.length > 0 && (
+      {tab === 'drafts' && recentCamps.length > 0 && (
         <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid #4caf50', padding:'16px 20px', marginBottom:20 }}>
           <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
             Сборы без новости
@@ -326,16 +388,25 @@ export default function NewsTab({ token }) {
       )}
 
       {loading && <div className="cabinet-loading">Загрузка...</div>}
-      {!loading && items.length === 0 && <div className="cabinet-empty">Новостей пока нет</div>}
+      {!loading && items.length === 0 && (
+        <div className="cabinet-empty">
+          {tab === 'drafts' ? 'Черновиков нет — всё разобрано' : 'Опубликованных новостей пока нет'}
+        </div>
+      )}
 
       <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
         {items.map(n => (
           <div key={n.id} style={{ background:'var(--dark)', border:'1px solid var(--gray-dim)', padding:'16px 20px' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12 }}>
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontFamily:'Barlow Condensed', fontSize:'11px', fontWeight:700, letterSpacing:'2px', color:'var(--red)', marginBottom:4 }}>
-                  {new Date(n.published_at).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
-                  {n.competition_id && <span style={{ marginLeft:8, color:'var(--gray)' }}>· соревнование</span>}
+                <div style={{ fontFamily:'Barlow Condensed', fontSize:'11px', fontWeight:700, letterSpacing:'2px', marginBottom:4, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                  <span style={{ color:'var(--red)' }}>
+                    {new Date(n.published_at).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
+                  </span>
+                  {n.source && SOURCE_LABELS[n.source] && (
+                    <span style={{ color:'var(--gray)', textTransform:'none', letterSpacing:'1px' }}>· {SOURCE_LABELS[n.source]}</span>
+                  )}
+                  {n.competition_id && <span style={{ color:'var(--gray)' }}>· соревнование</span>}
                 </div>
                 <div style={{ fontWeight:600, color:'var(--white)', fontSize:'15px', marginBottom:4 }}>{n.title}</div>
                 <div style={{ color:'var(--gray)', fontSize:'13px', lineHeight:1.5 }}>
@@ -345,6 +416,12 @@ export default function NewsTab({ token }) {
               <div style={{ display:'flex', flexDirection:'column', gap:6, flexShrink:0, alignItems:'flex-end' }}>
                 {n.photo_url && <img src={n.photo_url} alt="" style={{ width:100, height:70, objectFit:'cover', borderRadius:2 }} />}
                 <div style={{ display:'flex', gap:6 }}>
+                  {tab === 'drafts' && (
+                    <button className="btn-primary" style={{ fontSize:'11px', padding:'4px 10px' }}
+                      onClick={() => publishDraft(n.id)} disabled={saving}>
+                      Опубликовать
+                    </button>
+                  )}
                   <button className="att-all-btn" style={{ fontSize:'11px', padding:'4px 10px' }}
                     onClick={() => { setEditingId(n.id); setEditForm({ title: n.title, body: n.body }); setEditPhoto(null); setEditHasPhoto(!!n.photo_url) }}>
                     Ред.
@@ -377,7 +454,7 @@ export default function NewsTab({ token }) {
             </div>
             {msg && <div className="modal-msg" style={{ marginBottom:8 }}>{msg}</div>}
             <div className="modal-btns-row">
-              <button className="btn-primary" onClick={createNews} disabled={saving}>{saving ? 'Публикация...' : 'Опубликовать'}</button>
+              <button className="btn-primary" onClick={createNews} disabled={saving}>{saving ? 'Создание...' : 'Создать черновик'}</button>
               <button className="btn-outline" onClick={() => { setShowForm(false); setMsg('') }}>Отмена</button>
             </div>
           </div>
