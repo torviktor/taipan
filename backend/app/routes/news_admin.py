@@ -89,7 +89,8 @@ def _out(n: News) -> dict:
         "competition_id": n.competition_id,
         "certification_id": n.certification_id,
         "camp_id": n.camp_id,
-        "author": n.author.full_name if n.author else None,
+        "status": n.status,
+        "source": n.source,
     }
 
 

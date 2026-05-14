@@ -54,7 +54,8 @@ def _out(n: News) -> dict:
         "competition_id":   n.competition_id,
         "certification_id": n.certification_id,
         "camp_id":          n.camp_id,
-        "author":           n.author.full_name if n.author else None,
+        "status":           n.status,
+        "source":           n.source,
     }
 
 
@@ -102,6 +103,38 @@ def list_news(limit: int = 20, offset: int = 0, db: Session = Depends(get_db)):
 @router.get("/drafts/count")
 def drafts_count(db: Session = Depends(get_db), _: User = Depends(require_manager)):
     return {"count": db.query(News).filter(News.status == 'draft').count()}
+
+
+@router.get("/drafts")
+def list_drafts(
+    limit:  int = 50,
+    offset: int = 0,
+    db:     Session = Depends(get_db),
+    _:      User    = Depends(require_manager),
+):
+    items = (
+        db.query(News)
+          .filter(News.status == 'draft')
+          .order_by(News.published_at.desc())
+          .offset(offset).limit(limit).all()
+    )
+    total = db.query(News).filter(News.status == 'draft').count()
+    return {"items": [_out(n) for n in items], "total": total}
+
+
+@router.post("/{news_id}/publish", status_code=204)
+def publish_draft(
+    news_id: int,
+    db:      Session = Depends(get_db),
+    _:       User    = Depends(require_manager),
+):
+    n = db.query(News).filter(News.id == news_id, News.status == 'draft').first()
+    if not n:
+        raise HTTPException(404, "Черновик не найден")
+    from sqlalchemy import func
+    n.status = 'published'
+    n.published_at = func.now()
+    db.commit()
 
 
 @router.get("/{news_id}")
