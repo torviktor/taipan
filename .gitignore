@@ -7,3 +7,4 @@ scripts/fonts/
 
 # Personal Claude Code permissions — local-only, do not commit
 .claude/settings.local.json
+node_modules
