@@ -2,7 +2,7 @@
 
 import os, uuid
 from datetime import date as date_type
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
@@ -145,15 +145,15 @@ def get_news(news_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", status_code=201)
-def create_news(data: NewsCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), user: User = Depends(require_manager)):
+def create_news(data: NewsCreate, db: Session = Depends(get_db), user: User = Depends(require_manager)):
     if data.competition_id:
-        existing = db.query(News).filter(News.competition_id == data.competition_id, News.status == 'published').first()
+        existing = db.query(News).filter(News.competition_id == data.competition_id, News.status.in_(('draft', 'published'))).first()
         if existing: raise HTTPException(400, "Новость об этом соревновании уже опубликована")
     if data.certification_id:
-        existing = db.query(News).filter(News.certification_id == data.certification_id, News.status == 'published').first()
+        existing = db.query(News).filter(News.certification_id == data.certification_id, News.status.in_(('draft', 'published'))).first()
         if existing: raise HTTPException(400, "Новость об этой аттестации уже опубликована")
     if data.camp_id:
-        existing = db.query(News).filter(News.camp_id == data.camp_id, News.status == 'published').first()
+        existing = db.query(News).filter(News.camp_id == data.camp_id, News.status.in_(('draft', 'published'))).first()
         if existing: raise HTTPException(400, "Новость об этих сборах уже опубликована")
 
     n = News(
@@ -161,13 +161,11 @@ def create_news(data: NewsCreate, background_tasks: BackgroundTasks, db: Session
         competition_id=data.competition_id,
         certification_id=data.certification_id,
         camp_id=data.camp_id,
-        created_by=user.id
+        created_by=user.id,
+        status='draft',
+        source='manual',
     )
     db.add(n); db.commit(); db.refresh(n)
-
-    from app.services.notifications import notify_news_telegram
-    print(f"DEBUG: scheduling telegram notify for news: {n.title}")
-    background_tasks.add_task(notify_news_telegram, n.title, n.body, None)
 
     return _out(n)
 
@@ -236,7 +234,7 @@ def news_from_competition(
     comp = db.query(Competition).filter(Competition.id == comp_id).first()
     if not comp: raise HTTPException(404, "Соревнование не найдено")
 
-    existing = db.query(News).filter(News.competition_id == comp_id, News.status == 'published').first()
+    existing = db.query(News).filter(News.competition_id == comp_id, News.status.in_(('draft', 'published'))).first()
     if existing: raise HTTPException(400, "Новость об этом соревновании уже опубликована")
 
     mode     = _resolve_mode(data.mode, comp.date)
@@ -319,7 +317,8 @@ def news_from_competition(
         else:
             body_parts.append("Наши спортсмены достойно выступили и набрали опыт участия в соревнованиях. Продолжаем работать!")
 
-    n = News(title=title, body="\n".join(body_parts), competition_id=comp_id, created_by=user.id)
+    n = News(title=title, body="\n".join(body_parts), competition_id=comp_id, created_by=user.id,
+             status='draft', source='auto_competition_anons')
     db.add(n); db.commit(); db.refresh(n)
     return _out(n)
 
@@ -339,7 +338,7 @@ def news_from_certification(
     cert = db.query(Certification).filter(Certification.id == cert_id).first()
     if not cert: raise HTTPException(404, "Аттестация не найдена")
 
-    existing = db.query(News).filter(News.certification_id == cert_id, News.status == 'published').first()
+    existing = db.query(News).filter(News.certification_id == cert_id, News.status.in_(('draft', 'published'))).first()
     if existing: raise HTTPException(400, "Новость об этой аттестации уже опубликована")
 
     mode         = _resolve_mode(data.mode, cert.date)
@@ -408,7 +407,8 @@ def news_from_certification(
         body_parts.append("")
         body_parts.append(cert.notes)
 
-    n = News(title=title, body="\n".join(body_parts), certification_id=cert_id, created_by=user.id)
+    n = News(title=title, body="\n".join(body_parts), certification_id=cert_id, created_by=user.id,
+             status='draft', source='auto_certification_anons')
     db.add(n); db.commit(); db.refresh(n)
     return _out(n)
 
@@ -428,7 +428,7 @@ def news_from_camp(
     camp = db.query(Camp).filter(Camp.id == camp_id).first()
     if not camp: raise HTTPException(404, "Сборы не найдены")
 
-    existing = db.query(News).filter(News.camp_id == camp_id, News.status == 'published').first()
+    existing = db.query(News).filter(News.camp_id == camp_id, News.status.in_(('draft', 'published'))).first()
     if existing: raise HTTPException(400, "Новость об этих сборах уже опубликована")
 
     # Для сборов auto-логика по date_start / date_end
@@ -496,6 +496,7 @@ def news_from_camp(
         body_parts.append("")
         body_parts.append(camp.notes)
 
-    n = News(title=title, body="\n".join(body_parts), camp_id=camp_id, created_by=user.id)
+    n = News(title=title, body="\n".join(body_parts), camp_id=camp_id, created_by=user.id,
+             status='draft', source='auto_camp_anons')
     db.add(n); db.commit(); db.refresh(n)
     return _out(n)
