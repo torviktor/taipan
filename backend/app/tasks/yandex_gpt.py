@@ -58,11 +58,14 @@ def get_manager_id(db: Session) -> int:
     return user.id if user else 1
 
 
-# ── Автоновость о прошедшем соревновании ─────────────────────────────────────
+# ── Автоновость о соревновании (auto: preview / past по дате) ────────
 
 def generate_competition_news(comp_id: int) -> dict:
     """
-    Генерирует красивую новость о соревновании через YandexGPT.
+    Генерирует новость о соревновании через YandexGPT.
+    Режим определяется автоматически по comp.date vs date.today():
+      - дата в будущем → анонс (preview, будущее время, без результатов)
+      - дата в прошлом или сегодня → репортаж (past, прошедшее время, медали)
     Возвращает {title, body}.
     """
     from app.models.competition import Competition, CompetitionResult
@@ -74,15 +77,17 @@ def generate_competition_news(comp_id: int) -> dict:
         if not comp:
             raise ValueError(f"Соревнование {comp_id} не найдено")
 
+        today = date.today()
+        is_preview = comp.date and comp.date > today
+
         results = db.query(CompetitionResult).filter(
             CompetitionResult.competition_id == comp_id,
             CompetitionResult.status.in_(["confirmed", "paid"])
         ).all()
 
-        # Подсчёт медалей
+        participants = []
         gold = silver = bronze = 0
         medal_details = []
-        participants = []
 
         for r in results:
             athlete = db.query(Athlete).filter(Athlete.id == r.athlete_id).first()
@@ -90,44 +95,71 @@ def generate_competition_news(comp_id: int) -> dict:
                 continue
             participants.append(athlete.full_name)
 
-            places = {
-                "спарринг":  r.sparring_place,
-                "стоп-балл": r.stopball_place,
-                "тег-тим":   r.tegtim_place,
-                "туль":      r.tuli_place,
-            }
-            for disc, place in places.items():
-                if place == 1:
-                    gold += 1
-                    medal_details.append(f"{athlete.full_name} — 1 место ({disc})")
-                elif place == 2:
-                    silver += 1
-                    medal_details.append(f"{athlete.full_name} — 2 место ({disc})")
-                elif place == 3:
-                    bronze += 1
-                    medal_details.append(f"{athlete.full_name} — 3 место ({disc})")
+            if not is_preview:
+                places = {
+                    "спарринг":  r.sparring_place,
+                    "стоп-балл": r.stopball_place,
+                    "тег-тим":   r.tegtim_place,
+                    "туль":      r.tuli_place,
+                }
+                for disc, place in places.items():
+                    if place == 1:
+                        gold += 1
+                        medal_details.append(f"{athlete.full_name} — 1 место ({disc})")
+                    elif place == 2:
+                        silver += 1
+                        medal_details.append(f"{athlete.full_name} — 2 место ({disc})")
+                    elif place == 3:
+                        bronze += 1
+                        medal_details.append(f"{athlete.full_name} — 3 место ({disc})")
 
-        date_str  = comp.date.strftime("%d.%m.%Y") if comp.date else ""
-        total_med = gold + silver + bronze
+        date_str = comp.date.strftime("%d.%m.%Y") if comp.date else ""
 
-        # Формируем данные для GPT
-        facts = f"""
+        # ── facts блок (отличается для preview vs past) ─────────────────
+        if is_preview:
+            facts = f"""
 Соревнование: {comp.name}
-Дата: {date_str}
+Дата проведения (БУДУЩАЯ, ещё не прошло): {date_str}
+Сегодня: {today.strftime("%d.%m.%Y")}
+Место проведения: {comp.location or 'не указано'}
+Уровень: {comp.level} {comp.comp_type}
+Количество спортсменов клуба «Тайпан», заявленных на участие: {len(participants)}
+Список заявленных участников: {', '.join(participants) if participants else 'нет данных'}
+""".strip()
+        else:
+            total_med = gold + silver + bronze
+            facts = f"""
+Соревнование: {comp.name}
+Дата проведения (УЖЕ ПРОШЛО): {date_str}
+Сегодня: {today.strftime("%d.%m.%Y")}
 Место проведения: {comp.location or 'не указано'}
 Уровень: {comp.level} {comp.comp_type}
 Количество участников от клуба «Тайпан»: {len(participants)}
 Список участников: {', '.join(participants) if participants else 'нет данных'}
 Медали: золото — {gold}, серебро — {silver}, бронза — {bronze} (всего {total_med})
 Призёры: {chr(10).join(medal_details) if medal_details else 'мест не заняли'}
-        """.strip()
+""".strip()
 
-        system = """Ты — редактор новостей спортивного клуба тхэквондо «Тайпан» из Павловского Посада.
-Пишешь живые, эмоциональные новости о соревнованиях. Стиль — радостный, поддерживающий, гордый за спортсменов.
-Используй факты которые тебе дали. Не выдумывай детали которых нет.
-Не используй эмодзи. Структура: вступление (1-2 предложения), основная часть с результатами, завершение с мотивацией.
+        # ── system промт (отличается для preview vs past) ───────────────
+        if is_preview:
+            system = """Ты — редактор новостей спортивного клуба тхэквондо «Тайпан» из Павловского Посада.
+Пишешь АНОНС ПРЕДСТОЯЩЕГО соревнования. Соревнование ещё не прошло.
+Используй БУДУЩЕЕ время («состоится», «пройдёт», «выступят», «представят клуб»).
+НЕ пиши о результатах, медалях, победах — их ещё нет.
+Создавай ожидание, поддерживай спортсменов, призывай болеть за клуб.
+Стиль — мотивирующий, энергичный, гордый. Не используй эмодзи.
+Структура: вступление (1-2 предложения о предстоящем событии), основная часть (даты/место/участники), завершение с мотивацией.
+Объём — 150-250 слов."""
+        else:
+            system = """Ты — редактор новостей спортивного клуба тхэквондо «Тайпан» из Павловского Посада.
+Пишешь РЕПОРТАЖ о ПРОШЕДШЕМ соревновании. Соревнование уже состоялось.
+Используй ПРОШЕДШЕЕ время («состоялось», «прошло», «выступили», «завоевали»).
+Включи реальные результаты и медали из данных — не выдумывай.
+Стиль — радостный, поддерживающий, гордый за спортсменов. Не используй эмодзи.
+Структура: вступление (1-2 предложения), основная часть с результатами, завершение с мотивацией.
 Объём — 150-250 слов."""
 
+        # ── prompt (одинаковый для обоих режимов) ───────────────────────
         prompt = f"""Напиши новость о соревновании по тхэквондо для сайта клуба на основе этих данных:
 
 {facts}
@@ -139,7 +171,6 @@ def generate_competition_news(comp_id: int) -> dict:
 
         response = yandex_gpt(prompt, system)
 
-        # Парсим ответ
         title = f"{comp.name} — {date_str}"
         body  = response
 
@@ -157,18 +188,18 @@ def generate_competition_news(comp_id: int) -> dict:
 
 
 def run_competition_news(comp_id: int) -> bool:
-    """Создать новость о соревновании через YandexGPT."""
+    """Создать черновик новости о соревновании через YandexGPT.
+    Дедуп по (competition_id, status in draft/published)."""
     from app.models.news import News
 
     db = SessionLocal()
     try:
-        # Проверяем не публиковали ли уже
         existing = db.query(News).filter(
             News.competition_id == comp_id,
-            News.status         == 'published'
+            News.status.in_(('draft', 'published'))
         ).first()
         if existing:
-            print(f"[YaGPT] Новость о соревновании {comp_id} уже существует")
+            print(f"[YaGPT] Новость о соревновании {comp_id} уже существует (status={existing.status})")
             return False
 
         author_id = get_manager_id(db)
@@ -179,10 +210,12 @@ def run_competition_news(comp_id: int) -> bool:
             body=result["body"],
             competition_id=comp_id,
             created_by=author_id,
+            status='draft',
+            source='ai',
         )
         db.add(n)
         db.commit()
-        print(f"[YaGPT] Создана новость: {result['title']}")
+        print(f"[YaGPT] Создан черновик: {result['title']}")
         return True
 
     except Exception as e:
@@ -245,7 +278,8 @@ def run_weekly_announcement() -> bool:
                 title = title_part
 
         author_id = get_manager_id(db)
-        n = News(title=title[:255], body=body, created_by=author_id)
+        n = News(title=title[:255], body=body, created_by=author_id,
+                 status='draft', source='ai')
         db.add(n)
         db.commit()
         print(f"[YaGPT] Создан анонс: {title}")
