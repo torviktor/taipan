@@ -1,3 +1,12 @@
+# Импорт всех моделей для регистрации в Base.registry.
+# Порядок: user первым, потому что Athlete используется в relationship()
+# других моделей по строковой ссылке "Athlete".
+from app.models.user import (
+    User, UserRole, Gender, Athlete,
+    Section, Schedule,
+    Application, ApplicationStatus,
+    Payment, PaymentStatus,
+)
 from app.models.attendance import Attendance, TrainingSession
 from app.models.competition import Competition, CompetitionResult
 from app.models.certification import Certification, CertificationResult, Notification
