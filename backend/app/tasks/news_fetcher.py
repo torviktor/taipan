@@ -1,17 +1,19 @@
 # backend/app/tasks/news_fetcher.py
 
+import logging
 import re
+from urllib.parse import urlsplit, urlunsplit
+
 import requests
-from datetime import datetime, timezone
 from bs4 import BeautifulSoup
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 from app.models.news import News
 from app.models.user import User
+from app.services.news_drafts import _create_news_draft
 
-# Импортируем все модели чтобы SQLAlchemy правильно настроил relationships
-from app.models import user, event, attendance, competition, certification, achievement, camp, hall_of_fame, news, competition_file
+log = logging.getLogger(__name__)
 
 
 # ── Хелперы ───────────────────────────────────────────────────────────────────
@@ -22,18 +24,49 @@ def get_system_user(db: Session) -> int:
     return user.id if user else 1
 
 
-def news_already_exists(db: Session, source_url: str) -> bool:
-    """Проверяем не импортировали ли уже эту новость по URL в теле."""
-    return db.query(News).filter(News.body.contains(source_url)).first() is not None
+def _normalize_url(url: str) -> str:
+    """
+    Канонизация URL для дедупа:
+      - lower-case scheme + host
+      - убрать leading 'www.'
+      - убрать query и fragment
+      - убрать trailing slash в path (кроме корня)
+    Пример:
+      https://www.dss-pp.ru/news/abc/?utm=foo#x
+      → https://dss-pp.ru/news/abc
+    """
+    if not url:
+        return ""
+    try:
+        parts = urlsplit(url.strip())
+        scheme = parts.scheme.lower() or "https"
+        host = parts.netloc.lower()
+        if host.startswith("www."):
+            host = host[4:]
+        path = parts.path
+        if len(path) > 1 and path.endswith("/"):
+            path = path.rstrip("/")
+        return urlunsplit((scheme, host, path, "", ""))
+    except Exception:
+        return url.strip()
 
 
-def save_news(db: Session, title: str, body: str, author_id: int):
-    n = News(title=title, body=body, created_by=author_id)
-    db.add(n)
-    db.commit()
+def _source_url_marker(normalized: str) -> str:
+    """Маркер для дедупа, встраивается первой строкой в body."""
+    return f"Source-URL: {normalized}"
+
+
+def news_already_exists(db: Session, normalized_url: str) -> bool:
+    """Дедуп по нормализованному URL: ищем маркер в body."""
+    if not normalized_url:
+        return False
+    marker = _source_url_marker(normalized_url)
+    return db.query(News).filter(News.body.contains(marker)).first() is not None
 
 
 # ── Парсер Telegram канала ────────────────────────────────────────────────────
+# Источник 4.6 (Telegram ГТФ России) пока не используется в очереди черновиков.
+# Логика парсинга оставлена как есть, run_telegram_fetch удалён до решения 4.6.
 
 def fetch_telegram_gtf(limit: int = 10) -> list[dict]:
     """
@@ -48,7 +81,7 @@ def fetch_telegram_gtf(limit: int = 10) -> list[dict]:
         resp = requests.get(url, headers=headers, timeout=15)
         resp.raise_for_status()
     except Exception as e:
-        print(f"[TG parser] Ошибка запроса: {e}")
+        log.warning("[TG parser] request failed: %s", e)
         return []
 
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -56,7 +89,6 @@ def fetch_telegram_gtf(limit: int = 10) -> list[dict]:
 
     result = []
     for post in posts:
-        # Текст поста
         text_el = post.select_one(".tgme_widget_message_text")
         if not text_el:
             continue
@@ -64,27 +96,21 @@ def fetch_telegram_gtf(limit: int = 10) -> list[dict]:
         if not text or len(text) < 30:
             continue
 
-        # Ссылка на пост
         link_el = post.select_one(".tgme_widget_message_date")
         post_url = link_el["href"] if link_el and link_el.get("href") else ""
 
-        # Дата
         time_el = post.select_one("time")
         post_date = ""
         if time_el and time_el.get("datetime"):
             try:
+                from datetime import datetime
                 dt = datetime.fromisoformat(time_el["datetime"].replace("Z", "+00:00"))
                 post_date = dt.strftime("%d.%m.%Y")
             except Exception:
                 pass
 
-        # Первая строка как заголовок
         lines = [l.strip() for l in text.split("\n") if l.strip()]
         title = lines[0][:120] if lines else "Новость ГТФ России"
-        if len(title) == len(lines[0]) and len(lines) > 1:
-            title = title  # первая строка и есть заголовок
-        else:
-            title = "Новость ГТФ России"
 
         body = text
         if post_date:
@@ -101,11 +127,12 @@ def fetch_telegram_gtf(limit: int = 10) -> list[dict]:
 
 def fetch_dss_news(limit: int = 5) -> list[dict]:
     """
-    Парсит страницу новостей дворца спорта Надежда.
-    Возвращает список {title, body, url}.
+    Парсит страницу новостей дворца спорта «Надежда».
+    Возвращает список {title, body, url, url_normalized}.
+    Маркер Source-URL встраивается первой строкой body для дедупа.
     """
     base = "https://dss-pp.ru"
-    url  = f"{base}/news/"
+    url = f"{base}/news/"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
@@ -114,12 +141,11 @@ def fetch_dss_news(limit: int = 5) -> list[dict]:
         resp.raise_for_status()
         resp.encoding = "utf-8"
     except Exception as e:
-        print(f"[DSS parser] Ошибка запроса: {e}")
+        log.warning("[DSS parser] request failed: %s", e)
         return []
 
     soup = BeautifulSoup(resp.text, "html.parser")
 
-    # Ищем ссылки на новости
     news_links = []
     for a in soup.select("a[href]"):
         href = a["href"]
@@ -129,13 +155,15 @@ def fetch_dss_news(limit: int = 5) -> list[dict]:
             if title and len(title) > 10:
                 news_links.append({"url": full, "title": title})
 
-    # Убираем дубли
     seen = set()
     unique = []
     for item in news_links:
-        if item["url"] not in seen:
-            seen.add(item["url"])
-            unique.append(item)
+        normalized = _normalize_url(item["url"])
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        item["url_normalized"] = normalized
+        unique.append(item)
 
     result = []
     for item in unique[:limit]:
@@ -143,56 +171,65 @@ def fetch_dss_news(limit: int = 5) -> list[dict]:
             r2 = requests.get(item["url"], headers=headers, timeout=10)
             r2.encoding = "utf-8"
             s2 = BeautifulSoup(r2.text, "html.parser")
-            # Ищем основной текст
             content = s2.select_one(".news-detail") or s2.select_one("article") or s2.select_one(".content")
             if content:
                 text = content.get_text(separator="\n").strip()
-                text = re.sub(r'\n{3,}', '\n\n', text)
+                text = re.sub(r"\n{3,}", "\n\n", text)
             else:
                 text = item["title"]
 
-            body = f"Источник: Дворец спорта «Надежда», Павловский Посад\n\n{text}\n\nОригинал: {item['url']}"
-            result.append({"title": item["title"][:200], "body": body, "url": item["url"]})
+            marker = _source_url_marker(item["url_normalized"])
+            body = (
+                f"{marker}\n\n"
+                f"Источник: Дворец спорта «Надежда», Павловский Посад\n\n"
+                f"{text}\n\n"
+                f"Оригинал: {item['url']}"
+            )
+            result.append({
+                "title": item["title"][:200],
+                "body": body,
+                "url": item["url"],
+                "url_normalized": item["url_normalized"],
+            })
         except Exception as e:
-            print(f"[DSS parser] Ошибка загрузки {item['url']}: {e}")
+            log.warning("[DSS parser] article load failed %s: %s", item["url"], e)
             continue
 
     return result
 
 
-# ── Celery задачи ─────────────────────────────────────────────────────────────
-
-def run_telegram_fetch():
-    """Импортировать новые посты из Telegram ГТФ России."""
-    db = SessionLocal()
-    try:
-        author_id = get_system_user(db)
-        posts = fetch_telegram_gtf(limit=15)
-        imported = 0
-        for p in posts:
-            if p["url"] and news_already_exists(db, p["url"]):
-                continue
-            save_news(db, p["title"], p["body"], author_id)
-            imported += 1
-        print(f"[TG] Импортировано новых постов: {imported}")
-        return imported
-    finally:
-        db.close()
-
+# ── Celery-функции (вызываются из celery_app.py через .delay/.apply) ─────────
 
 def run_dss_fetch():
-    """Импортировать новые новости с сайта дворца спорта."""
+    """Импортировать новые новости с dss-pp.ru в очередь черновиков."""
     db = SessionLocal()
     try:
         author_id = get_system_user(db)
         posts = fetch_dss_news(limit=5)
         imported = 0
+        skipped = 0
         for p in posts:
-            if p["url"] and news_already_exists(db, p["url"]):
+            if p["url_normalized"] and news_already_exists(db, p["url_normalized"]):
+                skipped += 1
                 continue
-            save_news(db, p["title"], p["body"], author_id)
-            imported += 1
-        print(f"[DSS] Импортировано новых новостей: {imported}")
+            draft = _create_news_draft(
+                db,
+                source="nadezhda",
+                title=p["title"],
+                body=p["body"],
+                created_by=author_id,
+            )
+            if draft:
+                imported += 1
+            else:
+                log.warning("[DSS] draft creation returned None for %s", p["url"])
+        log.info(
+            "[DSS] fetched=%d, imported=%d, skipped(dedup)=%d",
+            len(posts), imported, skipped,
+        )
         return imported
     finally:
         db.close()
+
+
+# run_telegram_fetch удалён — Telegram ГТФ остаётся отдельной подзадачей 4.6.
