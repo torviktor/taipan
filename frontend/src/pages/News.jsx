@@ -91,7 +91,6 @@ export default function NewsPage() {
                   <div className="news-card-body">
                     <div className="news-card-meta">
                       <span className="news-card-date">{formatDate(n.published_at)}</span>
-                      {n.author && <span className="news-card-author">{n.author}</span>}
                     </div>
                     <h2 className="news-card-title" onClick={() => toggle(n.id)}>
                       {n.title}

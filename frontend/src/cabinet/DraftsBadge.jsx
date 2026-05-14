@@ -2,11 +2,6 @@ import { useState, useEffect } from 'react'
 import { API } from './constants'
 import { apiFetch } from '../utils/apiFetch'
 
-// TODO (Сессия 6, задачи 4.2/4.3): диспатчить window.dispatchEvent(new Event('news-drafts-changed'))
-// из NewsTab после publish/delete/create черновика, чтобы счётчик обновлялся
-// без ожидания 5-минутного polling. Сейчас событие диспатчится только при
-// переходе на вкладку «Новости» (Cabinet.jsx, useEffect [view]).
-
 export default function DraftsBadge({ token }) {
   const [count, setCount] = useState(0)
   const load = async () => {
