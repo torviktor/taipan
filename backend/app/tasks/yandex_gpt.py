@@ -7,6 +7,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
+from app.services.news_quality import validate_generated_news
 
 log = logging.getLogger(__name__)
 
@@ -199,7 +200,9 @@ def create_competition_news_draft(comp_id: int, mode: str = 'auto') -> bool:
 
     Сначала пробует сгенерировать текст через YandexGPT; при любой ошибке
     (timeout / 5xx / парсинг / etc.) — логирует и падает на статический
-    шаблон build_competition_anons / build_competition_report.
+    шаблон build_competition_anons / build_competition_report. Тот же
+    fallback срабатывает, если validate_generated_news вернул severity=hard
+    (плейсхолдеры, катастрофически короткий текст и т.п.).
 
     Возвращает True если черновик создан, False если дедуп заблокировал
     или соревнование не найдено.
@@ -228,9 +231,11 @@ def create_competition_news_draft(comp_id: int, mode: str = 'auto') -> bool:
         target_source = 'auto_competition_anons' if is_preview else 'auto_competition_report'
         author_id = get_manager_id(db)
 
+        gpt_used = False
         try:
             result = generate_competition_news(comp_id)
             title, body = result["title"], result["body"]
+            gpt_used = True
         except Exception:
             log.exception(
                 "create_competition_news_draft: GPT failed for comp=%s mode=%s, falling back to template",
@@ -241,6 +246,25 @@ def create_competition_news_draft(comp_id: int, mode: str = 'auto') -> bool:
             else:
                 title, body = build_competition_report(comp)
 
+        needs_review = False
+        if gpt_used:
+            check_mode = 'anons' if is_preview else 'report'
+            vr = validate_generated_news(
+                title, body, mode=check_mode, event_name=comp.name,
+            )
+            if vr.is_hard_fail:
+                log.warning(
+                    "create_competition_news_draft: GPT result rejected by validator "
+                    "(comp=%s mode=%s issues=%s), falling back to template",
+                    comp_id, mode, vr.issues,
+                )
+                if is_preview:
+                    title, body = build_competition_anons(comp)
+                else:
+                    title, body = build_competition_report(comp)
+            elif vr.needs_review:
+                needs_review = True
+
         draft = create_event_draft(
             db,
             source=target_source,
@@ -248,6 +272,7 @@ def create_competition_news_draft(comp_id: int, mode: str = 'auto') -> bool:
             title=title,
             body=body,
             created_by=author_id,
+            needs_review=needs_review,
         )
         return bool(draft)
     finally:
@@ -375,9 +400,11 @@ def create_certification_news_draft(cert_id: int, mode: str = 'auto') -> bool:
         target_source = 'auto_certification_anons' if is_preview else 'auto_certification_report'
         author_id = get_manager_id(db)
 
+        gpt_used = False
         try:
             result = generate_certification_news(cert_id)
             title, body = result["title"], result["body"]
+            gpt_used = True
         except Exception:
             log.exception(
                 "create_certification_news_draft: GPT failed for cert=%s mode=%s, falling back to template",
@@ -388,6 +415,25 @@ def create_certification_news_draft(cert_id: int, mode: str = 'auto') -> bool:
             else:
                 title, body = build_certification_report(cert)
 
+        needs_review = False
+        if gpt_used:
+            check_mode = 'anons' if is_preview else 'report'
+            vr = validate_generated_news(
+                title, body, mode=check_mode, event_name=cert.name,
+            )
+            if vr.is_hard_fail:
+                log.warning(
+                    "create_certification_news_draft: GPT result rejected by validator "
+                    "(cert=%s mode=%s issues=%s), falling back to template",
+                    cert_id, mode, vr.issues,
+                )
+                if is_preview:
+                    title, body = build_certification_anons(cert)
+                else:
+                    title, body = build_certification_report(cert)
+            elif vr.needs_review:
+                needs_review = True
+
         draft = create_event_draft(
             db,
             source=target_source,
@@ -395,6 +441,7 @@ def create_certification_news_draft(cert_id: int, mode: str = 'auto') -> bool:
             title=title,
             body=body,
             created_by=author_id,
+            needs_review=needs_review,
         )
         return bool(draft)
     finally:
@@ -526,9 +573,11 @@ def create_camp_news_draft(camp_id: int, mode: str = 'auto') -> bool:
         target_source = 'auto_camp_anons' if is_preview else 'auto_camp_report'
         author_id = get_manager_id(db)
 
+        gpt_used = False
         try:
             result = generate_camp_news(camp_id)
             title, body = result["title"], result["body"]
+            gpt_used = True
         except Exception:
             log.exception(
                 "create_camp_news_draft: GPT failed for camp=%s mode=%s, falling back to template",
@@ -539,6 +588,25 @@ def create_camp_news_draft(camp_id: int, mode: str = 'auto') -> bool:
             else:
                 title, body = build_camp_report(camp)
 
+        needs_review = False
+        if gpt_used:
+            check_mode = 'anons' if is_preview else 'report'
+            vr = validate_generated_news(
+                title, body, mode=check_mode, event_name=camp.name,
+            )
+            if vr.is_hard_fail:
+                log.warning(
+                    "create_camp_news_draft: GPT result rejected by validator "
+                    "(camp=%s mode=%s issues=%s), falling back to template",
+                    camp_id, mode, vr.issues,
+                )
+                if is_preview:
+                    title, body = build_camp_anons(camp)
+                else:
+                    title, body = build_camp_report(camp)
+            elif vr.needs_review:
+                needs_review = True
+
         draft = create_event_draft(
             db,
             source=target_source,
@@ -546,6 +614,7 @@ def create_camp_news_draft(camp_id: int, mode: str = 'auto') -> bool:
             title=title,
             body=body,
             created_by=author_id,
+            needs_review=needs_review,
         )
         return bool(draft)
     finally:
