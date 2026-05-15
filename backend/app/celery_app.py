@@ -30,10 +30,10 @@ celery_app.conf.update(
             "task":     "app.tasks.fetch_vk_news",
             "schedule": crontab(hour=9, minute=30),
         },
-        # Еженедельный анонс соревнований — каждое воскресенье в 10:00
-        "weekly-announcement": {
-            "task":     "app.tasks.generate_weekly_announcement",
-            "schedule": crontab(hour=10, minute=0, day_of_week=0),
+        # Авто-репортажи о вчерашних соревнованиях — ежедневно 10:00 МСК
+        "daily-event-reports": {
+            "task":     "app.tasks.daily_event_reports",
+            "schedule": crontab(hour=10, minute=0),
         },
         # Генерация взносов — 1-го числа каждого месяца в 09:00
         "generate-monthly-fees": {
@@ -87,10 +87,16 @@ def fetch_vk_news_task():
     return run_vk_fetch()
 
 
-@celery_app.task(name="app.tasks.generate_weekly_announcement")
-def generate_weekly_announcement():
-    from app.tasks.yandex_gpt import run_weekly_announcement
-    return run_weekly_announcement()
+@celery_app.task(name="app.tasks.competition_anons_task")
+def competition_anons_task(comp_id: int):
+    from app.tasks.yandex_gpt import create_competition_news_draft
+    return create_competition_news_draft(comp_id, mode='anons')
+
+
+@celery_app.task(name="app.tasks.daily_event_reports")
+def daily_event_reports_task():
+    from app.services.daily_reports import run_daily_event_reports
+    return run_daily_event_reports()
 
 
 @celery_app.task(name="app.tasks.generate_monthly_fees")
