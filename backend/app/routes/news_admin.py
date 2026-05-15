@@ -116,31 +116,6 @@ def fetch_vk(user: User = Depends(require_manager)):
         raise HTTPException(500, f"Ошибка парсинга VK: {str(e)}")
 
 
-class CompNewsRequest(BaseModel):
-    comp_id: int
-
-@router.post("/generate-comp-news")
-def generate_comp_news(data: CompNewsRequest, user: User = Depends(require_manager)):
-    try:
-        from app.tasks.yandex_gpt import run_competition_news
-        ok = run_competition_news(data.comp_id)
-        if ok: return {"ok": True, "message": "Новость сгенерирована и опубликована"}
-        else:  return {"ok": False, "message": "Новость уже существует или нет данных"}
-    except Exception as e:
-        raise HTTPException(500, f"Ошибка генерации: {str(e)}")
-
-
-@router.post("/generate-announcement")
-def generate_announcement(user: User = Depends(require_manager)):
-    try:
-        from app.tasks.yandex_gpt import run_weekly_announcement
-        ok = run_weekly_announcement()
-        if ok: return {"ok": True, "message": "Анонс сгенерирован и опубликован"}
-        else:  return {"ok": False, "message": "Нет предстоящих соревнований"}
-    except Exception as e:
-        raise HTTPException(500, f"Ошибка генерации: {str(e)}")
-
-
 # ─── generate-cert-news ───────────────────────────────────────────────────────
 
 class CertNewsRequest(BaseModel):
