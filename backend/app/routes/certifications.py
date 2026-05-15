@@ -13,7 +13,6 @@ from app.models.certification import (
     CertificationStatus, NotificationType
 )
 from app.models.news import News
-from app.services.news_drafts import build_certification_anons, create_event_draft
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/certifications", tags=["certifications"])
@@ -71,13 +70,10 @@ def create_certification(
     )
     db.add(cert); db.commit(); db.refresh(cert)
 
-    # Автодрафт «Анонс аттестации» (не валит основную операцию)
-    title, body = build_certification_anons(cert)
-    draft = create_event_draft(
-        db, source='auto_certification_anons',
-        entity_id=cert.id, title=title, body=body, created_by=user.id,
-    )
-    return _cert_out(cert, draft_created=bool(draft))
+    # Автодрафт «Анонс аттестации» — асинхронно через Celery (GPT + fallback).
+    from app.celery_app import certification_anons_task
+    certification_anons_task.delay(cert.id)
+    return _cert_out(cert, draft_created=True)
 
 
 @router.get("/seasons")
