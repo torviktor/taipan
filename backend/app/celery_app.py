@@ -93,6 +93,18 @@ def competition_anons_task(comp_id: int):
     return create_competition_news_draft(comp_id, mode='anons')
 
 
+@celery_app.task(name="app.tasks.certification_anons_task")
+def certification_anons_task(cert_id: int):
+    from app.tasks.yandex_gpt import create_certification_news_draft
+    return create_certification_news_draft(cert_id, mode='anons')
+
+
+@celery_app.task(name="app.tasks.camp_anons_task")
+def camp_anons_task(camp_id: int):
+    from app.tasks.yandex_gpt import create_camp_news_draft
+    return create_camp_news_draft(camp_id, mode='anons')
+
+
 @celery_app.task(name="app.tasks.daily_event_reports")
 def daily_event_reports_task():
     from app.services.daily_reports import run_daily_event_reports
