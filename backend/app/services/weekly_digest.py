@@ -25,6 +25,13 @@ _DISCIPLINES = [
 ]
 
 
+RU_MONTHS_GENITIVE = {
+    1:  "января",   2:  "февраля", 3:  "марта",    4:  "апреля",
+    5:  "мая",      6:  "июня",    7:  "июля",     8:  "августа",
+    9:  "сентября", 10: "октября", 11: "ноября",   12: "декабря",
+}
+
+
 def _pluralize_ru(n: int, one: str, few: str, many: str) -> str:
     """Русские числительные.
 
@@ -65,6 +72,15 @@ def _format_medals_aggregate(medals: list[dict]) -> str:
     if parts:
         return f"{total} {word} ({', '.join(parts)})"
     return f"{total} {word}"
+
+
+def _format_bday_ru(day_month: str) -> str:
+    """'18.05' -> '18 мая'. На некорректном вводе возвращает исходник."""
+    try:
+        d, m = day_month.split(".", 1)
+        return f"{int(d)} {RU_MONTHS_GENITIVE[int(m)]}"
+    except (ValueError, KeyError):
+        return day_month
 
 
 def get_msk_week_range(now_utc: datetime) -> Tuple[datetime, datetime]:
@@ -305,65 +321,63 @@ def build_weekly_digest(
         trainings_word = _pluralize_ru(
             trainings_count, "тренировка", "тренировки", "тренировок",
         )
-        lines = [
-            "## Тренировки",
-            f"За неделю проведено {trainings_count} {trainings_word}.",
-        ]
+        line = f"За неделю проведено {trainings_count} {trainings_word}."
         if attendance_total > 0:
-            lines.append(
-                f"Посещаемость: {attendance_present} из {attendance_total} "
-                f"({attendance_rate:.0f}%)."
+            line += (
+                f" Посещаемость: {attendance_present} из {attendance_total}"
+                f" ({attendance_rate:.0f}%)."
             )
-        sections.append("\n".join(lines))
+        sections.append("ТРЕНИРОВКИ\n" + line)
 
     if stats["new_achievements"]:
-        lines = ["## Новые достижения"]
         overflow = stats.get("new_achievements_overflow")
         if overflow:
             total_word = _pluralize_ru(
                 overflow["total"], "достижение", "достижения", "достижений",
             )
-            lines.append(f"На этой неделе {overflow['total']} {total_word}.")
+            line = f"На этой неделе {overflow['total']} {total_word}."
             if overflow["highlights"]:
-                lines.append(f"Среди них: {', '.join(overflow['highlights'])}.")
+                line += f" Среди них: {', '.join(overflow['highlights'])}."
+            sections.append("НОВЫЕ ДОСТИЖЕНИЯ\n" + line)
         else:
+            lines = ["НОВЫЕ ДОСТИЖЕНИЯ"]
             for a in stats["new_achievements"]:
-                lines.append(f"- {a['athlete_name']} — {a['achievement_name']}")
-        sections.append("\n".join(lines))
+                lines.append(f"• {a['athlete_name']} — {a['achievement_name']}")
+            sections.append("\n".join(lines))
 
     if stats["competitions"]:
-        lines = ["## Соревнования"]
+        lines = ["СОРЕВНОВАНИЯ"]
         for comp in stats["competitions"]:
             d = comp["date"]
             if comp["medals"]:
                 aggregate = _format_medals_aggregate(comp["medals"])
-                lines.append(f"- {comp['name']} ({d:%d.%m}): {aggregate}")
+                lines.append(f"• {comp['name']} ({d:%d.%m}) — {aggregate}.")
             else:
                 lines.append(
-                    f"- {comp['name']} ({d:%d.%m}): _результаты будут добавлены позже_"
+                    f"• {comp['name']} ({d:%d.%m}) — результаты будут добавлены позже."
                 )
         sections.append("\n".join(lines))
 
     if stats["certifications"]:
-        lines = ["## Аттестации"]
+        lines = ["АТТЕСТАЦИИ"]
         for cert in stats["certifications"]:
             d = cert["date"]
             lines.append(
-                f"- {cert['name']} ({d:%d.%m}): "
-                f"сдали {cert['passed_count']} из {cert['total_count']}"
+                f"• {cert['name']} ({d:%d.%m}) — "
+                f"сдали {cert['passed_count']} из {cert['total_count']}."
             )
         sections.append("\n".join(lines))
 
     if stats["birthdays_next_week"]:
-        lines = ["## Дни рождения на следующей неделе"]
+        lines = ["ДНИ РОЖДЕНИЯ НА СЛЕДУЮЩЕЙ НЕДЕЛЕ"]
         for b in stats["birthdays_next_week"]:
-            lines.append(f"- {b['athlete_name']} — {b['day_month']}")
+            lines.append(f"• {b['athlete_name']} — {_format_bday_ru(b['day_month'])}")
         sections.append("\n".join(lines))
 
     if stats["rating_leaders"]:
-        lines = ["## Лидеры по приросту рейтинга"]
+        lines = ["ЛИДЕРЫ ПО ПРИРОСТУ РЕЙТИНГА"]
         for r in stats["rating_leaders"]:
-            lines.append(f"- {r['athlete_name']} — +{r['rating_gained']}")
+            lines.append(f"• {r['athlete_name']} — +{r['rating_gained']}")
         sections.append("\n".join(lines))
 
     if not sections:
