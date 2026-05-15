@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.models.attendance import TrainingSession, Attendance
-from app.models.achievement import AthleteAchievement, ACHIEVEMENT_MAP
+from app.models.achievement import AthleteAchievement, ACHIEVEMENT_MAP, TIER_ORDER
 from app.models.user import Athlete
 from app.models.competition import Competition, CompetitionResult
 from app.models.certification import Certification, CertificationResult
@@ -42,6 +42,29 @@ def _pluralize_ru(n: int, one: str, few: str, many: str) -> str:
     if 2 <= mod10 <= 4:
         return few
     return many
+
+
+def _format_medals_aggregate(medals: list[dict]) -> str:
+    """Агрегат по списку медалей: "12 медалей (3 золота, 4 серебра, 5 бронзы)".
+
+    medals — элементы вида {"place": 1|2|3, ...}. Категории "золото/серебро/
+    бронза" — фиксированные слова без плюрализации; нулевые не выводятся.
+    """
+    gold = sum(1 for m in medals if m.get("place") == 1)
+    silver = sum(1 for m in medals if m.get("place") == 2)
+    bronze = sum(1 for m in medals if m.get("place") == 3)
+    total = gold + silver + bronze
+    word = _pluralize_ru(total, "медаль", "медали", "медалей")
+    parts = []
+    if gold:
+        parts.append(f"{gold} золот{'о' if gold == 1 else 'а'}")
+    if silver:
+        parts.append(f"{silver} серебр{'о' if silver == 1 else 'а'}")
+    if bronze:
+        parts.append(f"{bronze} бронз{'а' if bronze == 1 else 'ы'}")
+    if parts:
+        return f"{total} {word} ({', '.join(parts)})"
+    return f"{total} {word}"
 
 
 def get_msk_week_range(now_utc: datetime) -> Tuple[datetime, datetime]:
@@ -113,15 +136,30 @@ def collect_week_stats(
         new_achievements.append({
             "athlete_name": athlete.full_name,
             "achievement_name": meta["name"],
+            "tier": meta.get("tier", "common"),
         })
+
+    # Правило массовости: при >10 ачивках свернуть список в агрегат
+    # с 2-3 яркими примерами (приоритет по tier: legendary > rare > common).
     total_ach = len(new_achievements)
-    if total_ach > 20:
-        overflow = total_ach - 20
-        new_achievements = new_achievements[:20]
-        new_achievements.append({
-            "athlete_name": "...",
-            "achievement_name": f"и ещё {overflow}",
-        })
+    if total_ach > 10:
+        sorted_for_highlights = sorted(
+            new_achievements,
+            key=lambda a: TIER_ORDER.get(a["tier"], 0),
+            reverse=True,
+        )
+        seen: set[str] = set()
+        highlights: list[str] = []
+        for a in sorted_for_highlights:
+            name = a["achievement_name"]
+            if name not in seen:
+                seen.add(name)
+                highlights.append(name)
+            if len(highlights) >= 3:
+                break
+        new_achievements_overflow = {"total": total_ach, "highlights": highlights}
+    else:
+        new_achievements_overflow = None
 
     # ── Соревнования за неделю + медали ───────────────────────────────────
     competitions_list: list[dict] = []
@@ -232,15 +270,16 @@ def collect_week_stats(
             })
 
     return {
-        "trainings_count":    trainings_count,
-        "attendance_present": attendance_present,
-        "attendance_total":   attendance_total,
-        "attendance_rate":    attendance_rate,
-        "new_achievements":   new_achievements,
-        "competitions":       competitions_list,
-        "certifications":     certifications_list,
-        "birthdays_next_week": birthdays_next_week,
-        "rating_leaders":     rating_leaders,
+        "trainings_count":           trainings_count,
+        "attendance_present":        attendance_present,
+        "attendance_total":          attendance_total,
+        "attendance_rate":           attendance_rate,
+        "new_achievements":          new_achievements,
+        "new_achievements_overflow": new_achievements_overflow,
+        "competitions":              competitions_list,
+        "certifications":            certifications_list,
+        "birthdays_next_week":       birthdays_next_week,
+        "rating_leaders":            rating_leaders,
     }
 
 
@@ -279,22 +318,30 @@ def build_weekly_digest(
 
     if stats["new_achievements"]:
         lines = ["## Новые достижения"]
-        for a in stats["new_achievements"]:
-            lines.append(f"- {a['athlete_name']} — {a['achievement_name']}")
+        overflow = stats.get("new_achievements_overflow")
+        if overflow:
+            total_word = _pluralize_ru(
+                overflow["total"], "достижение", "достижения", "достижений",
+            )
+            lines.append(f"На этой неделе {overflow['total']} {total_word}.")
+            if overflow["highlights"]:
+                lines.append(f"Среди них: {', '.join(overflow['highlights'])}.")
+        else:
+            for a in stats["new_achievements"]:
+                lines.append(f"- {a['athlete_name']} — {a['achievement_name']}")
         sections.append("\n".join(lines))
 
     if stats["competitions"]:
         lines = ["## Соревнования"]
         for comp in stats["competitions"]:
             d = comp["date"]
-            lines.append(f"### {comp['name']} ({d:%d.%m})")
             if comp["medals"]:
-                for m in comp["medals"]:
-                    lines.append(
-                        f"- {m['place']} место: {m['athlete_name']} ({m['discipline']})"
-                    )
+                aggregate = _format_medals_aggregate(comp["medals"])
+                lines.append(f"- {comp['name']} ({d:%d.%m}): {aggregate}")
             else:
-                lines.append("_Результаты будут добавлены позже._")
+                lines.append(
+                    f"- {comp['name']} ({d:%d.%m}): _результаты будут добавлены позже_"
+                )
         sections.append("\n".join(lines))
 
     if stats["certifications"]:
