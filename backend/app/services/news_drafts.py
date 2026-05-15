@@ -18,6 +18,7 @@ log = logging.getLogger(__name__)
 Source = Literal[
     'manual',
     'auto_competition_anons',
+    'auto_competition_report',
     'auto_certification_anons',
     'auto_camp_anons',
     'nadezhda',
@@ -30,6 +31,7 @@ Source = Literal[
 
 _FK_BY_SOURCE = {
     'auto_competition_anons':   'competition_id',
+    'auto_competition_report':  'competition_id',
     'auto_certification_anons': 'certification_id',
     'auto_camp_anons':          'camp_id',
 }
@@ -47,6 +49,18 @@ def build_competition_anons(c: Competition) -> tuple[str, str]:
         f"Место: {c.location or '—'}\n"
         f"Тип: {c.level} {c.comp_type}\n\n"
         "<тренер дополняет>"
+    )
+    return title, body
+
+
+def build_competition_report(c: Competition) -> tuple[str, str]:
+    title = f"Итоги: {c.name}"
+    body = (
+        f"Соревнование «{c.name}» завершилось.\n"
+        f"Дата: {_fmt_ru(c.date)}\n"
+        f"Место: {c.location or '—'}\n"
+        f"Тип: {c.level} {c.comp_type}\n\n"
+        "<тренер дополняет результатами>"
     )
     return title, body
 
