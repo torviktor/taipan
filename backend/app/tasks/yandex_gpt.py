@@ -1,11 +1,14 @@
 # backend/app/tasks/yandex_gpt.py
 
+import logging
 import os
 import requests
-from datetime import date, timedelta
+from datetime import date
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
+
+log = logging.getLogger(__name__)
 
 # Импортируем все модели чтобы SQLAlchemy правильно настроил relationships
 from app.models import user, event, attendance, competition, certification, achievement, camp, hall_of_fame, news, competition_file
@@ -187,106 +190,67 @@ def generate_competition_news(comp_id: int) -> dict:
         db.close()
 
 
-def run_competition_news(comp_id: int) -> bool:
-    """Создать черновик новости о соревновании через YandexGPT.
-    Дедуп по (competition_id, status in draft/published)."""
-    from app.models.news import News
+def create_competition_news_draft(comp_id: int, mode: str = 'auto') -> bool:
+    """
+    Создать черновик новости о соревновании.
 
-    db = SessionLocal()
-    try:
-        existing = db.query(News).filter(
-            News.competition_id == comp_id,
-            News.status.in_(('draft', 'published'))
-        ).first()
-        if existing:
-            print(f"[YaGPT] Новость о соревновании {comp_id} уже существует (status={existing.status})")
-            return False
+    mode:
+      'auto'   — определить по comp.date vs today (preview если в будущем).
+      'anons'  — принудительно preview (source='auto_competition_anons').
+      'report' — принудительно past   (source='auto_competition_report').
 
-        author_id = get_manager_id(db)
-        result = generate_competition_news(comp_id)
+    Сначала пробует сгенерировать текст через YandexGPT; при любой ошибке
+    (timeout / 5xx / парсинг / etc.) — логирует и падает на статический
+    шаблон build_competition_anons / build_competition_report.
 
-        n = News(
-            title=result["title"],
-            body=result["body"],
-            competition_id=comp_id,
-            created_by=author_id,
-            status='draft',
-            source='ai',
-        )
-        db.add(n)
-        db.commit()
-        print(f"[YaGPT] Создан черновик: {result['title']}")
-        return True
-
-    except Exception as e:
-        print(f"[YaGPT] Ошибка генерации новости: {e}")
-        return False
-    finally:
-        db.close()
-
-
-# ── Еженедельный анонс предстоящих соревнований ───────────────────────────────
-
-def run_weekly_announcement() -> bool:
-    """Генерирует анонс предстоящих соревнований на следующие 2 недели."""
+    Возвращает True если черновик создан, False если дедуп заблокировал
+    или соревнование не найдено.
+    """
     from app.models.competition import Competition
-    from app.models.news import News
+    from app.services.news_drafts import (
+        build_competition_anons,
+        build_competition_report,
+        create_event_draft,
+    )
 
     db = SessionLocal()
     try:
-        today     = date.today()
-        in_2weeks = today + timedelta(days=14)
-
-        upcoming = db.query(Competition).filter(
-            Competition.date >= today,
-            Competition.date <= in_2weeks,
-        ).order_by(Competition.date).all()
-
-        if not upcoming:
-            print("[YaGPT] Нет предстоящих соревнований для анонса")
+        comp = db.query(Competition).filter(Competition.id == comp_id).first()
+        if not comp:
+            log.warning("create_competition_news_draft: competition %s not found", comp_id)
             return False
 
-        comp_list = "\n".join([
-            f"- {c.name}, {c.date.strftime('%d.%m.%Y')}, {c.location or 'место уточняется'}, уровень: {c.level}"
-            for c in upcoming
-        ])
+        if mode == 'anons':
+            is_preview = True
+        elif mode == 'report':
+            is_preview = False
+        else:
+            is_preview = bool(comp.date and comp.date > date.today())
 
-        system = """Ты — редактор новостей спортивного клуба тхэквондо «Тайпан» из Павловского Посада.
-Пишешь анонсы предстоящих соревнований. Стиль — мотивирующий, энергичный, поддерживающий.
-Не используй эмодзи. Объём — 100-180 слов."""
-
-        prompt = f"""Напиши анонс предстоящих соревнований для сайта клуба тхэквондо «Тайпан».
-
-Предстоящие соревнования:
-{comp_list}
-
-Заголовок должен быть мотивирующим, упоминать ближайшие турниры.
-Верни ответ в формате:
-ЗАГОЛОВОК: [заголовок]
-ТЕКСТ: [текст анонса]"""
-
-        response = yandex_gpt(prompt, system)
-
-        title = f"Анонс соревнований — {today.strftime('%d.%m.%Y')}"
-        body  = response
-
-        if "ЗАГОЛОВОК:" in response and "ТЕКСТ:" in response:
-            parts = response.split("ТЕКСТ:", 1)
-            title_part = parts[0].replace("ЗАГОЛОВОК:", "").strip()
-            body  = parts[1].strip()
-            if title_part:
-                title = title_part
-
+        target_source = 'auto_competition_anons' if is_preview else 'auto_competition_report'
         author_id = get_manager_id(db)
-        n = News(title=title[:255], body=body, created_by=author_id,
-                 status='draft', source='ai')
-        db.add(n)
-        db.commit()
-        print(f"[YaGPT] Создан анонс: {title}")
-        return True
 
-    except Exception as e:
-        print(f"[YaGPT] Ошибка генерации анонса: {e}")
-        return False
+        try:
+            result = generate_competition_news(comp_id)
+            title, body = result["title"], result["body"]
+        except Exception:
+            log.exception(
+                "create_competition_news_draft: GPT failed for comp=%s mode=%s, falling back to template",
+                comp_id, mode,
+            )
+            if is_preview:
+                title, body = build_competition_anons(comp)
+            else:
+                title, body = build_competition_report(comp)
+
+        draft = create_event_draft(
+            db,
+            source=target_source,
+            entity_id=comp_id,
+            title=title,
+            body=body,
+            created_by=author_id,
+        )
+        return bool(draft)
     finally:
         db.close()
