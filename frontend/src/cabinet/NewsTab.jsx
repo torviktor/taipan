@@ -6,6 +6,7 @@ const SOURCE_LABELS = {
   nadezhda:                 'Дворец Надежда',
   auto_weekly_digest:       'Авто-сводка',
   auto_competition_anons:   'Анонс соревнования',
+  auto_competition_report:  'Репортаж соревнования',
   auto_certification_anons: 'Анонс аттестации',
   auto_camp_anons:          'Анонс сборов',
   ai:                       'AI-генерация',
@@ -18,7 +19,6 @@ export default function NewsTab({ token }) {
   const hj  = { ...h, 'Content-Type': 'application/json' }
 
   const [items,        setItems]        = useState([])
-  const [comps,        setComps]        = useState([])
   const [certs,        setCerts]        = useState([])
   const [camps,        setCamps]        = useState([])
   const [loading,      setLoading]      = useState(false)
@@ -35,7 +35,7 @@ export default function NewsTab({ token }) {
   const [form, setForm] = useState({ title: '', body: '' })
 
   useEffect(() => { loadNews() }, [tab])
-  useEffect(() => { loadComps(); loadCerts(); loadCamps() }, [])
+  useEffect(() => { loadCerts(); loadCamps() }, [])
 
   const loadNews = async () => {
     setLoading(true)
@@ -47,13 +47,6 @@ export default function NewsTab({ token }) {
       if (r.ok) { const d = await r.json(); setItems(d.items) }
     } catch {}
     setLoading(false)
-  }
-
-  const loadComps = async () => {
-    try {
-      const r = await apiFetch(`${API}/competitions`, { headers: h })
-      if (r.ok) setComps(await r.json())
-    } catch {}
   }
 
   const loadCerts = async () => {
@@ -138,29 +131,6 @@ export default function NewsTab({ token }) {
     } catch {}
   }
 
-  const generateWithGPT = async (compId) => {
-    setSaving(true); setMsg('')
-    try {
-      const r = await apiFetch(`${API}/news-admin/generate-comp-news`, {
-        method: 'POST', headers: hj, body: JSON.stringify({ comp_id: compId })
-      })
-      const d = await r.json()
-      setMsg(d.message || (r.ok ? 'Черновик создан' : 'Ошибка'))
-      if (r.ok) { await loadNews(); window.dispatchEvent(new Event('news-drafts-changed')) }
-    } catch { setMsg('Ошибка') }
-    setSaving(false)
-  }
-
-  const publishFromComp = async (compId) => {
-    setSaving(true); setMsg('')
-    try {
-      const r = await apiFetch(`${API}/news/from-competition/${compId}`, { method: 'POST', headers: h })
-      if (r.ok) { setMsg('Черновик соревнования создан'); await loadNews(); window.dispatchEvent(new Event('news-drafts-changed')) }
-      else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
-    } catch { setMsg('Ошибка') }
-    setSaving(false)
-  }
-
   const publishFromCert = async (certId, certName, certDate) => {
     setSaving(true); setMsg('')
     try {
@@ -241,8 +211,6 @@ export default function NewsTab({ token }) {
   }
 
 
-  const publishedCompIds = new Set(items.filter(n => n.competition_id).map(n => n.competition_id))
-  const compsWithoutNews = comps.filter(c => !publishedCompIds.has(c.id))
   const publishedCertIds = new Set(items.filter(n => n.certification_id).map(n => n.certification_id))
   const publishedCampIds = new Set(items.filter(n => n.camp_id).map(n => n.camp_id))
   const recentCerts = certs.filter(c => !publishedCertIds.has(c.id)).slice(0, 5)
@@ -294,19 +262,6 @@ export default function NewsTab({ token }) {
           </div>
         </div>
         <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-          <button className="att-all-btn" style={{ fontSize:'13px' }}
-            onClick={async () => {
-              setSaving(true); setMsg('')
-              try {
-                const r = await apiFetch(`${API}/news-admin/generate-announcement`, { method:'POST', headers:hj })
-                const d = await r.json()
-                setMsg(d.message || 'Готово')
-                if (r.ok) { await loadNews(); window.dispatchEvent(new Event('news-drafts-changed')) }
-              } catch { setMsg('Ошибка') }
-              setSaving(false)
-            }} disabled={saving}>
-            Анонс соревнований
-          </button>
           <button className="btn-primary" style={{ padding:'8px 18px', fontSize:'14px' }} onClick={() => setShowForm(true)}>
             + Новость
           </button>
@@ -314,30 +269,6 @@ export default function NewsTab({ token }) {
       </div>
 
       {msg && <div className="att-msg" style={{ marginBottom:12 }}>{msg}</div>}
-
-      {/* Соревнования без новости */}
-      {tab === 'drafts' && compsWithoutNews.length > 0 && (
-        <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid var(--red)', padding:'16px 20px', marginBottom:12 }}>
-          <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
-            Соревнования без новости
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            {compsWithoutNews.slice(0, 5).map(c => (
-              <div key={c.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                <span style={{ color:'var(--white)', fontSize:'14px', flex:1, minWidth:0 }}>
-                  {c.name} — {new Date(c.date).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
-                </span>
-                <div style={{ display:'flex', gap:8, flexShrink:0 }}>
-                  <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap' }}
-                    onClick={() => publishFromComp(c.id)} disabled={saving}>Стандартная</button>
-                  <button className="btn-primary" style={{ fontSize:'12px', padding:'6px 12px', whiteSpace:'nowrap' }}
-                    onClick={() => generateWithGPT(c.id)} disabled={saving}>YandexGPT</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Аттестации */}
       {tab === 'drafts' && recentCerts.length > 0 && (
