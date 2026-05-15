@@ -3,15 +3,17 @@ import { API } from './constants'
 import { apiFetch } from '../utils/apiFetch'
 
 const SOURCE_LABELS = {
-  nadezhda:                 'Дворец Надежда',
-  auto_weekly_digest:       'Авто-сводка',
-  auto_competition_anons:   'Анонс соревнования',
-  auto_competition_report:  'Репортаж соревнования',
-  auto_certification_anons: 'Анонс аттестации',
-  auto_camp_anons:          'Анонс сборов',
-  ai:                       'AI-генерация',
-  vk:                       'VK',
-  gtf_telegram:             'Telegram ГТФ',
+  nadezhda:                  'Дворец Надежда',
+  auto_weekly_digest:        'Авто-сводка',
+  auto_competition_anons:    'Анонс соревнования',
+  auto_competition_report:   'Репортаж соревнования',
+  auto_certification_anons:  'Анонс аттестации',
+  auto_certification_report: 'Репортаж аттестации',
+  auto_camp_anons:           'Анонс сборов',
+  auto_camp_report:          'Репортаж сборов',
+  ai:                        'AI-генерация',
+  vk:                        'VK',
+  gtf_telegram:              'Telegram ГТФ',
 }
 
 export default function NewsTab({ token }) {
@@ -19,8 +21,6 @@ export default function NewsTab({ token }) {
   const hj  = { ...h, 'Content-Type': 'application/json' }
 
   const [items,        setItems]        = useState([])
-  const [certs,        setCerts]        = useState([])
-  const [camps,        setCamps]        = useState([])
   const [loading,      setLoading]      = useState(false)
   const [saving,       setSaving]       = useState(false)
   const [msg,          setMsg]          = useState('')
@@ -35,7 +35,6 @@ export default function NewsTab({ token }) {
   const [form, setForm] = useState({ title: '', body: '' })
 
   useEffect(() => { loadNews() }, [tab])
-  useEffect(() => { loadCerts(); loadCamps() }, [])
 
   const loadNews = async () => {
     setLoading(true)
@@ -47,20 +46,6 @@ export default function NewsTab({ token }) {
       if (r.ok) { const d = await r.json(); setItems(d.items) }
     } catch {}
     setLoading(false)
-  }
-
-  const loadCerts = async () => {
-    try {
-      const r = await apiFetch(`${API}/certifications`, { headers: h })
-      if (r.ok) { const d = await r.json(); setCerts(d) }
-    } catch {}
-  }
-
-  const loadCamps = async () => {
-    try {
-      const r = await apiFetch(`${API}/camps`, { headers: h })
-      if (r.ok) { const d = await r.json(); setCamps(d) }
-    } catch {}
   }
 
   const createNews = async () => {
@@ -131,91 +116,6 @@ export default function NewsTab({ token }) {
     } catch {}
   }
 
-  const publishFromCert = async (certId, certName, certDate) => {
-    setSaving(true); setMsg('')
-    try {
-      const dateStr = new Date(certDate).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
-      const title = `${certName} — ${dateStr}`
-      const body  = `${dateStr} в клубе «Тайпан» прошла аттестация: ${certName}.\n\nПоздравляем всех участников с получением новых поясов! Каждый пояс — это результат упорного труда, дисциплины и преданности тхэквондо ГТФ.\n\nПродолжаем расти и совершенствоваться!`
-      const r = await apiFetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title, body, certification_id: certId }) })
-      if (r.ok) { setMsg('Черновик аттестации создан'); await loadNews(); window.dispatchEvent(new Event('news-drafts-changed')) }
-      else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
-    } catch { setMsg('Ошибка') }
-    setSaving(false)
-  }
-
-
-  const generateCertWithGPT = async (certId, certName, certDate) => {
-    setSaving(true); setMsg('')
-    try {
-      const dateStr = new Date(certDate).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
-      const prompt = `Напиши новость об аттестации по тхэквондо ГТФ для сайта клуба «Тайпан».\n\nДанные:\nНазвание аттестации: ${certName}\nДата: ${dateStr}\nКлуб: Тайпан, г. Павловский Посад\nФедерация: ГТФ (GTF)\n\nСтиль — торжественный, поддерживающий, гордый. Не используй эмодзи. Зал называется доянг. Пояса — гыпы (ученические) и даны (мастерские).\nОбъём 100-180 слов.\nВерни:\nЗАГОЛОВОК: [заголовок]\nТЕКСТ: [текст]`
-      const rGpt = await apiFetch(`${API}/ai/chat`, { method: 'POST', headers: hj, body: JSON.stringify({ message: prompt, history: [] }) })
-      if (!rGpt.ok) { setMsg('Ошибка YandexGPT'); setSaving(false); return }
-      const gptData = await rGpt.json()
-      const reply = gptData.reply || ''
-      let title = `${certName} — ${dateStr}`
-      let body  = reply
-      if (reply.includes('ЗАГОЛОВОК:') && reply.includes('ТЕКСТ:')) {
-        const parts = reply.split('ТЕКСТ:')
-        title = parts[0].replace('ЗАГОЛОВОК:', '').trim() || title
-        body  = parts[1].trim()
-      }
-      const rSave = await apiFetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title: title.slice(0,255), body, certification_id: certId }) })
-      if (rSave.ok) { setMsg('Черновик аттестации сгенерирован YandexGPT'); await loadNews(); window.dispatchEvent(new Event('news-drafts-changed')) }
-      else { const d = await rSave.json(); setMsg(d.detail || 'Ошибка') }
-    } catch { setMsg('Ошибка') }
-    setSaving(false)
-  }
-
-
-  const publishFromCamp = async (campId, campName, campDateStart, campDateEnd, campLocation) => {
-    setSaving(true); setMsg('')
-    try {
-      const ds = new Date(campDateStart).toLocaleDateString('ru-RU', { day:'numeric', month:'long' })
-      const de = new Date(campDateEnd).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
-      const loc = campLocation ? ` в ${campLocation}` : ''
-      const title = `Учебно-тренировочные сборы «${campName}» — ${ds}–${de}`
-      const body  = `С ${ds} по ${de} наши спортсмены приняли участие в учебно-тренировочных сборах «${campName}»${loc}.\n\nСборы — важная часть подготовки каждого спортсмена. Интенсивные тренировки, работа над техникой хъёнгов и массоги, командный дух и взаимная поддержка — всё это делает наших бойцов сильнее.\n\nБлагодарим всех участников за старание и самоотдачу!`
-      const r = await apiFetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title, body, camp_id: campId }) })
-      if (r.ok) { setMsg('Черновик сборов создан'); await loadNews(); window.dispatchEvent(new Event('news-drafts-changed')) }
-      else { const d = await r.json(); setMsg(d.detail || 'Ошибка') }
-    } catch { setMsg('Ошибка') }
-    setSaving(false)
-  }
-
-
-  const generateCampWithGPT = async (campId, campName, campDateStart, campDateEnd, campLocation) => {
-    setSaving(true); setMsg('')
-    try {
-      const ds = new Date(campDateStart).toLocaleDateString('ru-RU', { day:'numeric', month:'long' })
-      const de = new Date(campDateEnd).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })
-      const loc = campLocation ? `, место: ${campLocation}` : ''
-      const prompt = `Напиши новость об учебно-тренировочных сборах по тхэквондо ГТФ для сайта клуба «Тайпан».\n\nДанные:\nНазвание: ${campName}\nДаты: ${ds}–${de}${loc}\nКлуб: Тайпан, г. Павловский Посад\nФедерация: ГТФ (GTF)\n\nСтиль — живой, мотивирующий, командный. Не используй эмодзи. Зал называется доянг, техника — хъёнги и массоги.\nОбъём 120-200 слов.\nВерни:\nЗАГОЛОВОК: [заголовок]\nТЕКСТ: [текст]`
-      const rGpt = await apiFetch(`${API}/ai/chat`, { method: 'POST', headers: hj, body: JSON.stringify({ message: prompt, history: [] }) })
-      if (!rGpt.ok) { setMsg('Ошибка YandexGPT'); setSaving(false); return }
-      const gptData = await rGpt.json()
-      const reply = gptData.reply || ''
-      let title = `Сборы «${campName}» — ${ds}–${de}`
-      let body  = reply
-      if (reply.includes('ЗАГОЛОВОК:') && reply.includes('ТЕКСТ:')) {
-        const parts = reply.split('ТЕКСТ:')
-        title = parts[0].replace('ЗАГОЛОВОК:', '').trim() || title
-        body  = parts[1].trim()
-      }
-      const rSave = await apiFetch(`${API}/news`, { method: 'POST', headers: hj, body: JSON.stringify({ title: title.slice(0,255), body, camp_id: campId }) })
-      if (rSave.ok) { setMsg('Черновик сборов сгенерирован YandexGPT'); await loadNews(); window.dispatchEvent(new Event('news-drafts-changed')) }
-      else { const d = await rSave.json(); setMsg(d.detail || 'Ошибка') }
-    } catch { setMsg('Ошибка') }
-    setSaving(false)
-  }
-
-
-  const publishedCertIds = new Set(items.filter(n => n.certification_id).map(n => n.certification_id))
-  const publishedCampIds = new Set(items.filter(n => n.camp_id).map(n => n.camp_id))
-  const recentCerts = certs.filter(c => !publishedCertIds.has(c.id)).slice(0, 5)
-  const recentCamps = camps.filter(c => !publishedCampIds.has(c.id)).slice(0, 5)
-
   return (
     <div>
       {confirm && (
@@ -269,54 +169,6 @@ export default function NewsTab({ token }) {
       </div>
 
       {msg && <div className="att-msg" style={{ marginBottom:12 }}>{msg}</div>}
-
-      {/* Аттестации */}
-      {tab === 'drafts' && recentCerts.length > 0 && (
-        <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid #c8962a', padding:'16px 20px', marginBottom:12 }}>
-          <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
-            Аттестации без новости
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            {recentCerts.map(c => (
-              <div key={c.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                <span style={{ color:'var(--white)', fontSize:'14px', flex:1, minWidth:0 }}>
-                  {c.name} — {new Date(c.date).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
-                </span>
-                <div style={{ display:'flex', gap:8, flexShrink:0 }}>
-                  <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap' }}
-                    onClick={() => publishFromCert(c.id, c.name, c.date)} disabled={saving}>Стандартная</button>
-                  <button className="btn-primary" style={{ fontSize:'12px', padding:'6px 12px', whiteSpace:'nowrap' }}
-                    onClick={() => generateCertWithGPT(c.id, c.name, c.date)} disabled={saving}>YandexGPT</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Сборы */}
-      {tab === 'drafts' && recentCamps.length > 0 && (
-        <div style={{ background:'var(--dark2)', border:'1px solid var(--gray-dim)', borderLeft:'3px solid #4caf50', padding:'16px 20px', marginBottom:20 }}>
-          <div style={{ fontFamily:'Barlow Condensed', fontSize:'12px', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color:'var(--gray)', marginBottom:12 }}>
-            Сборы без новости
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            {recentCamps.map(c => (
-              <div key={c.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                <span style={{ color:'var(--white)', fontSize:'14px', flex:1, minWidth:0 }}>
-                  {c.name} — {new Date(c.date_start).toLocaleDateString('ru-RU', { day:'numeric', month:'long' })}–{new Date(c.date_end).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
-                </span>
-                <div style={{ display:'flex', gap:8, flexShrink:0 }}>
-                  <button className="att-all-btn" style={{ fontSize:'12px', whiteSpace:'nowrap' }}
-                    onClick={() => publishFromCamp(c.id, c.name, c.date_start, c.date_end, c.location)} disabled={saving}>Стандартная</button>
-                  <button className="btn-primary" style={{ fontSize:'12px', padding:'6px 12px', whiteSpace:'nowrap' }}
-                    onClick={() => generateCampWithGPT(c.id, c.name, c.date_start, c.date_end, c.location)} disabled={saving}>YandexGPT</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {loading && <div className="cabinet-loading">Загрузка...</div>}
       {!loading && items.length === 0 && (
