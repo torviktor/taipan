@@ -12,7 +12,6 @@ from app.models.user import User, Athlete
 from app.models.camp import Camp, CampParticipant
 from app.models.certification import Notification, NotificationType
 from app.models.news import News
-from app.services.news_drafts import build_camp_anons, create_event_draft
 
 router = APIRouter(prefix="/camps", tags=["camps"])
 
@@ -67,13 +66,10 @@ def create_camp(data: CampCreate, db: Session = Depends(get_db), user: User = De
     # Уведомляем всех пользователей сразу при создании
     _notify_all_users(camp, db)
 
-    # Автодрафт «Анонс сборов» (не валит основную операцию)
-    title, body = build_camp_anons(camp)
-    draft = create_event_draft(
-        db, source='auto_camp_anons',
-        entity_id=camp.id, title=title, body=body, created_by=user.id,
-    )
-    return _camp_out(camp, draft_created=bool(draft))
+    # Автодрафт «Анонс сборов» — асинхронно через Celery (GPT + fallback).
+    from app.celery_app import camp_anons_task
+    camp_anons_task.delay(camp.id)
+    return _camp_out(camp, draft_created=True)
 
 
 @router.get("/seasons")
