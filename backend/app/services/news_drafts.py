@@ -20,7 +20,9 @@ Source = Literal[
     'auto_competition_anons',
     'auto_competition_report',
     'auto_certification_anons',
+    'auto_certification_report',
     'auto_camp_anons',
+    'auto_camp_report',
     'nadezhda',
     'vk',
     'gtf_telegram',
@@ -30,10 +32,12 @@ Source = Literal[
 
 
 _FK_BY_SOURCE = {
-    'auto_competition_anons':   'competition_id',
-    'auto_competition_report':  'competition_id',
-    'auto_certification_anons': 'certification_id',
-    'auto_camp_anons':          'camp_id',
+    'auto_competition_anons':    'competition_id',
+    'auto_competition_report':   'competition_id',
+    'auto_certification_anons':  'certification_id',
+    'auto_certification_report': 'certification_id',
+    'auto_camp_anons':           'camp_id',
+    'auto_camp_report':          'camp_id',
 }
 
 
@@ -78,6 +82,19 @@ def build_certification_anons(c: Certification) -> tuple[str, str]:
     return title, body
 
 
+def build_certification_report(c: Certification) -> tuple[str, str]:
+    title = f"Итоги аттестации {_fmt_ru(c.date)}"
+    notes_block = f"{c.notes}\n" if c.notes else ""
+    body = (
+        f"Аттестация «{c.name}» прошла.\n"
+        f"Дата: {_fmt_ru(c.date)}\n"
+        f"Место: {c.location or '—'}\n"
+        f"{notes_block}\n"
+        "<тренер дополняет результатами>"
+    )
+    return title, body
+
+
 def build_camp_anons(c: Camp) -> tuple[str, str]:
     title = f"Анонс сборов: {c.name}"
     price_str = f"{c.price} ₽" if c.price else "—"
@@ -90,6 +107,19 @@ def build_camp_anons(c: Camp) -> tuple[str, str]:
         f"Стоимость: {price_str}\n"
         f"{notes_block}\n"
         "<тренер дополняет>"
+    )
+    return title, body
+
+
+def build_camp_report(c: Camp) -> tuple[str, str]:
+    title = f"Итоги сборов: {c.name}"
+    notes_block = f"{c.notes}\n" if c.notes else ""
+    body = (
+        f"Сборы «{c.name}» завершились.\n"
+        f"Период: {_fmt_ru(c.date_start)} – {_fmt_ru(c.date_end)}\n"
+        f"Место: {c.location or '—'}\n"
+        f"{notes_block}\n"
+        "<тренер дополняет результатами>"
     )
     return title, body
 
