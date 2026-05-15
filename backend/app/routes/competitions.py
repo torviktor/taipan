@@ -16,7 +16,6 @@ from app.models.competition import (
 )
 from app.models.certification import Notification, NotificationType
 from app.models.news import News
-from app.services.news_drafts import build_competition_anons, create_event_draft
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/competitions", tags=["competitions"])
@@ -157,13 +156,10 @@ def create_competition(
     # Уведомляем всех при создании
     _notify_all_about_competition(comp, db)
 
-    # Автодрафт «Анонс соревнования» (не валит основную операцию)
-    title, body = build_competition_anons(comp)
-    draft = create_event_draft(
-        db, source='auto_competition_anons',
-        entity_id=comp.id, title=title, body=body, created_by=user.id,
-    )
-    return _comp_out(comp, draft_created=bool(draft))
+    # Автодрафт «Анонс соревнования» — асинхронно через Celery (GPT + fallback).
+    from app.celery_app import competition_anons_task
+    competition_anons_task.delay(comp.id)
+    return _comp_out(comp, draft_created=True)
 
 
 @router.get("")
