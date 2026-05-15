@@ -131,6 +131,7 @@ def _create_news_draft(
     title: str,
     body: str,
     created_by: int,
+    needs_review: bool = False,
     **fk_kwargs,
 ) -> Optional[News]:
     """
@@ -138,6 +139,8 @@ def _create_news_draft(
 
     НЕ делает дедуп и НЕ проверяет FK — это ответственность вызывающего.
     На исключении: log.exception, db.rollback, return None.
+
+    needs_review: пометка «требует ручной проверки» от валидатора качества.
     """
     try:
         news = News(
@@ -146,6 +149,7 @@ def _create_news_draft(
             status='draft',
             source=source,
             created_by=created_by,
+            needs_review=needs_review,
             **fk_kwargs,
         )
         db.add(news)
@@ -172,13 +176,17 @@ def create_event_draft(
     title: str,
     body: str,
     created_by: int,
+    needs_review: bool = False,
 ) -> Optional[News]:
     """
     Создать черновик News(status='draft', source=<source>) с привязкой
     к сущности по entity_id. FK выбирается автоматически по source.
     Дедуп: вернёт None, если черновик такого source для этой сущности
-    уже существует. Падения логирует и проглатывает (тоже None) —
-    не валит основную операцию caller'а.
+    уже существует (поле needs_review существующего не трогается).
+    Падения логирует и проглатывает (тоже None) — не валит основную
+    операцию caller'а.
+
+    needs_review: помечает черновик как «требует проверки тренером».
     """
     fk_field = _FK_BY_SOURCE.get(source)
     if not fk_field:
@@ -210,6 +218,7 @@ def create_event_draft(
         title=title,
         body=body,
         created_by=created_by,
+        needs_review=needs_review,
         **{fk_field: entity_id},
     )
 
@@ -222,16 +231,20 @@ def create_weekly_digest_draft(
     title: str,
     body: str,
     created_by: int,
+    needs_review: bool = False,
 ) -> Optional[News]:
     """
     Создать черновик еженедельного дайджеста (source='auto_weekly_digest').
 
     Дедуп: один draft на неделю — ищем существующий с
     published_at >= week_start_utc (для draft published_at = момент
-    создания записи, server_default=func.now()).
+    создания записи, server_default=func.now()). Поле needs_review
+    существующего черновика не трогается.
 
     week_end_utc передаётся для логирования и единообразия сигнатуры —
     внутри для дедупа не используется.
+
+    needs_review: помечает черновик как «требует проверки тренером».
     """
     try:
         existing = db.query(News).filter(
@@ -262,4 +275,5 @@ def create_weekly_digest_draft(
         title=title,
         body=body,
         created_by=created_by,
+        needs_review=needs_review,
     )
