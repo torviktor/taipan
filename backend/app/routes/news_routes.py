@@ -51,6 +51,7 @@ def _out(n: News) -> dict:
         "camp_id":          n.camp_id,
         "status":           n.status,
         "source":           n.source,
+        "needs_review":     bool(n.needs_review),
     }
 
 

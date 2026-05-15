@@ -186,6 +186,17 @@ export default function NewsTab({ token }) {
                   <span style={{ color:'var(--red)' }}>
                     {new Date(n.published_at).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' })}
                   </span>
+                  {n.needs_review && (
+                    <span style={{
+                      color:'var(--white)',
+                      background:'var(--red)',
+                      padding:'2px 8px',
+                      letterSpacing:'1px',
+                      fontSize:'10px'
+                    }}>
+                      Требует проверки
+                    </span>
+                  )}
                   {n.source && SOURCE_LABELS[n.source] && (
                     <span style={{ color:'var(--gray)', textTransform:'none', letterSpacing:'1px' }}>· {SOURCE_LABELS[n.source]}</span>
                   )}
