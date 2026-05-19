@@ -15,7 +15,7 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,ttf}'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/static\//, /^\/docs/],
+        navigateFallbackDenylist: [/^\/api\//, /^\/static\//, /^\/docs/, /^\/cv(\/|$)/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/taipan-tkd\.ru\/api\//,
