@@ -132,6 +132,7 @@ def _create_news_draft(
     body: str,
     created_by: int,
     needs_review: bool = False,
+    quality_notes: Optional[str] = None,
     **fk_kwargs,
 ) -> Optional[News]:
     """
@@ -141,6 +142,8 @@ def _create_news_draft(
     На исключении: log.exception, db.rollback, return None.
 
     needs_review: пометка «требует ручной проверки» от валидатора качества.
+    quality_notes: краткая причина авто-разметки для тренера
+        (например, "gpt_unavailable: Timeout" или "validator: rejected — ...").
     """
     try:
         news = News(
@@ -150,6 +153,7 @@ def _create_news_draft(
             source=source,
             created_by=created_by,
             needs_review=needs_review,
+            quality_notes=quality_notes,
             **fk_kwargs,
         )
         db.add(news)
@@ -177,16 +181,19 @@ def create_event_draft(
     body: str,
     created_by: int,
     needs_review: bool = False,
+    quality_notes: Optional[str] = None,
 ) -> Optional[News]:
     """
     Создать черновик News(status='draft', source=<source>) с привязкой
     к сущности по entity_id. FK выбирается автоматически по source.
     Дедуп: вернёт None, если черновик такого source для этой сущности
-    уже существует (поле needs_review существующего не трогается).
+    уже существует (поля needs_review и quality_notes существующего
+    не трогаются).
     Падения логирует и проглатывает (тоже None) — не валит основную
     операцию caller'а.
 
     needs_review: помечает черновик как «требует проверки тренером».
+    quality_notes: краткая причина авто-разметки (см. _create_news_draft).
     """
     fk_field = _FK_BY_SOURCE.get(source)
     if not fk_field:
@@ -219,6 +226,7 @@ def create_event_draft(
         body=body,
         created_by=created_by,
         needs_review=needs_review,
+        quality_notes=quality_notes,
         **{fk_field: entity_id},
     )
 
