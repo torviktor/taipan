@@ -203,6 +203,16 @@ export default function NewsTab({ token }) {
                   {n.competition_id && <span style={{ color:'var(--gray)' }}>· соревнование</span>}
                 </div>
                 <div style={{ fontWeight:600, color:'var(--white)', fontSize:'15px', marginBottom:4 }}>{n.title}</div>
+                {n.quality_notes && (
+                  <div style={{
+                    fontSize:'12px',
+                    color:'var(--gray-dim)',
+                    fontStyle:'italic',
+                    marginBottom:6,
+                  }}>
+                    {n.quality_notes}
+                  </div>
+                )}
                 <div style={{ color:'var(--gray)', fontSize:'13px', lineHeight:1.5 }}>
                   {n.body.slice(0, 120).replace(/\n/g, ' ')}{n.body.length > 120 ? '…' : ''}
                 </div>
