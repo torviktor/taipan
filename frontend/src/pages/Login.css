@@ -132,3 +132,39 @@
 }
 .login-footer a { color: var(--red); text-decoration: none; }
 .login-footer a:hover { text-decoration: underline; }
+
+/* ── Мобильная адаптация ──────────────────────────────────────────────── */
+/* На мобильных fixed-шапка ~96px высотой; центрирование .login-page
+   через align-items:center приводит к тому, что лого формы в момент
+   первой отрисовки оказывается ровно под шапкой и налезает на её
+   логотип/кнопку «Войти». Якорим контент к верху с padding-top под шапку.
+   Заголовок «ВХОД» 48px в узком viewport (Telegram in-app) слишком
+   крупный — уменьшаем. */
+@media (max-width: 600px) {
+  .login-page {
+    align-items: flex-start;
+    padding: 112px 16px 32px;
+  }
+  .login-box {
+    padding: 28px 20px;
+  }
+  .login-logo-img img {
+    height: 56px;
+    width: 56px;
+  }
+  .login-title {
+    font-size: 36px;
+    letter-spacing: 3px;
+    margin-bottom: 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  .login-page {
+    padding-top: 100px;
+  }
+  .login-title {
+    font-size: 30px;
+    letter-spacing: 2px;
+  }
+}
