@@ -2,6 +2,7 @@
 
 import logging
 import os
+from typing import Optional
 import requests
 from datetime import date
 from sqlalchemy.orm import Session
@@ -198,11 +199,14 @@ def create_competition_news_draft(comp_id: int, mode: str = 'auto') -> bool:
       'anons'  — принудительно preview (source='auto_competition_anons').
       'report' — принудительно past   (source='auto_competition_report').
 
-    Сначала пробует сгенерировать текст через YandexGPT; при любой ошибке
-    (timeout / 5xx / парсинг / etc.) — логирует и падает на статический
-    шаблон build_competition_anons / build_competition_report. Тот же
-    fallback срабатывает, если validate_generated_news вернул severity=hard
-    (плейсхолдеры, катастрофически короткий текст и т.п.).
+    Четыре исхода, каждый фиксируется в needs_review / quality_notes:
+      - GPT упал (timeout/5xx/parse) → шаблон + needs_review=True,
+        quality_notes='gpt_unavailable: <ExceptionClass>'.
+      - GPT отработал, validator HARD → СОХРАНЯЕМ GPT-текст
+        + needs_review=True, quality_notes='validator: rejected — ...'.
+      - GPT отработал, validator SOFT → GPT-текст + needs_review=True,
+        quality_notes='validator: needs review — ...'.
+      - GPT отработал, validator OK → GPT-текст без пометок.
 
     Возвращает True если черновик создан, False если дедуп заблокировал
     или соревнование не найдено.
@@ -231,12 +235,15 @@ def create_competition_news_draft(comp_id: int, mode: str = 'auto') -> bool:
         target_source = 'auto_competition_anons' if is_preview else 'auto_competition_report'
         author_id = get_manager_id(db)
 
+        needs_review = False
+        quality_notes: Optional[str] = None
+
         gpt_used = False
         try:
             result = generate_competition_news(comp_id)
             title, body = result["title"], result["body"]
             gpt_used = True
-        except Exception:
+        except Exception as e:
             log.exception(
                 "create_competition_news_draft: GPT failed for comp=%s mode=%s, falling back to template",
                 comp_id, mode,
@@ -245,8 +252,9 @@ def create_competition_news_draft(comp_id: int, mode: str = 'auto') -> bool:
                 title, body = build_competition_anons(comp)
             else:
                 title, body = build_competition_report(comp)
+            needs_review = True
+            quality_notes = f"gpt_unavailable: {type(e).__name__}"
 
-        needs_review = False
         if gpt_used:
             check_mode = 'anons' if is_preview else 'report'
             vr = validate_generated_news(
@@ -254,16 +262,15 @@ def create_competition_news_draft(comp_id: int, mode: str = 'auto') -> bool:
             )
             if vr.is_hard_fail:
                 log.warning(
-                    "create_competition_news_draft: GPT result rejected by validator "
-                    "(comp=%s mode=%s issues=%s), falling back to template",
+                    "create_competition_news_draft: GPT result flagged HARD by validator "
+                    "(comp=%s mode=%s issues=%s), keeping text with needs_review",
                     comp_id, mode, vr.issues,
                 )
-                if is_preview:
-                    title, body = build_competition_anons(comp)
-                else:
-                    title, body = build_competition_report(comp)
+                needs_review = True
+                quality_notes = ("validator: rejected — " + "; ".join(vr.issues))[:500]
             elif vr.needs_review:
                 needs_review = True
+                quality_notes = ("validator: needs review — " + "; ".join(vr.issues))[:500]
 
         draft = create_event_draft(
             db,
@@ -273,6 +280,7 @@ def create_competition_news_draft(comp_id: int, mode: str = 'auto') -> bool:
             body=body,
             created_by=author_id,
             needs_review=needs_review,
+            quality_notes=quality_notes,
         )
         return bool(draft)
     finally:
@@ -375,7 +383,10 @@ def generate_certification_news(cert_id: int) -> dict:
 
 def create_certification_news_draft(cert_id: int, mode: str = 'auto') -> bool:
     """Создать черновик новости об аттестации.
-    mode ∈ {'auto','anons','report'}. GPT с fallback на шаблон."""
+    mode ∈ {'auto','anons','report'}. GPT-выдача при HARD-валидации
+    сохраняется с пометкой needs_review + quality_notes; на исключение
+    GPT — fallback на шаблон с тем же признаком (см.
+    create_competition_news_draft)."""
     from app.models.certification import Certification
     from app.services.news_drafts import (
         build_certification_anons,
@@ -400,12 +411,15 @@ def create_certification_news_draft(cert_id: int, mode: str = 'auto') -> bool:
         target_source = 'auto_certification_anons' if is_preview else 'auto_certification_report'
         author_id = get_manager_id(db)
 
+        needs_review = False
+        quality_notes: Optional[str] = None
+
         gpt_used = False
         try:
             result = generate_certification_news(cert_id)
             title, body = result["title"], result["body"]
             gpt_used = True
-        except Exception:
+        except Exception as e:
             log.exception(
                 "create_certification_news_draft: GPT failed for cert=%s mode=%s, falling back to template",
                 cert_id, mode,
@@ -414,8 +428,9 @@ def create_certification_news_draft(cert_id: int, mode: str = 'auto') -> bool:
                 title, body = build_certification_anons(cert)
             else:
                 title, body = build_certification_report(cert)
+            needs_review = True
+            quality_notes = f"gpt_unavailable: {type(e).__name__}"
 
-        needs_review = False
         if gpt_used:
             check_mode = 'anons' if is_preview else 'report'
             vr = validate_generated_news(
@@ -423,16 +438,15 @@ def create_certification_news_draft(cert_id: int, mode: str = 'auto') -> bool:
             )
             if vr.is_hard_fail:
                 log.warning(
-                    "create_certification_news_draft: GPT result rejected by validator "
-                    "(cert=%s mode=%s issues=%s), falling back to template",
+                    "create_certification_news_draft: GPT result flagged HARD by validator "
+                    "(cert=%s mode=%s issues=%s), keeping text with needs_review",
                     cert_id, mode, vr.issues,
                 )
-                if is_preview:
-                    title, body = build_certification_anons(cert)
-                else:
-                    title, body = build_certification_report(cert)
+                needs_review = True
+                quality_notes = ("validator: rejected — " + "; ".join(vr.issues))[:500]
             elif vr.needs_review:
                 needs_review = True
+                quality_notes = ("validator: needs review — " + "; ".join(vr.issues))[:500]
 
         draft = create_event_draft(
             db,
@@ -442,6 +456,7 @@ def create_certification_news_draft(cert_id: int, mode: str = 'auto') -> bool:
             body=body,
             created_by=author_id,
             needs_review=needs_review,
+            quality_notes=quality_notes,
         )
         return bool(draft)
     finally:
@@ -548,7 +563,10 @@ def generate_camp_news(camp_id: int) -> dict:
 
 def create_camp_news_draft(camp_id: int, mode: str = 'auto') -> bool:
     """Создать черновик новости о сборах.
-    mode ∈ {'auto','anons','report'}. 'auto' определяется по camp.date_end."""
+    mode ∈ {'auto','anons','report'}. 'auto' определяется по camp.date_end.
+    GPT-выдача при HARD-валидации сохраняется с пометкой needs_review +
+    quality_notes; на исключение GPT — fallback на шаблон с тем же
+    признаком (см. create_competition_news_draft)."""
     from app.models.camp import Camp
     from app.services.news_drafts import (
         build_camp_anons,
@@ -573,12 +591,15 @@ def create_camp_news_draft(camp_id: int, mode: str = 'auto') -> bool:
         target_source = 'auto_camp_anons' if is_preview else 'auto_camp_report'
         author_id = get_manager_id(db)
 
+        needs_review = False
+        quality_notes: Optional[str] = None
+
         gpt_used = False
         try:
             result = generate_camp_news(camp_id)
             title, body = result["title"], result["body"]
             gpt_used = True
-        except Exception:
+        except Exception as e:
             log.exception(
                 "create_camp_news_draft: GPT failed for camp=%s mode=%s, falling back to template",
                 camp_id, mode,
@@ -587,8 +608,9 @@ def create_camp_news_draft(camp_id: int, mode: str = 'auto') -> bool:
                 title, body = build_camp_anons(camp)
             else:
                 title, body = build_camp_report(camp)
+            needs_review = True
+            quality_notes = f"gpt_unavailable: {type(e).__name__}"
 
-        needs_review = False
         if gpt_used:
             check_mode = 'anons' if is_preview else 'report'
             vr = validate_generated_news(
@@ -596,16 +618,15 @@ def create_camp_news_draft(camp_id: int, mode: str = 'auto') -> bool:
             )
             if vr.is_hard_fail:
                 log.warning(
-                    "create_camp_news_draft: GPT result rejected by validator "
-                    "(camp=%s mode=%s issues=%s), falling back to template",
+                    "create_camp_news_draft: GPT result flagged HARD by validator "
+                    "(camp=%s mode=%s issues=%s), keeping text with needs_review",
                     camp_id, mode, vr.issues,
                 )
-                if is_preview:
-                    title, body = build_camp_anons(camp)
-                else:
-                    title, body = build_camp_report(camp)
+                needs_review = True
+                quality_notes = ("validator: rejected — " + "; ".join(vr.issues))[:500]
             elif vr.needs_review:
                 needs_review = True
+                quality_notes = ("validator: needs review — " + "; ".join(vr.issues))[:500]
 
         draft = create_event_draft(
             db,
@@ -615,6 +636,7 @@ def create_camp_news_draft(camp_id: int, mode: str = 'auto') -> bool:
             body=body,
             created_by=author_id,
             needs_review=needs_review,
+            quality_notes=quality_notes,
         )
         return bool(draft)
     finally:
