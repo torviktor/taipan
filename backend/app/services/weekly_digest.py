@@ -12,6 +12,7 @@ from app.models.achievement import AthleteAchievement, ACHIEVEMENT_MAP, TIER_ORD
 from app.models.user import Athlete
 from app.models.competition import Competition, CompetitionResult
 from app.models.certification import Certification, CertificationResult
+from app.models.camp import Camp
 
 
 MSK = ZoneInfo("Europe/Moscow")
@@ -231,6 +232,19 @@ def collect_week_stats(
             "total_count": total_count,
         })
 
+    # ── Сборы на этой неделе (по дате окончания) ──────────────────────────
+    camps_list: list[dict] = []
+    camps = db.query(Camp).filter(
+        Camp.date_end >= week_start_date,
+        Camp.date_end <= week_end_date,
+    ).order_by(Camp.date_end.asc()).all()
+    for camp in camps:
+        camps_list.append({
+            "name": camp.name,
+            "date_start": camp.date_start,
+            "date_end": camp.date_end,
+        })
+
     # ── Дни рождения на следующей неделе ──────────────────────────────────
     next_week_start = week_end_date + timedelta(days=1)
     target_md = {
@@ -294,6 +308,7 @@ def collect_week_stats(
         "new_achievements_overflow": new_achievements_overflow,
         "competitions":              competitions_list,
         "certifications":            certifications_list,
+        "camps":                     camps_list,
         "birthdays_next_week":       birthdays_next_week,
         "rating_leaders":            rating_leaders,
     }
@@ -344,6 +359,10 @@ def build_weekly_digest(
             for a in stats["new_achievements"]:
                 lines.append(f"• {a['athlete_name']} — {a['achievement_name']}")
             sections.append("\n".join(lines))
+    else:
+        sections.append(
+            "НОВЫЕ ДОСТИЖЕНИЯ\nНа этой неделе достижений никто не получил."
+        )
 
     if stats["competitions"]:
         lines = ["СОРЕВНОВАНИЯ"]
@@ -357,6 +376,8 @@ def build_weekly_digest(
                     f"• {comp['name']} ({d:%d.%m}) — результаты будут добавлены позже."
                 )
         sections.append("\n".join(lines))
+    else:
+        sections.append("СОРЕВНОВАНИЯ\nНа этой неделе соревнований не было.")
 
     if stats["certifications"]:
         lines = ["АТТЕСТАЦИИ"]
@@ -367,6 +388,21 @@ def build_weekly_digest(
                 f"сдали {cert['passed_count']} из {cert['total_count']}."
             )
         sections.append("\n".join(lines))
+    else:
+        sections.append("АТТЕСТАЦИИ\nНа этой неделе аттестаций не было.")
+
+    if stats.get("camps"):
+        lines = ["СБОРЫ"]
+        for camp in stats["camps"]:
+            ds = camp["date_start"]
+            de = camp["date_end"]
+            if ds and ds != de:
+                lines.append(f"• {camp['name']} ({ds:%d.%m}–{de:%d.%m}).")
+            else:
+                lines.append(f"• {camp['name']} ({de:%d.%m}).")
+        sections.append("\n".join(lines))
+    else:
+        sections.append("СБОРЫ\nНа этой неделе сборов не было.")
 
     if stats["birthdays_next_week"]:
         lines = ["ДНИ РОЖДЕНИЯ НА СЛЕДУЮЩЕЙ НЕДЕЛЕ"]
@@ -379,6 +415,11 @@ def build_weekly_digest(
         for r in stats["rating_leaders"]:
             lines.append(f"• {r['athlete_name']} — +{r['rating_gained']}")
         sections.append("\n".join(lines))
+    else:
+        sections.append(
+            "ЛИДЕРЫ ПО ПРИРОСТУ РЕЙТИНГА\n"
+            "На этой неделе никто не набирал рейтинговые очки."
+        )
 
     if not sections:
         body = "На этой неделе значимых событий не было. Хорошей следующей!"
