@@ -18,6 +18,7 @@ class News(Base):
     source           = Column(String(32), nullable=True)
     is_published     = Column(Boolean, nullable=False, default=False)
     needs_review     = Column(Boolean, nullable=False, server_default='false', default=False)
+    quality_notes    = Column(Text, nullable=True)
     competition_id   = Column(Integer, ForeignKey("competitions.id",   ondelete="SET NULL"), nullable=True)
     certification_id = Column(Integer, ForeignKey("certifications.id", ondelete="SET NULL"), nullable=True)
     camp_id          = Column(Integer, ForeignKey("camps.id",          ondelete="SET NULL"), nullable=True)

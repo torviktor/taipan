@@ -52,6 +52,7 @@ def _out(n: News) -> dict:
         "status":           n.status,
         "source":           n.source,
         "needs_review":     bool(n.needs_review),
+        "quality_notes":    n.quality_notes,
     }
 
 
