@@ -19,10 +19,10 @@ const BELT_COLORS = {
 }
 
 const SLOT_LABEL = {
-  junior_boy:  'Лучший младшей группы',
-  junior_girl: 'Лучшая младшей группы',
-  senior_boy:  'Лучший старшей группы',
-  senior_girl: 'Лучшая старшей группы',
+  junior_boy:  'Лучший юный спортсмен сезона',
+  junior_girl: 'Лучшая юная спортсменка сезона',
+  senior_boy:  'Лучший спортсмен сезона',
+  senior_girl: 'Лучшая спортсменка сезона',
 }
 
 const SLOT_ORDER = ['junior_boy', 'junior_girl', 'senior_boy', 'senior_girl']

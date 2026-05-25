@@ -119,10 +119,10 @@ function PhotoPositioner({ item, onClose, onSave }) {
 // ── «Лучшие сезона» — секция админки ────────────────────────────────────────
 
 const SLOT_DEFS = [
-  { key: 'junior_boy',  label: 'Лучший младшей группы',  groups: ['Младшая группа (6–10 лет)'], gender: 'male' },
-  { key: 'junior_girl', label: 'Лучшая младшей группы',  groups: ['Младшая группа (6–10 лет)'], gender: 'female' },
-  { key: 'senior_boy',  label: 'Лучший старшей группы',  groups: ['Старшая группа (11+)', 'Взрослые (18+)'], gender: 'male' },
-  { key: 'senior_girl', label: 'Лучшая старшей группы',  groups: ['Старшая группа (11+)', 'Взрослые (18+)'], gender: 'female' },
+  { key: 'junior_boy',  label: 'Лучший юный спортсмен сезона',  groups: ['Младшая группа (6–10 лет)'], gender: 'male' },
+  { key: 'junior_girl', label: 'Лучшая юная спортсменка сезона', groups: ['Младшая группа (6–10 лет)'], gender: 'female' },
+  { key: 'senior_boy',  label: 'Лучший спортсмен сезона',        groups: ['Старшая группа (11+)', 'Взрослые (18+)'], gender: 'male' },
+  { key: 'senior_girl', label: 'Лучшая спортсменка сезона',      groups: ['Старшая группа (11+)', 'Взрослые (18+)'], gender: 'female' },
 ]
 
 function SeasonBestSection({ token }) {
