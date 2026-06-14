@@ -4,10 +4,13 @@
 Сезон хранится как int (год начала). Наружу формируется как "YYYY/YYYY".
 """
 
+import os
+import shutil
+import uuid
 from typing import Optional, List
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -22,6 +25,18 @@ from app.models.achievement import AthleteAchievement, ACHIEVEMENT_MAP
 from app.models.season_best import SeasonBestAthlete, ALL_SLOTS
 
 router = APIRouter(prefix="/season-best", tags=["Лучшие сезона"])
+
+UPLOAD_DIR = "/app/static/season-best"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+def _remove_photo_file(photo_url: Optional[str]) -> None:
+    """Удалить файл фото с диска по его публичному URL. Безопасно для None."""
+    if not photo_url:
+        return
+    path = f"/app/static{photo_url.replace('/static', '')}"
+    if os.path.exists(path):
+        os.remove(path)
 
 
 # ── Группы (синхронизировано с fees.py) ───────────────────────────────────────
@@ -61,6 +76,10 @@ class AssignBody(BaseModel):
     season:     Optional[int] = None  # если не указано — текущий сезон
 
 
+class PositionBody(BaseModel):
+    photo_position: str
+
+
 # ── Хелперы выдачи ────────────────────────────────────────────────────────────
 
 def _entry_out(e: SeasonBestAthlete) -> dict:
@@ -73,9 +92,11 @@ def _entry_out(e: SeasonBestAthlete) -> dict:
         "dan":          a.dan if a else None,
         "group":        a.group if a else None,
         "gender":       (a.gender.value if hasattr(a.gender, "value") else a.gender) if a else None,
-        "slot":         e.slot,
-        "season":       e.season,
-        "season_label": format_season_label(e.season),
+        "slot":           e.slot,
+        "season":         e.season,
+        "season_label":   format_season_label(e.season),
+        "photo_url":      e.photo_url,
+        "photo_position": e.photo_position or "0px 0px / 100%",
     }
 
 
@@ -317,8 +338,9 @@ def replace_slot(
         # Если это тот же спортсмен — ничего не делаем.
         if existing.athlete_id == candidate.id:
             return _entry_out(existing)
-        # Снимаем ачивку старому и удаляем запись.
+        # Снимаем ачивку старому, удаляем фото и запись.
         _revoke_legendary(db, existing.athlete_id, body.slot, season)
+        _remove_photo_file(existing.photo_url)
         db.delete(existing)
         db.flush()
 
@@ -349,5 +371,55 @@ def delete_slot(
     if not entry:
         raise HTTPException(404, "Запись не найдена")
     _revoke_legendary(db, entry.athlete_id, entry.slot, entry.season)
+    _remove_photo_file(entry.photo_url)
     db.delete(entry)
     db.commit()
+
+
+# ── Фото слота (manager/admin) ───────────────────────────────────────────────
+
+@router.post("/{entry_id}/photo")
+def upload_slot_photo(
+    entry_id: int,
+    file:     UploadFile = File(...),
+    db:       Session = Depends(get_db),
+    _:        User = Depends(require_manager),
+):
+    """Загрузить/заменить фото слота. Старый файл удаляется."""
+    entry = db.query(SeasonBestAthlete).filter(SeasonBestAthlete.id == entry_id).first()
+    if not entry:
+        raise HTTPException(404, "Запись не найдена")
+
+    # Удаляем старое фото
+    _remove_photo_file(entry.photo_url)
+
+    ext = os.path.splitext(file.filename)[1].lower() or ".jpg"
+    filename = f"{uuid.uuid4().hex}{ext}"
+    filepath = os.path.join(UPLOAD_DIR, filename)
+
+    with open(filepath, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    entry.photo_url = f"/static/season-best/{filename}"
+    if not entry.photo_position:
+        entry.photo_position = "0px 0px / 100%"
+    db.commit()
+    db.refresh(entry)
+    return _entry_out(entry)
+
+
+@router.patch("/{entry_id}/position")
+def update_slot_position(
+    entry_id: int,
+    body:     PositionBody,
+    db:       Session = Depends(get_db),
+    _:        User = Depends(require_manager),
+):
+    """Сохранить кадрирование фото слота (формат "Xpx Ypx / zoom%")."""
+    entry = db.query(SeasonBestAthlete).filter(SeasonBestAthlete.id == entry_id).first()
+    if not entry:
+        raise HTTPException(404, "Запись не найдена")
+    entry.photo_position = body.photo_position
+    db.commit()
+    db.refresh(entry)
+    return _entry_out(entry)

@@ -25,6 +25,11 @@ class SeasonBestAthlete(Base):
     slot       = Column(String(20), nullable=False)
     season     = Column(Integer, nullable=False, index=True)
 
+    # Фото слота — переиспользует рендер/кадрирование Зала Славы.
+    # photo_position в формате "Xpx Ypx / zoom%" (тот, что парсит ChampionImg).
+    photo_url      = Column(String(500), nullable=True)
+    photo_position = Column(String(50), nullable=True, default="0px 0px / 100%")
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
