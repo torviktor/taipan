@@ -138,6 +138,8 @@ function SeasonBestSection({ token }) {
   const [suggest,     setSuggest]     = useState({})
   const [confirm,     setConfirm]     = useState(null)
   const [msg,         setMsg]         = useState('')
+  const [uploading,   setUploading]   = useState(null)
+  const [posEditor,   setPosEditor]   = useState(null)
 
   useEffect(() => {
     loadAthletes()
@@ -270,6 +272,35 @@ function SeasonBestSection({ token }) {
     })
   }
 
+  const uploadSlotPhoto = async (entryId, file) => {
+    setUploading(entryId)
+    const fd = new FormData(); fd.append('file', file)
+    try {
+      const r = await apiFetch(`${API}/season-best/${entryId}/photo`, { method: 'POST', headers: h, body: fd })
+      if (r.ok) await loadSlotsFor(season)
+    } catch {}
+    setUploading(null)
+  }
+
+  const saveSlotPosition = async (entryId, position) => {
+    try {
+      const r = await apiFetch(`${API}/season-best/${entryId}/position`, {
+        method: 'PATCH', headers: hj,
+        body: JSON.stringify({ photo_position: position }),
+      })
+      if (r.ok) {
+        setSlots(prev => {
+          const next = { ...prev }
+          for (const k of Object.keys(next)) {
+            if (next[k]?.id === entryId) next[k] = { ...next[k], photo_position: position }
+          }
+          return next
+        })
+        setPosEditor(prev => prev && prev.id === entryId ? { ...prev, photo_position: position } : prev)
+      }
+    } catch {}
+  }
+
   if (season === null) return null
 
   const seasonOptions = [...seasons]
@@ -280,6 +311,16 @@ function SeasonBestSection({ token }) {
   return (
     <div style={{ marginBottom: 32, padding: 20, background: 'var(--dark2)', border: '1px solid var(--gray-dim)', borderRadius: 10 }}>
       {confirm && <ConfirmModal message={confirm.message} confirmText={confirm.confirmText} danger={confirm.danger} onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)}/>}
+      {posEditor && (
+        <PhotoPositioner
+          item={posEditor}
+          onClose={() => setPosEditor(null)}
+          onSave={async (posStr) => {
+            await saveSlotPosition(posEditor.id, posStr)
+            setPosEditor(null)
+          }}
+        />
+      )}
 
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12, marginBottom:16 }}>
         <h3 style={{ fontFamily:'Bebas Neue', fontSize:'1.5rem', letterSpacing:'0.06em', color:'var(--white)', margin:0 }}>
@@ -308,8 +349,22 @@ function SeasonBestSection({ token }) {
                   {def.label}
                 </div>
                 {entry && (
-                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
                     <span style={{ color:'var(--white)', fontSize:'0.9rem' }}>{entry.athlete_name}</span>
+                    <label className="btn-outline" style={{ padding:'4px 12px', fontSize:'12px', cursor:'pointer' }}>
+                      {uploading === entry.id ? 'Загрузка...' : (entry.photo_url ? 'Заменить фото' : '+ Фото')}
+                      <input type="file" accept="image/*" style={{ display:'none' }}
+                        onChange={e => e.target.files[0] && uploadSlotPhoto(entry.id, e.target.files[0])}/>
+                    </label>
+                    {entry.photo_url && (
+                      <button className="btn-outline" style={{ padding:'4px 12px', fontSize:'12px' }}
+                        onClick={() => setPosEditor({
+                          id:             entry.id,
+                          full_name:      entry.athlete_name,
+                          photo_url:      entry.photo_url,
+                          photo_position: entry.photo_position,
+                        })}>Кадр</button>
+                    )}
                     <button className="btn-outline" style={{ padding:'4px 12px', fontSize:'12px' }}
                       onClick={() => removeEntry(entry)}>Снять</button>
                   </div>
