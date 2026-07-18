@@ -49,5 +49,6 @@ jobs:
 
             # 4. Чистка dangling-образов
             docker image prune -f
+            docker builder prune -f
 
             echo "Деплой завершён"
