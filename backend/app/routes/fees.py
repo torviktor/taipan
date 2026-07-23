@@ -724,6 +724,74 @@ def list_periods(
     return [_period_out(p) for p in items]
 
 
+# ── Общие хелперы для init/add ────────────────────────────────────────────────
+
+def _in_group_scope(athlete, mg) -> bool:
+    if not mg:
+        return True
+    if not athlete:
+        return False
+    if mg == 'junior':
+        return athlete.group in JUNIOR_GROUPS
+    if mg == 'senior':
+        return athlete.group in SENIOR_GROUPS
+    return True
+
+
+def _find_roster_source(db, year, month, mg):
+    """
+    Ищет последний предыдущий (period_year, period_month), в котором
+    есть хотя бы одна запись AthleteFeePeriod в скоупе менеджера.
+    Возвращает список athlete_id из этого периода, либо None если
+    в истории (для этого скоупа) вообще ничего нет.
+    """
+    past_periods = (
+        db.query(AthleteFeePeriod.period_year, AthleteFeePeriod.period_month)
+        .filter(
+            tuple_(AthleteFeePeriod.period_year, AthleteFeePeriod.period_month)
+                < tuple_(year, month)
+        )
+        .distinct()
+        .order_by(AthleteFeePeriod.period_year.desc(), AthleteFeePeriod.period_month.desc())
+        .all()
+    )
+    for py, pm in past_periods:
+        period_athlete_ids = [
+            aid for (aid,) in db.query(AthleteFeePeriod.athlete_id).filter(
+                AthleteFeePeriod.period_year  == py,
+                AthleteFeePeriod.period_month == pm,
+            ).all()
+        ]
+        period_athletes = db.query(Athlete).filter(Athlete.id.in_(period_athlete_ids)).all()
+        if any(_in_group_scope(a, mg) for a in period_athletes):
+            return period_athlete_ids
+    return None
+
+
+def _prev_is_budget(db, athlete_id, year, month) -> bool:
+    row = (
+        db.query(AthleteFeePeriod.is_budget)
+        .filter(
+            AthleteFeePeriod.athlete_id == athlete_id,
+            tuple_(AthleteFeePeriod.period_year, AthleteFeePeriod.period_month)
+                < tuple_(year, month),
+        )
+        .order_by(AthleteFeePeriod.period_year.desc(), AthleteFeePeriod.period_month.desc())
+        .first()
+    )
+    return bool(row[0]) if row else False
+
+
+def _calc_debt(db, athlete_id, fee_amount) -> int:
+    unpaid_frozen = db.query(AthleteFeePeriod).filter(
+        AthleteFeePeriod.athlete_id == athlete_id,
+        AthleteFeePeriod.is_frozen  == True,
+        AthleteFeePeriod.paid       == False,
+        AthleteFeePeriod.is_budget  == False,
+    ).count()
+    return unpaid_frozen * fee_amount
+
+
 # ── POST /fees/periods/init ───────────────────────────────────────────────────
 
 @router.post("/periods/init")
@@ -744,18 +812,42 @@ def init_periods(
             "Используйте режим истории для просмотра."
         )
 
+    mg = current_user.manager_group
+
+    # Если в этом месяце в скоупе менеджера уже есть хотя бы одна запись —
+    # ничего не создаём (init идемпотентен, состав уже зафиксирован).
+    existing_ids = [
+        aid for (aid,) in db.query(AthleteFeePeriod.athlete_id).filter(
+            AthleteFeePeriod.period_year  == year,
+            AthleteFeePeriod.period_month == month,
+        ).all()
+    ]
+    if existing_ids:
+        existing_athletes = db.query(Athlete).filter(Athlete.id.in_(existing_ids)).all()
+        if any(_in_group_scope(a, mg) for a in existing_athletes):
+            return {"created": 0, "skipped_existing": True}
+
     cfg = db.query(FeeConfig).first()
     fee_amount = cfg.fee_amount if cfg else 2000
 
     prev_year  = year if month > 1 else year - 1
     prev_month = month - 1 if month > 1 else 12
 
-    athletes = db.query(Athlete).filter(Athlete.is_archived == False).all()
-    mg = current_user.manager_group
-    if mg == 'junior':
-        athletes = [a for a in athletes if a.group in JUNIOR_GROUPS]
-    elif mg == 'senior':
-        athletes = [a for a in athletes if a.group in SENIOR_GROUPS]
+    # Состав нового месяца: наследуем из последнего предыдущего периода
+    # с записями в скоупе. Если истории вообще нет — берём всех неархивных
+    # спортсменов группы (прежнее поведение).
+    roster_ids = _find_roster_source(db, year, month, mg)
+    if roster_ids is not None:
+        athletes = db.query(Athlete).filter(
+            Athlete.id.in_(roster_ids),
+            Athlete.is_archived == False,
+        ).all()
+    else:
+        athletes = db.query(Athlete).filter(Athlete.is_archived == False).all()
+        if mg == 'junior':
+            athletes = [a for a in athletes if a.group in JUNIOR_GROUPS]
+        elif mg == 'senior':
+            athletes = [a for a in athletes if a.group in SENIOR_GROUPS]
 
     # UPDATE предыдущего месяца фиксируем отдельной транзакцией:
     # дальше в цикле возможен rollback по IntegrityError, и он не должен
@@ -828,6 +920,84 @@ def init_periods(
             conflicts += 1
 
     return {"created": created, "skipped": skipped, "conflicts": conflicts}
+
+
+# ── POST /fees/periods/add ────────────────────────────────────────────────────
+
+class AddPeriodBody(BaseModel):
+    athlete_id: int
+    year:       int
+    month:      int
+
+
+@router.post("/periods/add", status_code=201)
+def add_period(
+    body:         AddPeriodBody,
+    db:           Session = Depends(get_db),
+    current_user: User = Depends(require_manager),
+):
+    today = date_type.today()
+    if (body.year, body.month) < (today.year, today.month):
+        raise HTTPException(
+            400,
+            "Инициализация прошлых периодов запрещена. "
+            "Используйте режим истории для просмотра."
+        )
+
+    athlete = db.query(Athlete).filter(Athlete.id == body.athlete_id).first()
+    if not athlete:
+        raise HTTPException(404, "Спортсмен не найден")
+    if athlete.is_archived:
+        raise HTTPException(400, "Спортсмен в архиве")
+
+    mg = current_user.manager_group
+    if not _in_group_scope(athlete, mg):
+        raise HTTPException(403, "Спортсмен вне вашей группы")
+
+    cfg = db.query(FeeConfig).first()
+    fee_amount = cfg.fee_amount if cfg else 2000
+
+    p = AthleteFeePeriod(
+        athlete_id=athlete.id,
+        period_year=body.year,
+        period_month=body.month,
+        is_budget=_prev_is_budget(db, athlete.id, body.year, body.month),
+        debt=_calc_debt(db, athlete.id, fee_amount),
+    )
+    db.add(p)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Спортсмен уже в списке")
+    db.refresh(p)
+    return _period_out(p)
+
+
+# ── DELETE /fees/periods/{period_id} ─────────────────────────────────────────
+
+@router.delete("/periods/{period_id}")
+def delete_period(
+    period_id:    int,
+    db:           Session = Depends(get_db),
+    current_user: User = Depends(require_manager),
+):
+    p = db.query(AthleteFeePeriod).options(joinedload(AthleteFeePeriod.athlete)).filter(
+        AthleteFeePeriod.id == period_id
+    ).first()
+    if not p:
+        raise HTTPException(404, "Период не найден")
+
+    mg = current_user.manager_group
+    if not _in_group_scope(p.athlete, mg):
+        raise HTTPException(403, "Недостаточно прав")
+
+    if (p.period_year, p.period_month) < (date_type.today().year, date_type.today().month):
+        raise HTTPException(400, "Нельзя изменять прошлые периоды")
+
+    db.delete(p)
+    db.commit()
+    return {"ok": True}
 
 
 # ── PATCH /fees/periods/{period_id} ──────────────────────────────────────────
