@@ -8,6 +8,12 @@ const MONTHS_RU = ['', 'Январь', 'Февраль', 'Март', 'Апрел
 
 const GROUP_LABELS = { junior: 'Младшая', senior: 'Старшая' }
 
+// Реальные значения Athlete.group (= Athlete.auto_group на бэкенде).
+// Держать в синхроне с JUNIOR_GROUPS/SENIOR_GROUPS из backend/app/routes/fees.py.
+const JUNIOR_GROUP_VALUES = ['Младшая группа (6–10 лет)']
+const SENIOR_GROUP_VALUES = ['Старшая группа (11+)']
+const ADULTS_GROUP_VALUES = ['Взрослые (18+)']
+
 const thStyle = {
   padding: '8px 12px',
   color: 'var(--gray)',
@@ -49,6 +55,10 @@ export default function FeesTab({ token, role }) {
   const [showHistory, setShowHistory] = useState(false)
   const [historyData, setHistoryData] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [allAthletes,   setAllAthletes]   = useState([])
+  const [showAddModal,  setShowAddModal]  = useState(false)
+  const [addSearch,     setAddSearch]     = useState('')
+  const [adding,        setAdding]        = useState(false)
 
   const h  = { Authorization: `Bearer ${token}` }
   const hj = { ...h, 'Content-Type': 'application/json' }
@@ -65,14 +75,42 @@ export default function FeesTab({ token, role }) {
         .then(d => { if (d?.manager_group) setGroupFilter(d.manager_group) })
         .catch(() => {})
     }
+
+    // Полный список спортсменов клуба — тот же эндпоинт, что используют
+    // другие вкладки (CampsTab/CompetitionsTab), для модалки «+ Спортсмен».
+    apiFetch(`${API}/users/athletes`, { headers: h })
+      .then(r => r.ok ? r.json() : [])
+      .then(setAllAthletes)
+      .catch(() => {})
   }, [])
+
+  // Только перезагрузка списка за месяц, без init — используется после
+  // add/delete, чтобы удалённый спортсмен не возвращался в рамках сессии.
+  const reloadPeriods = async () => {
+    setLoading(true)
+    try {
+      const res = await apiFetch(
+        `${API}/fees/periods?year=${year}&month=${month}`,
+        { headers: h }
+      )
+      if (res.ok) {
+        const data = await res.json()
+        setPeriods(data)
+      } else {
+        setMsg('Ошибка загрузки данных')
+      }
+    } catch (e) {
+      console.error('reloadPeriods error:', e)
+    }
+    setLoading(false)
+  }
 
   const loadAndInit = async () => {
     setLoading(true)
     setMsg('')
     try {
-      // Backend идемпотентен: если записи уже есть — пропустит, если нет — создаст.
-      // Это гарантирует что недавно добавленные спортсмены попадут в текущий период.
+      // Backend идемпотентен: если записи уже есть — пропустит, если нет — создаст
+      // (наследуя состав из последнего периода с записями).
       const initRes = await apiFetch(
         `${API}/fees/periods/init?year=${year}&month=${month}`,
         { method: 'POST', headers: h }
@@ -102,6 +140,56 @@ export default function FeesTab({ token, role }) {
   }
 
   useEffect(() => { loadAndInit() }, [year, month])
+
+  const deletePeriod = async (p) => {
+    if (!window.confirm(`Убрать ${p.full_name} из списка за этот месяц?`)) return
+    try {
+      const r = await apiFetch(`${API}/fees/periods/${p.id}`, {
+        method: 'DELETE', headers: h,
+      })
+      if (r.ok) {
+        await reloadPeriods()
+      } else {
+        const t = await r.text()
+        setMsg('Ошибка удаления: ' + t)
+      }
+    } catch {}
+  }
+
+  const addAthleteToMonth = async (a) => {
+    setAdding(true)
+    try {
+      const r = await apiFetch(`${API}/fees/periods/add`, {
+        method: 'POST', headers: hj,
+        body: JSON.stringify({ athlete_id: a.id, year, month }),
+      })
+      if (r.ok) {
+        setShowAddModal(false)
+        setAddSearch('')
+        await reloadPeriods()
+      } else {
+        const t = await r.text()
+        setMsg('Ошибка добавления: ' + t)
+      }
+    } catch {}
+    setAdding(false)
+  }
+
+  const notInList = useMemo(() => {
+    const currentIds = new Set((periods || []).map(p => p.athlete_id))
+    const q = addSearch.trim().toLowerCase()
+    return allAthletes
+      .filter(a => !currentIds.has(a.id))
+      .filter(a => {
+        if (groupFilter === 'all')    return true
+        if (groupFilter === 'junior') return JUNIOR_GROUP_VALUES.includes(a.group)
+        if (groupFilter === 'senior') return SENIOR_GROUP_VALUES.includes(a.group)
+        if (groupFilter === 'adults') return ADULTS_GROUP_VALUES.includes(a.group)
+        return true
+      })
+      .filter(a => !q || (a.full_name || '').toLowerCase().includes(q))
+      .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'ru'))
+  }, [allAthletes, periods, groupFilter, addSearch])
 
   const saveConfig = async () => {
     try {
@@ -318,6 +406,11 @@ export default function FeesTab({ token, role }) {
             />
           )}
         </td>
+        <td style={{...tdStyle, textAlign:'center'}}>
+          {!(role === 'admin' || isPast) && (
+            <button className="td-btn td-btn-del" onClick={() => deletePeriod(p)}>✕</button>
+          )}
+        </td>
       </tr>
     )
   }
@@ -332,6 +425,7 @@ export default function FeesTab({ token, role }) {
         <th style={thStyle}>Оплачено</th>
         <th style={thStyle}>Долг</th>
         <th style={{...thStyle, textAlign:'left'}}>Комментарий</th>
+        <th style={thStyle}></th>
       </tr>
     </thead>
   )
@@ -473,13 +567,24 @@ export default function FeesTab({ token, role }) {
         <span style={{color:'var(--gray)', fontSize:'0.95rem'}}>
           (взносы за <strong style={{color:'var(--white)'}}>{MONTHS_RU[billingMonth].toLowerCase()} {billingYear}</strong>)
         </span>
-        <button
-          onClick={openHistory}
-          className="btn-outline"
-          style={{padding:'6px 14px', marginLeft:'auto', fontSize:'0.85rem'}}
-        >
-          История
-        </button>
+        <div style={{ display:'flex', gap:10, marginLeft:'auto' }}>
+          {!(role === 'admin' || isPast) && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="btn-outline"
+              style={{padding:'6px 14px', fontSize:'0.85rem'}}
+            >
+              + Спортсмен
+            </button>
+          )}
+          <button
+            onClick={openHistory}
+            className="btn-outline"
+            style={{padding:'6px 14px', fontSize:'0.85rem'}}
+          >
+            История
+          </button>
+        </div>
       </div>
 
       {msg && <div style={{color:'#6cba6c', marginBottom:12, fontSize:'0.88rem'}}>{msg}</div>}
@@ -584,6 +689,45 @@ export default function FeesTab({ token, role }) {
               <button className="btn-outline" onClick={() => setShowHistory(false)}>
                 Закрыть
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модалка «+ Спортсмен» */}
+      {showAddModal && (
+        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <h3 style={{fontFamily:'Bebas Neue', fontSize:'1.4rem', letterSpacing:'0.06em', color:'var(--white)', marginTop:0}}>
+              Добавить спортсмена
+              <span style={{color:'var(--gray)', fontSize:'0.8rem', fontFamily:'inherit', letterSpacing:'normal', marginLeft:10}}>
+                Вне списка: {notInList.length}
+              </span>
+            </h3>
+            <input
+              type="text"
+              className="modal-input"
+              placeholder="Поиск по имени..."
+              value={addSearch}
+              onChange={e => setAddSearch(e.target.value)}
+              style={{marginBottom:12}}
+            />
+            {notInList.length === 0
+              ? <p style={{ color:'var(--gray)' }}>Все спортсмены группы уже в списке.</p>
+              : notInList.map(a => (
+                  <div
+                    key={a.id}
+                    className="att-athlete-row absent"
+                    style={{ cursor: adding ? 'default' : 'pointer', opacity: adding ? 0.5 : 1 }}
+                    onClick={() => !adding && addAthleteToMonth(a)}
+                  >
+                    <div className="att-athlete-name">{a.full_name}</div>
+                    <div className="att-athlete-age">{a.age} лет · {a.group || a.auto_group || '—'}</div>
+                  </div>
+                ))
+            }
+            <div className="modal-btns-row" style={{marginTop:12}}>
+              <button className="btn-outline" onClick={() => setShowAddModal(false)}>Закрыть</button>
             </div>
           </div>
         </div>
