@@ -14,24 +14,45 @@ logger = logging.getLogger(__name__)
 
 BOT_USERNAME = "taipan_tkd_bot"
 
+# Канал до api.telegram.org с этого сервера нестабилен: TCP на 443
+# устанавливается, а TLS часто рвётся — по замерам 17.08.2026 проходила
+# примерно каждая третья попытка. Одна попытка означала, что бот молчит в
+# ответ на две команды из трёх: пользователь пишет /start и не получает
+# ничего, хотя обработчик отработал и данные в БД записаны.
+# Число попыток намеренно небольшое: Telegram ждёт ответ на вебхук не дольше
+# минуты, иначе повторит апдейт и пользователь получит дубли.
+TELEGRAM_SEND_ATTEMPTS = 3
+TELEGRAM_SEND_DELAY    = 2      # база паузы между попытками, секунды
+TELEGRAM_SEND_TIMEOUT  = 10
+
 # ─── Telegram Bot ─────────────────────────────────────────────────────────────
 
 async def send_telegram_message(chat_id: str, text: str) -> bool:
-    """Отправить сообщение в Telegram."""
+    """Отправить сообщение в Telegram. С повторами — канал ненадёжен."""
     token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    try:
-        import httpx
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        async with httpx.AsyncClient() as client:
-            r = await client.post(url, json={
-                "chat_id":    chat_id,
-                "text":       text,
-                "parse_mode": "HTML",
-            })
-            return r.status_code == 200
-    except Exception as e:
-        logger.error(f"Telegram error: {e}")
-        return False
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+
+    last = ""
+    for attempt in range(1, TELEGRAM_SEND_ATTEMPTS + 1):
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                r = await client.post(url, json=payload, timeout=TELEGRAM_SEND_TIMEOUT)
+            if r.status_code == 200:
+                if attempt > 1:
+                    logger.info("Telegram: доставлено с попытки %s", attempt)
+                return True
+            last = f"HTTP {r.status_code}: {r.text[:200]}"
+        except Exception as e:
+            # Пустой str(e) у httpx.ConnectError раньше давал бесполезное
+            # «Telegram error: » — поэтому логируем и тип исключения.
+            last = f"{type(e).__name__}: {e}"
+        if attempt < TELEGRAM_SEND_ATTEMPTS:
+            await asyncio.sleep(TELEGRAM_SEND_DELAY * attempt)
+
+    logger.error("Telegram: не доставлено за %s попыток — %s", TELEGRAM_SEND_ATTEMPTS, last)
+    return False
 
 
 async def send_telegram_photo(chat_id: str, photo_url: str, caption: str) -> bool:
