@@ -151,9 +151,20 @@ async def process_telegram_update(update: dict):
                         f"которым вы зарегистрированы на сайте taipan-tkd.ru"
                     )
                 else:
-                    if subscriber:
-                        subscriber.user_id = user.id
-                        db.commit()
+                    # Строки подписчика может не быть: человек начал сразу с
+                    # /link, минуя /start. Раньше привязка в этом случае молча
+                    # пропускалась (`if subscriber:`), а ответ всё равно уходил
+                    # успешный — снаружи неотличимо от «сработало».
+                    if not subscriber:
+                        subscriber = TelegramSubscriber(
+                            telegram_id = chat_id,
+                            username    = username,
+                            full_name   = full_name,
+                            subscribed  = True,
+                        )
+                        db.add(subscriber)
+                    subscriber.user_id = user.id
+                    db.commit()
 
                     athletes = db.query(Athlete).filter(
                         Athlete.user_id == user.id,
