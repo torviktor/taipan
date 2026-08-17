@@ -56,6 +56,11 @@ def attach_file_handler(logger) -> None:
     """
     if _handler is None:
         return
+    # Повторяем и здесь: Celery перенастраивает логирование после нашего
+    # setup_file_logging и может вернуть httpx на INFO, а с ним — токен бота
+    # в тексте URL.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
     if _handler not in logger.handlers:
         logger.addHandler(_handler)
     if logger.level > logging.INFO or logger.level == logging.NOTSET:
@@ -83,6 +88,13 @@ def setup_file_logging(service: str) -> None:
         # оставляет корневой логгер на WARNING, и успешные ретраи терялись.
         if root.level > logging.INFO or root.level == logging.NOTSET:
             root.setLevel(logging.INFO)
+        # httpx на INFO печатает URL целиком, а у Telegram токен зашит прямо в
+        # путь: .../bot<TOKEN>/sendMessage. В эфемерном логе контейнера это
+        # почти не жило, но файл на диске хранится 30 суток — токен туда
+        # попадать не должен.
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("httpcore").setLevel(logging.WARNING)
+
         _configured = True
         root.info("logging: файловый лог включён — %s", path)
     except Exception as e:
