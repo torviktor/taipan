@@ -288,20 +288,19 @@ def send_notifications(
             type=NotificationType.certification,
             title=title,
             body=body,
-            link_id=cert_id
+            link_id=cert_id,
+            tg_status="pending",
         )
         db.add(notif)
-        telegram_notifs.append((r.athlete.user_id, title, body))
         sent += 1
 
     cert.notify_sent = True
     db.commit()
 
-    from app.services.notifications import send_telegram_to_user
-    for uid, tl, bd in telegram_notifs:
-        send_telegram_to_user(uid, tl, bd, db)
+    from app.services.notifications import enqueue_telegram_delivery
+    enqueue_telegram_delivery()
 
-    return {"sent": sent}
+    return {"sent": sent, "queued": True}
 
 
 # ── Уведомления ───────────────────────────────────────────────────────────────

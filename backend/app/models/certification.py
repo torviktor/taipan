@@ -76,4 +76,13 @@ class Notification(Base):
     response  = Column(String(20), nullable=True) # "going" | "not_going" | null — ответ на опрос
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    # Доставка в Telegram. NULL — уведомление не предназначено для отправки
+    # (создано, например, недельным дайджестом и живёт только в кабинете).
+    # "pending" — поставлено в очередь, разбирает app.tasks.deliver_telegram.
+    # Дальше: "sent" | "failed" | "no_account" (у пользователя нет привязки).
+    # Раньше результат отправки выбрасывался, и узнать, дошло ли уведомление,
+    # было нельзя в принципе.
+    tg_status = Column(String(20), nullable=True, index=True)
+    tg_error  = Column(Text, nullable=True)      # текст последней ошибки
+
     user = relationship("User", foreign_keys=[user_id])

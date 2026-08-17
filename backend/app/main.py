@@ -1,3 +1,12 @@
+from app.core.logging_setup import setup_file_logging
+from app.core.net import force_ipv4
+
+# До импорта прикладных модулей: файловый лог должен подхватить в том числе
+# сообщения, возникающие при старте, а ограничение резолвинга — подействовать
+# на все исходящие соединения процесса.
+setup_file_logging("backend")
+force_ipv4()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse

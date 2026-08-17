@@ -1,5 +1,13 @@
 # backend/app/celery_app.py
 
+from app.core.logging_setup import setup_file_logging
+from app.core.net import force_ipv4
+
+# Тот же процесс рассылает уведомления, поэтому и файловый лог, и ограничение
+# резолвинга нужны здесь не меньше, чем в веб-процессе.
+setup_file_logging("celery")
+force_ipv4()
+
 from celery import Celery
 from celery.schedules import crontab
 import os
@@ -60,8 +68,65 @@ celery_app.conf.update(
             "task":     "app.tasks.recompute_achievements",
             "schedule": crontab(hour=10, minute=0),
         },
+        # Подбор уведомлений, оставшихся в pending: страховка на случай, если
+        # задачу не поставили (перезапуск воркера, потеря сообщения в Redis).
+        "deliver-telegram": {
+            "task":     "app.tasks.deliver_telegram",
+            "schedule": crontab(minute="*/10"),
+        },
     },
 )
+
+
+@celery_app.task(name="app.tasks.deliver_telegram")
+def deliver_telegram_task(limit: int = 500):
+    """Разослать уведомления, помеченные tg_status='pending'.
+
+    Вынесено из HTTP-обработчиков: раньше рассылка шла синхронным циклом прямо
+    в роуте, и при 30 получателях по 18 с в худшем случае тренер получал 504 от
+    nginx (proxy_read_timeout 60 с) на середине рассылки.
+
+    Строки забираются по одной с FOR UPDATE SKIP LOCKED: параллельный воркер
+    пропустит занятую и не отправит её второй раз.
+    """
+    from app.core.database import SessionLocal
+    from app.models.certification import Notification
+    from app.services.notifications import send_telegram_to_user_result
+    import logging
+    log = logging.getLogger(__name__)
+
+    db = SessionLocal()
+    stats = {"sent": 0, "failed": 0, "no_account": 0}
+    try:
+        for _ in range(limit):
+            n = (
+                db.query(Notification)
+                .filter(Notification.tg_status == "pending")
+                .order_by(Notification.id)
+                .limit(1)
+                .with_for_update(skip_locked=True)
+                .first()
+            )
+            if not n:
+                break
+            status, err = send_telegram_to_user_result(n.user_id, n.title, n.body, db)
+            n.tg_status = status
+            n.tg_error  = err or None
+            stats[status] = stats.get(status, 0) + 1
+            db.commit()   # снимает блокировку строки
+
+        if any(stats.values()):
+            log.info(
+                "deliver_telegram: доставлено %s, не доставлено %s, без привязки %s",
+                stats["sent"], stats["failed"], stats["no_account"],
+            )
+        return stats
+    except Exception:
+        db.rollback()
+        log.exception("deliver_telegram: задача упала")
+        raise
+    finally:
+        db.close()
 
 
 @celery_app.task(name="app.tasks.send_reminders")

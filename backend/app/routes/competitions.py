@@ -520,17 +520,17 @@ def notify_competition(comp_id: int, db: Session = Depends(get_db), _: User = De
             body=body,
             link_id=comp_id,
             link_type="competition",
+            tg_status="pending",
         )
         db.add(notif)
         sent += 1
 
     db.commit()
 
-    from app.services.notifications import send_telegram_to_user
-    for u in users:
-        send_telegram_to_user(u.id, title, body, db)
+    from app.services.notifications import enqueue_telegram_delivery
+    enqueue_telegram_delivery()
 
-    return {"sent": sent}
+    return {"sent": sent, "queued": True}
 
 
 @router.post("/{comp_id}/respond")

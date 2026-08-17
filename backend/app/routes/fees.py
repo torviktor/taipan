@@ -163,12 +163,11 @@ def generate_monthly_fees(db: Session, notify: bool = True) -> int:
                     type="fee",
                     title=notif_title,
                     body=notif_body,
+                    tg_status="pending",
                 ))
         db.commit()
-        from app.services.notifications import send_telegram_to_user
-        for athlete in athletes:
-            if athlete.id in new_ids_set and athlete.user_id:
-                send_telegram_to_user(athlete.user_id, notif_title, notif_body, db)
+        from app.services.notifications import enqueue_telegram_delivery
+        enqueue_telegram_delivery()
 
     return len(new_athlete_ids)
 
@@ -290,14 +289,15 @@ def pay_fee(
             type="fee",
             title=notif_title,
             body=notif_body,
+            tg_status="pending",
         ))
-        fee_notif_data = (athlete.user_id, notif_title, notif_body)
+        fee_notif_data = True
 
     db.commit()
     db.refresh(fee)
     if fee_notif_data:
-        from app.services.notifications import send_telegram_to_user
-        send_telegram_to_user(*fee_notif_data, db)
+        from app.services.notifications import enqueue_telegram_delivery
+        enqueue_telegram_delivery()
     return fee_to_dict(fee)
 
 
@@ -502,7 +502,6 @@ def notify_overdue(db: Session) -> int:
     )
 
     sent = 0
-    tg_notifs = []
     for fee in fees:
         athlete = fee.athlete
         if not athlete or not athlete.user_id:
@@ -516,14 +515,13 @@ def notify_overdue(db: Session) -> int:
             title="Просрочен взнос",
             body=notif_body,
             link_id=fee.id,
+            tg_status="pending",
         ))
-        tg_notifs.append((athlete.user_id, "Просрочен взнос", notif_body))
         sent += 1
 
     db.commit()
-    from app.services.notifications import send_telegram_to_user
-    for uid, tl, bd in tg_notifs:
-        send_telegram_to_user(uid, tl, bd, db)
+    from app.services.notifications import enqueue_telegram_delivery
+    enqueue_telegram_delivery()
     return sent
 
 
@@ -551,7 +549,6 @@ def notify_overdue_manual(
     )
 
     sent = 0
-    tg_notifs = []
     for fee in fees:
         athlete = fee.athlete
         if not athlete or not athlete.user_id:
@@ -572,15 +569,14 @@ def notify_overdue_manual(
             title="Напоминание о взносе",
             body=body,
             link_id=fee.id,
+            tg_status="pending",
         ))
-        tg_notifs.append((athlete.user_id, "Напоминание о взносе", body))
         sent += 1
 
     db.commit()
-    from app.services.notifications import send_telegram_to_user
-    for uid, tl, bd in tg_notifs:
-        send_telegram_to_user(uid, tl, bd, db)
-    return {"sent": sent}
+    from app.services.notifications import enqueue_telegram_delivery
+    enqueue_telegram_delivery()
+    return {"sent": sent, "queued": True}
 
 
 # ── Счётчик просроченных взносов ──────────────────────────────────────────────
@@ -1079,7 +1075,6 @@ def save_and_notify(
             .all()
         )
         notify_periods = _apply_group_filter(notify_periods, current_user.manager_group)
-        tg_notifs = []
         for p in notify_periods:
             athlete = p.athlete
             if not athlete or not athlete.user_id:
@@ -1098,15 +1093,14 @@ def save_and_notify(
                 type="fee",
                 title=notif_title,
                 body=body_text,
+                tg_status="pending",
             ))
-            tg_notifs.append((athlete.user_id, notif_title, body_text))
             notified += 1
         db.commit()
-        from app.services.notifications import send_telegram_to_user
-        for uid, tl, bd in tg_notifs:
-            send_telegram_to_user(uid, tl, bd, db)
+        from app.services.notifications import enqueue_telegram_delivery
+        enqueue_telegram_delivery()
 
-    return {"saved": saved, "notified": notified}
+    return {"saved": saved, "notified": notified, "queued": True}
 
 
 # ── GET /fees/periods/athlete/{athlete_id} ────────────────────────────────────

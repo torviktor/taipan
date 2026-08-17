@@ -145,10 +145,31 @@ async def notify_all_subscribers(db, message: str):
     return sent
 
 
-def send_telegram_to_user(user_id: int, title: str, body: str, db) -> bool:
+def enqueue_telegram_delivery() -> bool:
+    """Поставить фоновую задачу на рассылку уведомлений с tg_status='pending'.
+
+    Вызывается роутами вместо синхронного цикла отправок. Ошибку постановки
+    намеренно проглатываем: HTTP-обработчик не должен падать из-за недоступного
+    Redis, а beat всё равно подберёт зависшие pending раз в 10 минут.
     """
-    Отправить Telegram уведомление пользователю если у него привязан аккаунт.
-    Синхронная функция — работает в обычных sync роутах FastAPI.
+    try:
+        from app.celery_app import deliver_telegram_task
+        deliver_telegram_task.delay()
+        return True
+    except Exception as e:
+        logger.warning(
+            "не удалось поставить задачу рассылки (%s: %s); подберёт периодическая",
+            type(e).__name__, e,
+        )
+        return False
+
+
+def send_telegram_to_user_result(user_id: int, title: str, body: str, db):
+    """Как send_telegram_to_user, но возвращает (статус, текст ошибки).
+
+    Статус — одно из значений notifications.tg_status: "sent", "failed",
+    "no_account". Нужен фоновой задаче, чтобы записать в БД не только факт
+    неудачи, но и её причину.
     """
     try:
         from app.models.event import TelegramSubscriber
@@ -158,11 +179,11 @@ def send_telegram_to_user(user_id: int, title: str, body: str, db) -> bool:
         ).first()
 
         if not sub:
-            return False
+            return "no_account", "у пользователя нет привязанного Telegram"
 
         token = os.getenv("TELEGRAM_BOT_TOKEN", "")
         if not token:
-            return False
+            return "failed", "TELEGRAM_BOT_TOKEN не задан"
 
         text = f"🔔 <b>{title}</b>\n\n{body}\n\n<i>taipan-tkd.ru/cabinet</i>"
 
@@ -187,7 +208,7 @@ def send_telegram_to_user(user_id: int, title: str, body: str, db) -> bool:
                 if r.status_code == 200:
                     if attempt > 1:
                         logger.info("Telegram: user_id=%s доставлено с попытки %s", user_id, attempt)
-                    return True
+                    return "sent", ""
                 last = f"HTTP {r.status_code}: {r.text[:200]}"
             except Exception as e:
                 last = f"{type(e).__name__}: {e}"
@@ -198,10 +219,20 @@ def send_telegram_to_user(user_id: int, title: str, body: str, db) -> bool:
             "Telegram: уведомление user_id=%s НЕ доставлено за %s попыток — %s",
             user_id, TELEGRAM_SEND_ATTEMPTS, last,
         )
-        return False
+        return "failed", last
     except Exception as e:
         logger.error("send_telegram_to_user: %s: %s", type(e).__name__, e)
-        return False
+        return "failed", f"{type(e).__name__}: {e}"
+
+
+def send_telegram_to_user(user_id: int, title: str, body: str, db) -> bool:
+    """Отправить уведомление пользователю. True — Telegram принял сообщение.
+
+    Тонкая обёртка над send_telegram_to_user_result: сохранена ради вызовов,
+    которым достаточно факта успеха.
+    """
+    status, _ = send_telegram_to_user_result(user_id, title, body, db)
+    return status == "sent"
 
 
 def build_reminder_message(event, days_before: int) -> str:

@@ -74,7 +74,7 @@ def create_request(
         notif_body += f" {body.comment}"
 
     from app.models.certification import Notification
-    from app.services.notifications import send_telegram_to_user
+    from app.services.notifications import enqueue_telegram_delivery
 
     managers = db.query(User).filter(
         User.role == "admin",
@@ -86,10 +86,10 @@ def create_request(
             type="individual_training",
             title=notif_title,
             body=notif_body,
+            tg_status="pending",
         ))
     db.commit()
-    for m in managers:
-        send_telegram_to_user(m.id, notif_title, notif_body, db)
+    enqueue_telegram_delivery()
 
     return _out(req)
 
@@ -140,15 +140,16 @@ def update_status(
         )
 
     from app.models.certification import Notification
-    from app.services.notifications import send_telegram_to_user
+    from app.services.notifications import enqueue_telegram_delivery
 
     db.add(Notification(
         user_id=req.user_id,
         type="individual_training",
         title=notif_title,
         body=notif_body,
+        tg_status="pending",
     ))
     db.commit()
-    send_telegram_to_user(req.user_id, notif_title, notif_body, db)
+    enqueue_telegram_delivery()
 
     return _out(req)
