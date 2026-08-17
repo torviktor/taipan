@@ -25,6 +25,41 @@ MAX_BYTES = 20 * 1024 * 1024   # 20 МБ на файл
 BACKUP_COUNT = 5               # + 5 архивных, т.е. не больше ~120 МБ на сервис
 
 _configured = False
+_handler = None
+
+
+def _build_handler(service: str):
+    """Создать (или вернуть уже созданный) файловый обработчик."""
+    global _handler
+    if _handler is not None:
+        return _handler
+    os.makedirs(LOG_DIR, exist_ok=True)
+    path = os.path.join(LOG_DIR, f"{service}.log")
+    h = RotatingFileHandler(
+        path, maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT, encoding="utf-8"
+    )
+    h.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    h.setLevel(logging.INFO)
+    _handler = h
+    return h
+
+
+def attach_file_handler(logger) -> None:
+    """Повесить файловый обработчик на конкретный логгер.
+
+    Нужно для Celery: он после старта перенастраивает логирование и сносит
+    обработчики корневого логгера, из-за чего исходы доставки уведомлений —
+    ровно то, ради чего файл и заводился, — в него не попадали.
+    """
+    if _handler is None:
+        return
+    if _handler not in logger.handlers:
+        logger.addHandler(_handler)
+    if logger.level > logging.INFO or logger.level == logging.NOTSET:
+        logger.setLevel(logging.INFO)
 
 
 def setup_file_logging(service: str) -> None:
@@ -40,15 +75,8 @@ def setup_file_logging(service: str) -> None:
 
     service = os.getenv("LOG_SERVICE", service)
     try:
-        os.makedirs(LOG_DIR, exist_ok=True)
-        path = os.path.join(LOG_DIR, f"{service}.log")
-        handler = RotatingFileHandler(
-            path, maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT, encoding="utf-8"
-        )
-        handler.setFormatter(logging.Formatter(
-            "%(asctime)s %(levelname)-8s %(name)s: %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        ))
+        handler = _build_handler(service)
+        path = handler.baseFilename
         root = logging.getLogger()
         root.addHandler(handler)
         # INFO, иначе не видно строк вида «доставлено с попытки 2»: uvicorn

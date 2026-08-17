@@ -10,7 +10,24 @@ force_ipv4()
 
 from celery import Celery
 from celery.schedules import crontab
+from celery.signals import after_setup_logger, after_setup_task_logger
 import os
+
+
+# Celery после запуска перенастраивает логирование и сносит обработчики
+# корневого логгера. Без этих двух хуков файл /var/log/taipan/celery_*.log
+# получал бы только пару строк со старта, а исходы доставки уведомлений —
+# то, ради чего файл и заводился, — терялись бы вместе с контейнером.
+@after_setup_logger.connect
+def _restore_file_logging(logger=None, **kwargs):
+    from app.core.logging_setup import attach_file_handler
+    attach_file_handler(logger)
+
+
+@after_setup_task_logger.connect
+def _restore_file_logging_task(logger=None, **kwargs):
+    from app.core.logging_setup import attach_file_handler
+    attach_file_handler(logger)
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
