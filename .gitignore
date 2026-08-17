@@ -8,3 +8,6 @@ scripts/fonts/
 # Personal Claude Code permissions — local-only, do not commit
 .claude/settings.local.json
 node_modules
+
+# Рабочий план проекта — живёт только локально, в публичный репозиторий не коммитить
+taipan_plan.md
