@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { API } from '../cabinet/constants'
+import { fetchWithTimeout } from '../utils/apiFetch'
+import { responseErrorText, thrownErrorText } from '../utils/apiError'
+
+// Общий разбор ошибок — в utils/apiError.js. Здесь только тексты этой страницы.
+const LOGIN_ERRORS  = { 401: 'Неверный телефон или пароль', fallback: 'Не удалось войти. Попробуйте ещё раз.' }
+const INVITE_ERRORS = { fallback: 'Не удалось принять приглашение' }
+const REG_ERRORS    = { fallback: 'Не удалось зарегистрироваться. Попробуйте ещё раз.' }
 
 export default function InvitePage() {
   const { token } = useParams()
@@ -24,7 +31,7 @@ export default function InvitePage() {
   useEffect(() => {
     const existingToken = localStorage.getItem('token')
 
-    fetch(`${API}/invite/${token}`)
+    fetchWithTimeout(`${API}/invite/${token}`)
       .then(r => r.ok ? r.json() : null)
       .then(async data => {
         if (!data) { setStatus('invalid'); return }
@@ -33,7 +40,7 @@ export default function InvitePage() {
         if (existingToken) {
           // Уже авторизован — сразу принять
           try {
-            const r = await fetch(`${API}/invite/accept`, {
+            const r = await fetchWithTimeout(`${API}/invite/accept`, {
               method: 'POST',
               headers: { Authorization: `Bearer ${existingToken}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({ token }),
@@ -55,39 +62,43 @@ export default function InvitePage() {
       const fd = new FormData()
       fd.append('username', phone)
       fd.append('password', password)
-      const r = await fetch(`${API}/auth/login`, { method: 'POST', body: fd })
-      if (!r.ok) { setMsg('Неверный телефон или пароль'); setLoading(false); return }
+      const r = await fetchWithTimeout(`${API}/auth/login`, { method: 'POST', body: fd })
+      // Раньше здесь на ЛЮБОЙ неуспешный код показывалось «Неверный телефон или
+      // пароль» — тот же самый баг, что увёл диагностику 14.08.2026.
+      if (!r.ok) { setMsg(await responseErrorText(r, LOGIN_ERRORS)); return }
       const data = await r.json()
       localStorage.setItem('token', data.access_token)
       localStorage.setItem('role',  data.role)
       localStorage.setItem('name',  data.full_name)
 
-      const r2 = await fetch(`${API}/invite/accept`, {
+      const r2 = await fetchWithTimeout(`${API}/invite/accept`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${data.access_token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
       })
       if (r2.ok) { navigate('/cabinet') }
-      else { setMsg('Не удалось принять приглашение'); setLoading(false) }
-    } catch { setMsg('Ошибка сети'); setLoading(false) }
+      else { setMsg(await responseErrorText(r2, INVITE_ERRORS)) }
+    } catch (err) { setMsg(thrownErrorText(err, LOGIN_ERRORS)) }
+    finally { setLoading(false) }
   }
 
   const handleRegister = async (e) => {
     e.preventDefault()
     setMsg(''); setLoading(true)
     try {
-      const r = await fetch(`${API}/auth/register-by-invite`, {
+      const r = await fetchWithTimeout(`${API}/auth/register-by-invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, full_name: regName, phone: regPhone, password: regPass }),
       })
+      if (!r.ok) { setMsg(await responseErrorText(r, REG_ERRORS)); return }
       const data = await r.json()
-      if (!r.ok) { setMsg(data.detail || 'Ошибка регистрации'); setLoading(false); return }
       localStorage.setItem('token', data.access_token)
       localStorage.setItem('role',  data.role)
       localStorage.setItem('name',  data.full_name)
       navigate('/cabinet')
-    } catch { setMsg('Ошибка сети'); setLoading(false) }
+    } catch (err) { setMsg(thrownErrorText(err, REG_ERRORS)) }
+    finally { setLoading(false) }
   }
 
   const inputStyle = {

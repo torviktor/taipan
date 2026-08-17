@@ -3,21 +3,14 @@ import { useNavigate, Link } from 'react-router-dom'
 import axios from 'axios'
 import './Login.css'
 import { formatPhone, normalizePhone } from '../utils/phone'
+import { apiErrorText } from '../utils/apiError'
 
-// Разбирает ошибку axios в текст для пользователя.
-// Без этого любой сбой (502, таймаут, обрыв сети) выглядел как «неверный пароль»
-// и уводил диагностику в сторону.
-function loginErrorText(err) {
-  // Ответа от сервера нет вообще: таймаут, обрыв, DNS, сервер недоступен.
-  if (err.code === 'ECONNABORTED' || !err.response) {
-    return 'Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.'
-  }
-  const { status, data } = err.response
-  if (status === 401) return 'Неверный телефон или пароль'
-  if (status === 403) return data?.detail || 'Доступ запрещён'
-  if (status === 429) return 'Слишком много попыток входа. Подождите минуту.'
-  if (status >= 500)  return 'Сервис недоступен, попробуйте позже'
-  return data?.detail || 'Не удалось войти. Попробуйте ещё раз.'
+// Тексты ошибок входа. Общий разбор живёт в utils/apiError.js — здесь только
+// то, что специфично для формы входа.
+const LOGIN_ERRORS = {
+  401: 'Неверный телефон или пароль',
+  429: 'Слишком много попыток входа. Подождите минуту.',
+  fallback: 'Не удалось войти. Попробуйте ещё раз.',
 }
 
 export default function Login() {
@@ -47,7 +40,7 @@ export default function Login() {
         navigate('/cabinet')
       }
     } catch (err) {
-      setError(loginErrorText(err))
+      setError(apiErrorText(err, LOGIN_ERRORS))
     } finally {
       setLoading(false)
     }

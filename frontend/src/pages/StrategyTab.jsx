@@ -2,6 +2,7 @@
 // Вкладка «Стратегия» — чеклист тренера, хранение в БД (не localStorage)
 
 import { useState, useEffect, useRef } from 'react'
+import { fetchWithTimeout } from '../utils/apiFetch'
 
 const API = '/api'
 
@@ -20,7 +21,7 @@ export default function StrategyTab({ token }) {
   const load = async () => {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/insurance-strategy/strategy`, { headers: h })
+      const r = await fetchWithTimeout(`${API}/insurance-strategy/strategy`, { headers: h })
       if (r.ok) {
         const d = await r.json()
         setItems(d.items || [])
@@ -34,7 +35,7 @@ export default function StrategyTab({ token }) {
     saveTimer.current = setTimeout(async () => {
       setSaving(true)
       try {
-        await fetch(`${API}/insurance-strategy/strategy`, {
+        await fetchWithTimeout(`${API}/insurance-strategy/strategy`, {
           method: 'PUT',
           headers: hj,
           body: JSON.stringify({ items: newItems })

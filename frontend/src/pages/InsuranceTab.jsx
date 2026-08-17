@@ -2,6 +2,7 @@
 // Вкладка «Страхование» — данные ГТФ России, хранение в БД
 
 import { useState, useEffect } from 'react'
+import { fetchWithTimeout } from '../utils/apiFetch'
 
 const API = '/api'
 
@@ -20,7 +21,7 @@ export default function InsuranceTab({ token, athletes: propAthletes }) {
   const load = async () => {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/insurance-strategy/insurance`, { headers: h })
+      const r = await fetchWithTimeout(`${API}/insurance-strategy/insurance`, { headers: h })
       if (r.ok) {
         const data = await r.json()
         setAthletes(data)
@@ -32,7 +33,7 @@ export default function InsuranceTab({ token, athletes: propAthletes }) {
   const save = async (athleteId, expiry) => {
     setSaving(athleteId)
     try {
-      const r = await fetch(`${API}/insurance-strategy/insurance`, {
+      const r = await fetchWithTimeout(`${API}/insurance-strategy/insurance`, {
         method: 'PATCH',
         headers: hj,
         body: JSON.stringify({ athlete_id: athleteId, insurance_expiry: expiry || null })

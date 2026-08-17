@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { fetchWithTimeout } from '../utils/apiFetch'
 import { Link } from 'react-router-dom'
 import './Champions.css'
 
@@ -141,9 +142,9 @@ export default function Champions() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${API}/hall-of-fame`).then(r => r.ok ? r.json() : []),
-      fetch(`${API}/season-best`).then(r => r.ok ? r.json() : null),
-      fetch(`${API}/season-best/seasons`).then(r => r.ok ? r.json() : []),
+      fetchWithTimeout(`${API}/hall-of-fame`).then(r => r.ok ? r.json() : []),
+      fetchWithTimeout(`${API}/season-best`).then(r => r.ok ? r.json() : null),
+      fetchWithTimeout(`${API}/season-best/seasons`).then(r => r.ok ? r.json() : []),
     ])
     .then(([hof, sb, seas]) => {
       setItems(hof)
@@ -159,7 +160,7 @@ export default function Champions() {
   const loadSeason = (year) => {
     if (seasonData[year] || seasonLoad[year]) return
     setSeasonLoad(prev => ({ ...prev, [year]: true }))
-    fetch(`${API}/season-best?season=${year}`)
+    fetchWithTimeout(`${API}/season-best?season=${year}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data) setSeasonData(prev => ({ ...prev, [year]: data }))

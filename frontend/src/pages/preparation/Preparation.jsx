@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { fetchWithTimeout } from '../../utils/apiFetch'
 import { Link } from 'react-router-dom'
 import './Preparation.css'
 
@@ -33,7 +34,7 @@ export default function Preparation() {
     // Если юзер — родитель с несколькими детьми, берём первого неархивного.
     const token = localStorage.getItem('token')
     if (!token) return
-    fetch('/api/users/me', { headers: { Authorization: `Bearer ${token}` } })
+    fetchWithTimeout('/api/users/me', { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!data) return

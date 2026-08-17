@@ -2,7 +2,11 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import './Register.css'
 import { formatPhone } from '../utils/phone'
+import { fetchWithTimeout } from '../utils/apiFetch'
+import { responseErrorText, thrownErrorText } from '../utils/apiError'
 const API = '/api'
+// Тексты, специфичные для регистрации. Общий разбор — в utils/apiError.js.
+const REGISTER_ERRORS = { fallback: 'Не удалось зарегистрироваться. Попробуйте ещё раз.' }
 const emptyAthlete = () => ({
   full_name: '', birth_date: '', gender: 'male', gup: '', dan: '', has_dan: false
 })
@@ -77,7 +81,8 @@ const buildAthletePayload = (a) => ({
     const phone = form.phone.replace(/\D/g, '')
     if (phone.length < 11 || form.role !== 'parent') return
     try {
-      const r = await fetch(`${API}/auth/check-phone/${phone}`)
+      const r = await fetchWithTimeout(`${API}/auth/check-phone/${phone}`)
+      if (!r.ok) return
       const data = await r.json()
       if (data.exists && data.athletes_count > 0) {
         setForm(f => ({ ...f, _existing: data }))
@@ -113,14 +118,16 @@ const buildAthletePayload = (a) => ({
           : athletes[0]
         ),
       }
-      const res  = await fetch(`${API}/auth/register`, {
+      const res  = await fetchWithTimeout(`${API}/auth/register`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
+      // Код ответа проверяем ДО разбора тела: 502/504 приходят HTML-страницей,
+      // и res.json() на них бросает исключение, маскируя настоящую причину.
+      if (!res.ok) { setError(await responseErrorText(res, REGISTER_ERRORS)); return }
       const data = await res.json()
-      if (!res.ok) { setError(data.detail || 'Ошибка регистрации'); return }
       for (let i = 1; i < athletes.length; i++) {
-        await fetch(`${API}/auth/add-athlete`, {
+        await fetchWithTimeout(`${API}/auth/add-athlete`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone, password: form.password, athlete: buildAthletePayload(athletes[i]) }),
         })
@@ -129,8 +136,8 @@ const buildAthletePayload = (a) => ({
       localStorage.setItem('role',  data.role)
       localStorage.setItem('full_name', data.full_name)
       navigate('/cabinet')
-    } catch {
-      setError('Ошибка соединения с сервером')
+    } catch (err) {
+      setError(thrownErrorText(err, REGISTER_ERRORS))
     } finally {
       setLoading(false)
     }
@@ -140,19 +147,19 @@ const buildAthletePayload = (a) => ({
     setModal(null)
     try {
       for (const a of modal.athletes) {
-        const res = await fetch(`${API}/auth/add-athlete`, {
+        const res = await fetchWithTimeout(`${API}/auth/add-athlete`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone: modal.phone, password: modal.password, athlete: buildAthletePayload(a) }),
         })
+        if (!res.ok) { setError(await responseErrorText(res, REGISTER_ERRORS)); setLoading(false); return }
         const data = await res.json()
-        if (!res.ok) { setError(data.detail || 'Ошибка'); setLoading(false); return }
         localStorage.setItem('token', data.access_token)
         localStorage.setItem('role',  data.role)
         localStorage.setItem('full_name', data.full_name)
       }
       navigate('/cabinet')
-    } catch {
-      setError('Ошибка соединения с сервером')
+    } catch (err) {
+      setError(thrownErrorText(err, REGISTER_ERRORS))
     } finally {
       setLoading(false)
     }

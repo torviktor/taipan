@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { fetchWithTimeout } from '../utils/apiFetch'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import PwaInstallButton from './PwaInstallButton'
 import './Navbar.css'
@@ -70,7 +71,7 @@ export default function Navbar() {
     setSearching(true)
     let eventHits = []
     try {
-      const r = await fetch('/api/events/')
+      const r = await fetchWithTimeout('/api/events/')
       if (r.ok) {
         const events = await r.json()
         eventHits = events

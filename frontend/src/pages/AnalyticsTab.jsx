@@ -5,6 +5,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useState, useEffect } from 'react'
+import { fetchWithTimeout } from '../utils/apiFetch'
 
 const API = '/api'
 
@@ -151,8 +152,8 @@ export function ParentAnalyticsTab({ token, athletes }) {
       setLoading(true)
       try {
         const [rRep, rReq] = await Promise.all([
-          fetch(`${API}/analytics/reports/my/`, { headers: h }),
-          fetch(`${API}/analytics/requests/my/`, { headers: h }),
+          fetchWithTimeout(`${API}/analytics/reports/my/`, { headers: h }),
+          fetchWithTimeout(`${API}/analytics/requests/my/`, { headers: h }),
         ])
         if (rRep.ok) setReports(await rRep.json())
         if (rReq.ok) setRequests(await rReq.json())
@@ -171,7 +172,7 @@ export function ParentAnalyticsTab({ token, athletes }) {
     if (!selectedId) return
     setSubmitting(true); setSubmitError('')
     try {
-      const r = await fetch(`${API}/analytics/requests/`, {
+      const r = await fetchWithTimeout(`${API}/analytics/requests/`, {
         method: 'POST', headers: hj,
         body: JSON.stringify({ athlete_id: Number(selectedId), comment }),
       })
@@ -372,8 +373,8 @@ export function AnalyticsAdminTab({ token, athletes }) {
     setLoading(true)
     try {
       const [rReq, rRep] = await Promise.all([
-        fetch(`${API}/analytics/requests/`, { headers: h }),
-        fetch(`${API}/analytics/reports/`, { headers: h }),
+        fetchWithTimeout(`${API}/analytics/requests/`, { headers: h }),
+        fetchWithTimeout(`${API}/analytics/reports/`, { headers: h }),
       ])
       if (rReq.ok) setRequests(await rReq.json())
       if (rRep.ok) setReports(await rRep.json())
@@ -384,7 +385,7 @@ export function AnalyticsAdminTab({ token, athletes }) {
   useEffect(() => { load() }, [])
 
   const setReqStatus = async (id, status) => {
-    const r = await fetch(`${API}/analytics/requests/${id}/status`, {
+    const r = await fetchWithTimeout(`${API}/analytics/requests/${id}/status`, {
       method: 'PATCH', headers: hj, body: JSON.stringify({ status }),
     })
     if (r.ok) setRequests(prev => prev.map(x => x.id === id ? { ...x, status } : x))
@@ -412,7 +413,7 @@ export function AnalyticsAdminTab({ token, athletes }) {
       const url    = editRep
         ? `${API}/analytics/reports/${editRep.id}/`
         : `${API}/analytics/reports/`
-      const r = await fetch(url, {
+      const r = await fetchWithTimeout(url, {
         method, headers: hj,
         body: JSON.stringify({
           athlete_id: Number(form.athlete_id),
@@ -429,7 +430,7 @@ export function AnalyticsAdminTab({ token, athletes }) {
 
   const deleteReport = async (id) => {
     if (!window.confirm('Удалить аналитику?')) return
-    await fetch(`${API}/analytics/reports/${id}/`, { method: 'DELETE', headers: h })
+    await fetchWithTimeout(`${API}/analytics/reports/${id}/`, { method: 'DELETE', headers: h })
     setReports(prev => prev.filter(r => r.id !== id))
   }
 

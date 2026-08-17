@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import './Apply.css'
+import { fetchWithTimeout } from '../utils/apiFetch'
+import { responseErrorText, thrownErrorText } from '../utils/apiError'
 
 const API = '/api'
+// Тексты, специфичные для заявки. Общий разбор — в utils/apiError.js.
+const APPLY_ERRORS = { fallback: 'Не удалось отправить заявку. Попробуйте ещё раз.' }
 
 const formatPhone = (v) => {
   const d = v.replace(/\D/g, '').slice(0, 11)
@@ -52,7 +56,7 @@ export default function Apply() {
 
     setLoading(true)
     try {
-      const res = await fetch(`${API}/applications/`, {
+      const res = await fetchWithTimeout(`${API}/applications/`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -62,13 +66,14 @@ export default function Apply() {
         }),
       })
       if (!res.ok) {
-        const d = await res.json()
-        setError(d.detail || 'Ошибка отправки')
+        // Раньше здесь был res.json() без защиты: на 502 от nginx он бросал
+        // исключение и заявка выглядела как «ошибка соединения».
+        setError(await responseErrorText(res, APPLY_ERRORS))
         return
       }
       setDone(true)
-    } catch {
-      setError('Ошибка соединения с сервером')
+    } catch (err) {
+      setError(thrownErrorText(err, APPLY_ERRORS))
     } finally {
       setLoading(false)
     }

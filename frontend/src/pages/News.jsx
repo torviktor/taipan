@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { fetchWithTimeout } from '../utils/apiFetch'
 import { useNavigate } from 'react-router-dom'
 import './News.css'
 
@@ -45,7 +46,7 @@ export default function NewsPage() {
   const load = async (off) => {
     setLoading(true)
     try {
-      const r = await fetch(`${API}/news?limit=${LIMIT}&offset=${off}`)
+      const r = await fetchWithTimeout(`${API}/news?limit=${LIMIT}&offset=${off}`)
       if (r.ok) {
         const d = await r.json()
         setItems(off === 0 ? d.items : prev => [...prev, ...d.items])

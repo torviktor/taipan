@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { fetchWithTimeout } from '../../utils/apiFetch'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import './Preparation.css'
 
@@ -31,7 +32,7 @@ export default function Methodichka() {
       return
     }
     const token = localStorage.getItem('token')
-    fetch(`/api/preparation/method/${slug}`, {
+    fetchWithTimeout(`/api/preparation/method/${slug}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => {

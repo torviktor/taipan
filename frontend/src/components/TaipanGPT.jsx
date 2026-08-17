@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { fetchWithTimeout } from '../utils/apiFetch'
 import './TaipanGPT.css'
 
 const SUGGESTIONS = [
@@ -71,7 +72,7 @@ export default function TaipanGPT() {
       .map(m => ({ role: m.role, content: m.content }))
 
     try {
-      const res = await fetch('/api/ai/chat', {
+      const res = await fetchWithTimeout('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: msg, history: history.slice(0, -1) }),

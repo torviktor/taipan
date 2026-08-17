@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { fetchWithTimeout } from '../../utils/apiFetch'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import './Preparation.css'
 
@@ -31,7 +32,7 @@ export default function Plan() {
       return
     }
     const token = localStorage.getItem('token')
-    fetch(`/api/preparation/plan/${gup}`, {
+    fetchWithTimeout(`/api/preparation/plan/${gup}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => {
