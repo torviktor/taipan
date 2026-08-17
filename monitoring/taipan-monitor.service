@@ -8,8 +8,10 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/python3 /opt/taipan-monitor/taipan_monitor.py
-# Жёсткий потолок: одна проверка не должна висеть до следующего запуска.
-TimeoutStartSec=120
+# Потолок с запасом на повторные попытки доставки в Telegram (канал до
+# api.telegram.org нестабилен), но заведомо меньше интервала таймера в 5 минут,
+# чтобы запуски не наезжали друг на друга.
+TimeoutStartSec=280
 # Падение проверки — это ожидаемый исход, а не поломка юнита.
 SuccessExitStatus=0 1
 StandardOutput=journal

@@ -24,10 +24,24 @@ import os
 import socket
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+
+# У сервера нет IPv6-маршрута, а часть хостов (в т.ч. api.telegram.org)
+# резолвится и в A, и в AAAA. Попытка по IPv6 гарантированно даёт
+# «[Errno 101] Network is unreachable» и просто съедает время и попытки.
+_orig_getaddrinfo = socket.getaddrinfo
+
+
+def _getaddrinfo_ipv4_only(*args, **kwargs):
+    res = [r for r in _orig_getaddrinfo(*args, **kwargs) if r[0] == socket.AF_INET]
+    return res or _orig_getaddrinfo(*args, **kwargs)
+
+
+socket.getaddrinfo = _getaddrinfo_ipv4_only
 
 CONFIG_PATH = os.environ.get("TAIPAN_MONITOR_CONFIG", "/etc/taipan-monitor.env")
 STATE_PATH = os.environ.get("TAIPAN_MONITOR_STATE", "/var/lib/taipan-monitor/state.json")
@@ -38,6 +52,8 @@ URL_API = f"https://{DOMAIN}/api/schedule/"
 
 HTTP_TIMEOUT = 15          # секунд на одну проверку
 FAIL_THRESHOLD = 3         # столько неудач подряд до алерта (5 мин × 3 ≈ 15 мин)
+TELEGRAM_ATTEMPTS = 6      # попыток доставки алерта: канал до Telegram нестабилен
+TELEGRAM_RETRY_DELAY = 3   # база паузы между попытками, секунды (3, 6, 9, …)
 
 IP_SERVICES = [
     "https://api.ipify.org",
@@ -183,15 +199,28 @@ def telegram_send(cfg, text):
         "disable_web_page_preview": "true",
     }).encode()
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    try:
-        with urllib.request.urlopen(urllib.request.Request(url, data=data), timeout=20) as r:
-            ok = r.status == 200
-            if not ok:
-                log(f"Telegram ответил {r.status}")
-            return ok
-    except Exception as e:
-        log(f"Telegram недоступен: {type(e).__name__}: {e}")
-        return False
+
+    # Исходящий доступ к api.telegram.org с этого сервера нестабилен: TCP на
+    # 443 устанавливается, а TLS рвётся — по замерам 17.08.2026 проходила
+    # примерно каждая третья попытка. Одиночный запрос терял бы алерты именно
+    # тогда, когда они нужны, поэтому повторяем с нарастающей паузой.
+    last = ""
+    for attempt in range(1, TELEGRAM_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, data=data), timeout=20) as r:
+                if r.status == 200:
+                    if attempt > 1:
+                        log(f"Telegram: доставлено с попытки {attempt}")
+                    return True
+                last = f"HTTP {r.status}"
+        except Exception as e:
+            last = f"{type(e).__name__}: {e}"
+        if attempt < TELEGRAM_ATTEMPTS:
+            time.sleep(TELEGRAM_RETRY_DELAY * attempt)
+
+    log(f"Telegram недоступен после {TELEGRAM_ATTEMPTS} попыток, последняя ошибка — {last}")
+    log("недоставленный текст: " + text.replace("\n", " | "))
+    return False
 
 
 def log(msg):
