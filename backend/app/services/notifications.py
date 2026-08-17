@@ -25,6 +25,12 @@ TELEGRAM_SEND_ATTEMPTS = 3
 TELEGRAM_SEND_DELAY    = 2      # база паузы между попытками, секунды
 TELEGRAM_SEND_TIMEOUT  = 10
 
+# Для синхронного пути (send_telegram_to_user) бюджет жёстче: он вызывается
+# циклом по всем родителям прямо внутри HTTP-обработчика, без BackgroundTasks.
+# 3 попытки × 5 с + паузы 1 и 2 с = не больше 18 с на одного получателя.
+TELEGRAM_SYNC_TIMEOUT     = 5
+TELEGRAM_SYNC_RETRY_DELAY = 1
+
 # ─── Telegram Bot ─────────────────────────────────────────────────────────────
 
 async def send_telegram_message(chat_id: str, text: str) -> bool:
@@ -56,22 +62,34 @@ async def send_telegram_message(chat_id: str, text: str) -> bool:
 
 
 async def send_telegram_photo(chat_id: str, photo_url: str, caption: str) -> bool:
-    """Отправить фото с подписью в Telegram."""
+    """Отправить фото с подписью в Telegram. С повторами — канал ненадёжен."""
     token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    try:
-        import httpx
-        url = f"https://api.telegram.org/bot{token}/sendPhoto"
-        async with httpx.AsyncClient() as client:
-            r = await client.post(url, json={
-                "chat_id":    chat_id,
-                "photo":      photo_url,
-                "caption":    caption,
-                "parse_mode": "HTML",
-            })
-            return r.status_code == 200
-    except Exception as e:
-        logger.error(f"Telegram photo error: {e}")
-        return False
+    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    payload = {
+        "chat_id":    chat_id,
+        "photo":      photo_url,
+        "caption":    caption,
+        "parse_mode": "HTML",
+    }
+
+    last = ""
+    for attempt in range(1, TELEGRAM_SEND_ATTEMPTS + 1):
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                r = await client.post(url, json=payload, timeout=TELEGRAM_SEND_TIMEOUT)
+            if r.status_code == 200:
+                if attempt > 1:
+                    logger.info("Telegram photo: доставлено с попытки %s", attempt)
+                return True
+            last = f"HTTP {r.status_code}: {r.text[:200]}"
+        except Exception as e:
+            last = f"{type(e).__name__}: {e}"
+        if attempt < TELEGRAM_SEND_ATTEMPTS:
+            await asyncio.sleep(TELEGRAM_SEND_DELAY * attempt)
+
+    logger.error("Telegram photo: не доставлено за %s попыток — %s", TELEGRAM_SEND_ATTEMPTS, last)
+    return False
 
 
 async def notify_channel(text: str) -> bool:
@@ -149,18 +167,40 @@ def send_telegram_to_user(user_id: int, title: str, body: str, db) -> bool:
         text = f"🔔 <b>{title}</b>\n\n{body}\n\n<i>taipan-tkd.ru/cabinet</i>"
 
         import httpx
-        httpx.post(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            json={
-                "chat_id": sub.telegram_id,
-                "text": text,
-                "parse_mode": "HTML",
-            },
-            timeout=5
+        import time
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload = {
+            "chat_id": sub.telegram_id,
+            "text": text,
+            "parse_mode": "HTML",
+        }
+
+        # Раньше здесь была одна попытка, а результат вообще не проверялся:
+        # return True стоял после httpx.post безусловно, поэтому функция
+        # рапортовала об успехе даже когда Telegram отвечал ошибкой или запрос
+        # падал по таймауту. При потерях канала это скрывало недоставленные
+        # уведомления родителям — о взносах, сборах, аттестациях.
+        last = ""
+        for attempt in range(1, TELEGRAM_SEND_ATTEMPTS + 1):
+            try:
+                r = httpx.post(url, json=payload, timeout=TELEGRAM_SYNC_TIMEOUT)
+                if r.status_code == 200:
+                    if attempt > 1:
+                        logger.info("Telegram: user_id=%s доставлено с попытки %s", user_id, attempt)
+                    return True
+                last = f"HTTP {r.status_code}: {r.text[:200]}"
+            except Exception as e:
+                last = f"{type(e).__name__}: {e}"
+            if attempt < TELEGRAM_SEND_ATTEMPTS:
+                time.sleep(TELEGRAM_SYNC_RETRY_DELAY * attempt)
+
+        logger.error(
+            "Telegram: уведомление user_id=%s НЕ доставлено за %s попыток — %s",
+            user_id, TELEGRAM_SEND_ATTEMPTS, last,
         )
-        return True
+        return False
     except Exception as e:
-        print(f"send_telegram_to_user error: {e}")
+        logger.error("send_telegram_to_user: %s: %s", type(e).__name__, e)
         return False
 
 
