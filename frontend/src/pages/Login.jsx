@@ -4,6 +4,22 @@ import axios from 'axios'
 import './Login.css'
 import { formatPhone, normalizePhone } from '../utils/phone'
 
+// Разбирает ошибку axios в текст для пользователя.
+// Без этого любой сбой (502, таймаут, обрыв сети) выглядел как «неверный пароль»
+// и уводил диагностику в сторону.
+function loginErrorText(err) {
+  // Ответа от сервера нет вообще: таймаут, обрыв, DNS, сервер недоступен.
+  if (err.code === 'ECONNABORTED' || !err.response) {
+    return 'Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.'
+  }
+  const { status, data } = err.response
+  if (status === 401) return 'Неверный телефон или пароль'
+  if (status === 403) return data?.detail || 'Доступ запрещён'
+  if (status === 429) return 'Слишком много попыток входа. Подождите минуту.'
+  if (status >= 500)  return 'Сервис недоступен, попробуйте позже'
+  return data?.detail || 'Не удалось войти. Попробуйте ещё раз.'
+}
+
 export default function Login() {
   const [phone,        setPhone]        = useState('+7 (')
   const [password,     setPassword]     = useState('')
@@ -20,7 +36,7 @@ export default function Login() {
       const form = new FormData()
       form.append('username', normalizePhone(phone))
       form.append('password', password)
-      const r = await axios.post('/api/auth/login', form)
+      const r = await axios.post('/api/auth/login', form, { timeout: 15000 })
       localStorage.setItem('token',     r.data.access_token)
       localStorage.setItem('role',      r.data.role)
       localStorage.setItem('full_name', r.data.full_name)
@@ -30,8 +46,8 @@ export default function Login() {
       } else {
         navigate('/cabinet')
       }
-    } catch {
-      setError('Неверный телефон или пароль')
+    } catch (err) {
+      setError(loginErrorText(err))
     } finally {
       setLoading(false)
     }

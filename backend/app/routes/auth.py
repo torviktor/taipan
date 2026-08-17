@@ -8,11 +8,14 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import date, datetime
 from app.core.database import get_db
+from app.core.phone import normalize_phone
 from app.core.security import hash_password, verify_password, create_access_token
 from app.models.user import User, UserRole, Athlete, Gender
+import logging
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
+logger = logging.getLogger(__name__)
 
 # ─── Схемы ────────────────────────────────────────────────────────────────────
 class AthleteData(BaseModel):
@@ -83,6 +86,7 @@ def _check_duplicate_athlete(db: Session, full_name: str, birth_date: date) -> N
 @router.get("/check-phone/{phone}", response_model=CheckPhoneResponse)
 @limiter.limit("10/minute")
 def check_phone(request: Request, phone: str, db: Session = Depends(get_db)):
+    phone = normalize_phone(phone)
     user = db.query(User).filter(User.phone == phone).first()
     if not user:
         return CheckPhoneResponse(exists=False, athletes_count=0, athletes=[])
@@ -99,6 +103,7 @@ def check_phone(request: Request, phone: str, db: Session = Depends(get_db)):
 def register(request: Request, data: RegisterRequest, db: Session = Depends(get_db)):
     data.full_name         = normalize_name(data.full_name)
     data.athlete.full_name = normalize_name(data.athlete.full_name)
+    data.phone             = normalize_phone(data.phone)
 
     # Запрет регистрации как спортсмен для детей до 11 лет
     if data.role == UserRole.athlete:
@@ -150,6 +155,7 @@ def register(request: Request, data: RegisterRequest, db: Session = Depends(get_
 @router.post("/add-athlete", response_model=TokenResponse)
 def add_athlete(data: AddAthleteRequest, db: Session = Depends(get_db)):
     data.athlete.full_name = normalize_name(data.athlete.full_name)
+    data.phone             = normalize_phone(data.phone)
 
     user = db.query(User).filter(User.phone == data.phone).first()
     if not user:
@@ -193,6 +199,7 @@ def register_by_invite(request: Request, data: RegisterByInviteRequest, db: Sess
     from app.models.invite import AthleteInvite, AthleteViewer
 
     data.full_name = normalize_name(data.full_name)
+    data.phone     = normalize_phone(data.phone)
 
     inv = db.query(AthleteInvite).filter(AthleteInvite.token == data.token).first()
     if not inv or not inv.is_active or inv.expires_at < datetime.utcnow():
@@ -228,10 +235,21 @@ def register_by_invite(request: Request, data: RegisterByInviteRequest, db: Sess
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("10/minute")
 def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.phone == form.username).first()
-    if not user or not verify_password(form.password, user.password):
+    phone = normalize_phone(form.username)
+    user = db.query(User).filter(User.phone == phone).first()
+
+    # Причина отказа пишется в лог, но наружу по-прежнему уходит общий текст:
+    # различать «нет такого номера» и «неверный пароль» для клиента нельзя,
+    # а для диагностики это две совершенно разные починки.
+    # Пароль и хеш в лог не попадают.
+    if not user:
+        logger.warning("login denied: user_not_found phone=%s", phone)
+        raise HTTPException(status_code=401, detail="Неверный телефон или пароль")
+    if not verify_password(form.password, user.password):
+        logger.warning("login denied: bad_password user_id=%s phone=%s", user.id, phone)
         raise HTTPException(status_code=401, detail="Неверный телефон или пароль")
     if not user.is_active:
+        logger.warning("login denied: inactive user_id=%s phone=%s", user.id, phone)
         raise HTTPException(status_code=403, detail="Аккаунт заблокирован")
     user.last_login_at = datetime.utcnow()
     user.last_activity_at = datetime.utcnow()
