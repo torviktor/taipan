@@ -1,0 +1,19 @@
+[Unit]
+Description=Проверка доступности taipan-tkd.ru и совпадения IP с A-записью
+Documentation=file:/opt/taipan/monitoring/README.md
+# Сеть нужна, но НЕ docker: монитор намеренно не зависит от приложения.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/taipan-monitor/taipan_monitor.py
+# Жёсткий потолок: одна проверка не должна висеть до следующего запуска.
+TimeoutStartSec=120
+# Падение проверки — это ожидаемый исход, а не поломка юнита.
+SuccessExitStatus=0 1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

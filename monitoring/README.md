@@ -1,0 +1,72 @@
+# Мониторинг доступности
+
+Проверяет каждые 5 минут, что сайт жив, и пишет админу в Telegram, когда он
+падает и когда поднимается.
+
+## Почему на хосте, а не задачей в Celery beat
+
+Монитор не должен разделять точку отказа с тем, что он проверяет.
+
+Celery worker и beat живут внутри того же `docker compose`, что и backend, БД и
+фронтенд. Если compose не поднялся, упал docker или кончилась память — Celery
+умрёт вместе со всем остальным и промолчит ровно в тот момент, когда сообщить
+важнее всего. Это не теория: 14.08.2026 сайт был недоступен трое суток, и узнали
+об этом от пользователей.
+
+Скрипт на хосте под systemd timer переживает падение любого контейнера, самого
+docker и неудачный деплой. Зависимостей у него нет вообще — только стандартная
+библиотека Python 3.
+
+**Чего эта схема не ловит:** если сервер выключен целиком или у него отвалилась
+сеть, монитор молчит вместе с ним. Полностью это закрывается только проверкой
+снаружи — бесплатного UptimeRobot на один адрес достаточно, и его стоит завести
+дополнительно, а не вместо.
+
+## Что проверяется
+
+1. `https://taipan-tkd.ru/` отдаёт 200
+2. `https://taipan-tkd.ru/api/schedule/` отдаёт 200
+3. публичный IP сервера совпадает с A-записью домена
+
+Третья проверка — про инцидент 14.08: у сервера сменился адрес по DHCP, DNS
+остался со старым, сайт стал недоступен. Эта проверка ловит такое за 15 минут.
+
+## Антиспам
+
+Алерт уходит **один раз** при переходе в «упал» и **один раз** при
+восстановлении. Порог — 3 неудачные проверки подряд (около 15 минут), чтобы
+секундная сетевая икота не будила админа. Состояние лежит в
+`/var/lib/taipan-monitor/state.json`.
+
+## Установка
+
+```bash
+# 1. Скрипт — вне /opt/taipan, чтобы деплой его не затрагивал
+mkdir -p /opt/taipan-monitor
+install -m 755 /opt/taipan/monitoring/taipan_monitor.py /opt/taipan-monitor/
+
+# 2. Конфиг с токеном (в git не хранится)
+install -m 600 /opt/taipan/monitoring/taipan-monitor.env.example /etc/taipan-monitor.env
+# вписать TELEGRAM_BOT_TOKEN (из /opt/taipan/.env) и ALERT_CHAT_ID
+
+# 3. systemd
+install -m 644 /opt/taipan/monitoring/taipan-monitor.service /etc/systemd/system/
+install -m 644 /opt/taipan/monitoring/taipan-monitor.timer   /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now taipan-monitor.timer
+```
+
+## Проверка
+
+```bash
+/opt/taipan-monitor/taipan_monitor.py --status        # что видит монитор прямо сейчас
+/opt/taipan-monitor/taipan_monitor.py --test          # прислать тестовое сообщение
+/opt/taipan-monitor/taipan_monitor.py --force-fail    # учебная тревога (3 запуска до алерта)
+/opt/taipan-monitor/taipan_monitor.py --resolve-chat  # достать chat_id админа из БД
+
+systemctl list-timers taipan-monitor.timer
+journalctl -u taipan-monitor.service --since "1 hour ago"
+```
+
+После `--force-fail` не забыть сбросить состояние обычным успешным запуском —
+он пришлёт сообщение о восстановлении.

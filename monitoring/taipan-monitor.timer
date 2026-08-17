@@ -1,0 +1,16 @@
+[Unit]
+Description=Запуск проверки доступности taipan-tkd.ru каждые 5 минут
+
+[Timer]
+# Первый запуск через 2 минуты после загрузки — чтобы не дёргать сеть
+# одновременно с поднятием docker compose.
+OnBootSec=2min
+OnUnitActiveSec=5min
+# Разброс в 20 секунд, чтобы проверки не били ровно в минуту.
+RandomizedDelaySec=20s
+# Если сервер был выключен — догнать пропущенный запуск.
+Persistent=true
+Unit=taipan-monitor.service
+
+[Install]
+WantedBy=timers.target
