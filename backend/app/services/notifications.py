@@ -54,6 +54,18 @@ def bot_api_url(method: str) -> str:
     return f"{base}/bot{token}/{method}"
 
 
+def bot_api_headers() -> dict:
+    """Заголовки для запросов к Bot API — тоже собираются в одном месте.
+
+    Воркер-релей закрыт секретом: без верного x-bridge-auth он в строгом режиме
+    отвечает 403. Секрет читается из окружения (TELEGRAM_API_SECRET); если он не
+    задан, заголовок не добавляется вовсе — так работает обращение напрямую к
+    api.telegram.org и переходный режим воркера.
+    """
+    secret = os.getenv("TELEGRAM_API_SECRET", "")
+    return {"x-bridge-auth": secret} if secret else {}
+
+
 # ─── Telegram Bot ─────────────────────────────────────────────────────────────
 
 async def send_telegram_message(chat_id: str, text: str) -> bool:
@@ -66,7 +78,8 @@ async def send_telegram_message(chat_id: str, text: str) -> bool:
         try:
             import httpx
             async with httpx.AsyncClient() as client:
-                r = await client.post(url, json=payload, timeout=TELEGRAM_SEND_TIMEOUT)
+                r = await client.post(url, json=payload, timeout=TELEGRAM_SEND_TIMEOUT,
+                                      headers=bot_api_headers())
             if r.status_code == 200:
                 if attempt > 1:
                     logger.info("Telegram: доставлено с попытки %s", attempt)
@@ -98,7 +111,8 @@ async def send_telegram_photo(chat_id: str, photo_url: str, caption: str) -> boo
         try:
             import httpx
             async with httpx.AsyncClient() as client:
-                r = await client.post(url, json=payload, timeout=TELEGRAM_SEND_TIMEOUT)
+                r = await client.post(url, json=payload, timeout=TELEGRAM_SEND_TIMEOUT,
+                                      headers=bot_api_headers())
             if r.status_code == 200:
                 if attempt > 1:
                     logger.info("Telegram photo: доставлено с попытки %s", attempt)
@@ -225,7 +239,8 @@ def send_telegram_to_user_result(user_id: int, title: str, body: str, db):
         last = ""
         for attempt in range(1, TELEGRAM_SEND_ATTEMPTS + 1):
             try:
-                r = httpx.post(url, json=payload, timeout=TELEGRAM_SYNC_TIMEOUT)
+                r = httpx.post(url, json=payload, timeout=TELEGRAM_SYNC_TIMEOUT,
+                               headers=bot_api_headers())
                 if r.status_code == 200:
                     if attempt > 1:
                         logger.info("Telegram: user_id=%s доставлено с попытки %s", user_id, attempt)

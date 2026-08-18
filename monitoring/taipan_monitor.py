@@ -82,7 +82,8 @@ def load_config():
     except FileNotFoundError:
         pass
     # переменные окружения имеют приоритет — удобно для ручного запуска
-    for k in ("TELEGRAM_BOT_TOKEN", "ALERT_CHAT_ID", "TELEGRAM_API_BASE"):
+    for k in ("TELEGRAM_BOT_TOKEN", "ALERT_CHAT_ID", "TELEGRAM_API_BASE",
+              "TELEGRAM_API_SECRET"):
         if os.environ.get(k):
             cfg[k] = os.environ[k]
     return cfg
@@ -221,6 +222,12 @@ def telegram_send(cfg, text):
     # стабильный 403, то есть алерты молча не уходили бы вообще.
     req = urllib.request.Request(url, data=data)
     req.add_header("User-Agent", "taipan-monitor/1.0")
+    # Воркер-релей закрыт секретом: без верного x-bridge-auth он в строгом
+    # режиме отвечает 403. Если секрет не задан — заголовка нет вовсе, так
+    # работает обращение напрямую к api.telegram.org.
+    secret = cfg.get("TELEGRAM_API_SECRET", "")
+    if secret:
+        req.add_header("x-bridge-auth", secret)
 
     last = ""
     for attempt in range(1, TELEGRAM_ATTEMPTS + 1):
