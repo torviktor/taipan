@@ -1,0 +1,18 @@
+[Unit]
+Description=Ежедневная сводка мониторинга Тайпан («я жив»)
+Documentation=file:/opt/taipan/monitoring/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/taipan-monitor/taipan_monitor.py --heartbeat
+# Запас на повторные попытки доставки (до 6 с нарастающей паузой).
+TimeoutStartSec=280
+# Неотправленная сводка — сама по себе сигнал, но юнит из-за неё не «сломан».
+SuccessExitStatus=0 1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

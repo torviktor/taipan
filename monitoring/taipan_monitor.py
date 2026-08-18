@@ -90,12 +90,17 @@ def load_config():
 
 # ─── состояние ────────────────────────────────────────────────────────────────
 
+def _iso_hours_ago(hours):
+    from datetime import timedelta
+    return (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat(timespec="seconds")
+
+
 def load_state():
     try:
         with open(STATE_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
     except (FileNotFoundError, ValueError):
-        return {"fails": 0, "down": False, "since": None}
+        return {"fails": 0, "down": False, "since": None, "fail_log": []}
 
 
 def save_state(state):
@@ -250,6 +255,12 @@ def cmd_check(cfg, force_fail=False):
 
     if problems:
         state["fails"] = state.get("fails", 0) + 1
+        # Журнал неудач за последние двое суток — из него ежедневная сводка
+        # берёт цифру «сколько раз проверка падала». Счётчик fails для этого не
+        # годится: он обнуляется при первой же удачной проверке.
+        fail_log = [t for t in state.get("fail_log", []) if t > _iso_hours_ago(48)]
+        fail_log.append(datetime.now(timezone.utc).isoformat(timespec="seconds"))
+        state["fail_log"] = fail_log[-500:]
         log(f"проверка провалена ({state['fails']}/{FAIL_THRESHOLD}): {'; '.join(problems)}")
 
         if state["fails"] >= FAIL_THRESHOLD and not state.get("down"):
@@ -277,6 +288,72 @@ def cmd_check(cfg, force_fail=False):
 
     save_state(state)
     return 1 if problems else 0
+
+
+def _failed_notifications_24h():
+    """Сколько уведомлений за сутки осталось со статусом failed.
+
+    Обращение к БД допустимо только здесь: сводка — это отчёт, а не путь
+    доставки алерта. Если БД недоступна, сводка всё равно уходит, просто с
+    пометкой вместо цифры.
+    """
+    sql = ("SELECT count(*) FROM notifications "
+           "WHERE tg_status = 'failed' AND created_at >= now() - interval '24 hours';")
+    try:
+        out = subprocess.run(
+            ["docker", "compose", "exec", "-T", "db", "psql", "-U", "taipan_user",
+             "-d", "taipan_db", "-tAc", sql],
+            capture_output=True, text=True, timeout=30, cwd="/opt/taipan",
+        )
+        val = out.stdout.strip()
+        return int(val) if val.isdigit() else None
+    except Exception:
+        return None
+
+
+def cmd_heartbeat(cfg):
+    """Ежедневное «я жив».
+
+    Смысл сообщения — не в его содержимом, а в самом факте прихода: если оно
+    не пришло, значит сломан канал уведомлений. За сессию дважды случалось,
+    что система считала себя исправной, а доставки не было — send_telegram_to_user
+    возвращала True не глядя на ответ, а монитор получал от Cloudflare 403,
+    показывая при этом --status OK. Такое молчание теперь заметно.
+
+    Поэтому сводка уходит ВСЕГДА: она не зависит от состояния «упал/ок», не
+    трогает счётчики и не подавляется антиспамом.
+    """
+    now = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC")
+    problems = run_checks()
+    state = load_state()
+
+    public_ip = get_public_ip()
+    dns_ip = get_dns_ip()
+    ip_line = ("совпадает" if public_ip and public_ip == dns_ip
+               else f"РАСХОЖДЕНИЕ: сервер {public_ip}, DNS {dns_ip}")
+
+    since = _iso_hours_ago(24)
+    fails_24h = len([t for t in state.get("fail_log", []) if t > since])
+    failed_notifs = _failed_notifications_24h()
+    notif_line = "нет данных (БД недоступна)" if failed_notifs is None else str(failed_notifs)
+
+    if problems:
+        site_line = "ЕСТЬ ПРОБЛЕМЫ — " + escape("; ".join(problems))
+        head = "🟠 <b>Тайпан: сводка за сутки</b>"
+    else:
+        site_line = "работает"
+        head = "✅ <b>Тайпан: сводка за сутки</b>"
+
+    ok = telegram_send(cfg, (
+        f"{head}\n\n"
+        f"Сайт: {site_line}\n"
+        f"IP и A-запись: {escape(ip_line)}\n"
+        f"Неудачных проверок за сутки: {fails_24h}\n"
+        f"Уведомлений не доставлено: {notif_line}\n\n"
+        f"{now}"
+    ))
+    log("сводка отправлена" if ok else "сводку отправить НЕ удалось")
+    return 0 if ok else 1
 
 
 def cmd_test(cfg):
@@ -337,6 +414,8 @@ def main():
     cfg = load_config()
     if "--test" in args:
         return cmd_test(cfg)
+    if "--heartbeat" in args:
+        return cmd_heartbeat(cfg)
     if "--status" in args:
         return cmd_status(cfg)
     if "--resolve-chat" in args:
