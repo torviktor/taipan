@@ -55,6 +55,9 @@ FAIL_THRESHOLD = 3         # столько неудач подряд до ал�
 TELEGRAM_ATTEMPTS = 6      # попыток доставки алерта: канал до Telegram нестабилен
 TELEGRAM_RETRY_DELAY = 3   # база паузы между попытками, секунды (3, 6, 9, …)
 
+# Переопределяется через TELEGRAM_API_BASE в /etc/taipan-monitor.env
+DEFAULT_TELEGRAM_API_BASE = "https://api.telegram.org"
+
 IP_SERVICES = [
     "https://api.ipify.org",
     "https://checkip.amazonaws.com",
@@ -79,7 +82,7 @@ def load_config():
     except FileNotFoundError:
         pass
     # переменные окружения имеют приоритет — удобно для ручного запуска
-    for k in ("TELEGRAM_BOT_TOKEN", "ALERT_CHAT_ID"):
+    for k in ("TELEGRAM_BOT_TOKEN", "ALERT_CHAT_ID", "TELEGRAM_API_BASE"):
         if os.environ.get(k):
             cfg[k] = os.environ[k]
     return cfg
@@ -198,16 +201,26 @@ def telegram_send(cfg, text):
         "parse_mode": "HTML",
         "disable_web_page_preview": "true",
     }).encode()
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    # Базовый адрес Bot API берётся из конфига: на проде это Cloudflare Worker,
+    # прозрачно пробрасывающий /bot<token>/<method>. Прямой канал до
+    # api.telegram.org с этого сервера теряет около половины запросов.
+    base = cfg.get("TELEGRAM_API_BASE", DEFAULT_TELEGRAM_API_BASE).rstrip("/")
+    url = f"{base}/bot{token}/sendMessage"
 
-    # Исходящий доступ к api.telegram.org с этого сервера нестабилен: TCP на
-    # 443 устанавливается, а TLS рвётся — по замерам 17.08.2026 проходила
-    # примерно каждая третья попытка. Одиночный запрос терял бы алерты именно
-    # тогда, когда они нужны, поэтому повторяем с нарастающей паузой.
+    # Повторы оставлены и после перехода на воркер: канал до Cloudflare
+    # стабилен (20/20 в замере), но ретраи ничего не стоят, а алерт — это
+    # ровно то сообщение, которое нельзя терять.
+    # User-Agent обязателен: Cloudflare (а воркер живёт за ним) отдаёт
+    # «error code: 1010» на дефолтный Python-urllib — блокировка по сигнатуре
+    # клиента. Проверено: с любым осмысленным UA запрос проходит, без него —
+    # стабильный 403, то есть алерты молча не уходили бы вообще.
+    req = urllib.request.Request(url, data=data)
+    req.add_header("User-Agent", "taipan-monitor/1.0")
+
     last = ""
     for attempt in range(1, TELEGRAM_ATTEMPTS + 1):
         try:
-            with urllib.request.urlopen(urllib.request.Request(url, data=data), timeout=20) as r:
+            with urllib.request.urlopen(req, timeout=20) as r:
                 if r.status == 200:
                     if attempt > 1:
                         log(f"Telegram: доставлено с попытки {attempt}")

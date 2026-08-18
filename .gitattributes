@@ -1,0 +1,8 @@
+# Файлы, которые копируются на Linux-сервер и запускаются там напрямую,
+# обязаны иметь LF. С core.autocrlf=true на Windows они получали CRLF, и после
+# scp на сервер ломался shebang: /usr/bin/env: ‘python3\r’: No such file or
+# directory — монитор молча переставал запускаться.
+monitoring/*.py            text eol=lf
+monitoring/*.service       text eol=lf
+monitoring/*.timer         text eol=lf
+monitoring/*.env.example   text eol=lf

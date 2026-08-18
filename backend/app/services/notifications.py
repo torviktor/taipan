@@ -31,12 +31,34 @@ TELEGRAM_SEND_TIMEOUT  = 10
 TELEGRAM_SYNC_TIMEOUT     = 5
 TELEGRAM_SYNC_RETRY_DELAY = 1
 
+# Базовый адрес Bot API. По умолчанию — сам Telegram; на проде подменяется на
+# Cloudflare Worker, который прозрачно пробрасывает /bot<token>/<method>.
+# Прямой канал до api.telegram.org с этого сервера теряет около половины
+# запросов (замер 17.08.2026: TCP 8/20, TLS 1/5), тогда как до Cloudflare —
+# 20/20 за 14 мс.
+#
+# ВАЖНО: это адрес ТОЛЬКО для исходящих вызовов. Вебхук (Telegram → наш сервер)
+# работает штатно и остаётся на https://taipan-tkd.ru — setWebhook в коде нет
+# вовсе, так что подменить его этой настройкой невозможно.
+DEFAULT_TELEGRAM_API_BASE = "https://api.telegram.org"
+
+
+def bot_api_url(method: str) -> str:
+    """Единственное место, где собирается URL Bot API.
+
+    Значение читается при каждом вызове, чтобы правка .env подхватывалась
+    перезапуском контейнера без пересборки образа.
+    """
+    base = os.getenv("TELEGRAM_API_BASE", DEFAULT_TELEGRAM_API_BASE).rstrip("/")
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    return f"{base}/bot{token}/{method}"
+
+
 # ─── Telegram Bot ─────────────────────────────────────────────────────────────
 
 async def send_telegram_message(chat_id: str, text: str) -> bool:
     """Отправить сообщение в Telegram. С повторами — канал ненадёжен."""
-    token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    url = bot_api_url("sendMessage")
     payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
 
     last = ""
@@ -63,8 +85,7 @@ async def send_telegram_message(chat_id: str, text: str) -> bool:
 
 async def send_telegram_photo(chat_id: str, photo_url: str, caption: str) -> bool:
     """Отправить фото с подписью в Telegram. С повторами — канал ненадёжен."""
-    token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    url = bot_api_url("sendPhoto")
     payload = {
         "chat_id":    chat_id,
         "photo":      photo_url,
@@ -189,7 +210,7 @@ def send_telegram_to_user_result(user_id: int, title: str, body: str, db):
 
         import httpx
         import time
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        url = bot_api_url("sendMessage")
         payload = {
             "chat_id": sub.telegram_id,
             "text": text,
