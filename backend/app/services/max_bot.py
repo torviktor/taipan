@@ -120,6 +120,83 @@ def has_visible_text(text: str) -> bool:
     return bool(stripped.replace("&nbsp;", " ").strip())
 
 
+# ─── Клавиатура под сообщением ───────────────────────────────────────────────
+#
+# Пределы и структура установлены на живом API 22.08.2026 тем же приёмом
+# (400 proto.payload против 404 dialog.not.found у несуществующего адресата):
+#
+#   * вложение: {"type": "inline_keyboard", "payload": {"buttons": [[…], […]]}}.
+#     Кнопки — СПИСОК РЯДОВ. Плоский список и вариант без обёртки payload
+#     отвергаются с «Can't deserialize body»;
+#   * не больше 7 кнопок в ряду (errors.maxRowSize) и 30 рядов
+#     (errors.maxRows), то есть 210 штук всего;
+#   * подпись кнопки — до 128 символов, пустая запрещена;
+#   * payload у callback — до 1024 символов, поле обязательное, как и text;
+#   * типы: callback, link, request_contact, request_geo_location, message.
+#     Выдуманный тип отвергается.
+#
+# Пределы вынесены в константы не для красоты: подпись собирается из данных
+# (например, имени ребёнка), и обрезать её надо нам, а не получать 400 из
+# середины обработки вебхука.
+
+KEYBOARD_MAX_ROWS    = 30
+KEYBOARD_MAX_PER_ROW = 7
+BUTTON_TEXT_LIMIT    = 128
+CALLBACK_PAYLOAD_LIMIT = 1024
+
+
+def callback_button(text: str, payload: str) -> dict:
+    """Кнопка, присылающая апдейт message_callback."""
+    text = (text or "").strip()[:BUTTON_TEXT_LIMIT]
+    if not text:
+        raise ValueError("подпись кнопки не может быть пустой — MAX отвергает")
+    if len(payload) > CALLBACK_PAYLOAD_LIMIT:
+        raise ValueError(f"payload длиннее {CALLBACK_PAYLOAD_LIMIT} символов")
+    return {"type": "callback", "text": text, "payload": payload}
+
+
+def link_button(text: str, url: str) -> dict:
+    """Кнопка-ссылка. Нажатие к нам не приходит — браузер открывается сам."""
+    return {"type": "link", "text": (text or "").strip()[:BUTTON_TEXT_LIMIT], "url": url}
+
+
+def keyboard(rows: list) -> dict:
+    """Собрать вложение с клавиатурой из списка рядов.
+
+    Проверяем пределы здесь, чтобы ошибка всплыла на нашей стороне с внятным
+    текстом, а не пришла как proto.payload посреди обработки апдейта.
+    """
+    rows = [r for r in rows if r]
+    if len(rows) > KEYBOARD_MAX_ROWS:
+        raise ValueError(f"рядов {len(rows)}, предел {KEYBOARD_MAX_ROWS}")
+    for i, row in enumerate(rows, 1):
+        if len(row) > KEYBOARD_MAX_PER_ROW:
+            raise ValueError(f"в ряду {i} кнопок {len(row)}, предел {KEYBOARD_MAX_PER_ROW}")
+    return {"type": "inline_keyboard", "payload": {"buttons": rows}}
+
+
+def answer_callback(callback_id: str, notification: Optional[str] = None) -> bool:
+    """Подтвердить нажатие кнопки.
+
+    Без этого у нажавшего остаётся крутящийся индикатор: платформа ждёт
+    подтверждения. Пустое тело допустимо и ничего не показывает — всплывающее
+    уведомление на каждое нажатие только мешало бы, ответ и так приходит
+    отдельным сообщением.
+    """
+    body = {"notification": notification} if notification else {}
+    try:
+        r = httpx.post(f"{api_base()}/answers", params={"callback_id": callback_id},
+                       json=body, headers=api_headers(),
+                       timeout=MAX_SEND_TIMEOUT, verify=ca_bundle())
+        if r.status_code != 200:
+            logger.warning("MAX: нажатие не подтверждено — HTTP %s: %s",
+                           r.status_code, r.text[:200])
+        return r.status_code == 200
+    except Exception as e:
+        logger.warning("MAX: подтверждение нажатия упало — %s: %s", type(e).__name__, e)
+        return False
+
+
 def split_text(text: str, limit: int = MAX_TEXT_LIMIT) -> list:
     """Разбить длинный текст на части не длиннее limit символов.
 
@@ -150,7 +227,8 @@ def split_text(text: str, limit: int = MAX_TEXT_LIMIT) -> list:
 
 # ─── Отправка ────────────────────────────────────────────────────────────────
 
-def send_message_result(user_id: str, text: str, fmt: str = "html") -> Tuple[str, str]:
+def send_message_result(user_id: str, text: str, fmt: str = "html",
+                        buttons: Optional[list] = None) -> Tuple[str, str]:
     """Отправить сообщение в личку. Возвращает (статус, текст ошибки).
 
     Статусы совпадают со значениями notifications.tg_status, чтобы в будущем
@@ -160,6 +238,9 @@ def send_message_result(user_id: str, text: str, fmt: str = "html") -> Tuple[str
     Длинный текст разбивается на части: предел MAX — 4000 символов, а сводка
     событий на месяц его перерастает. Части уходят по очереди, статус общий:
     недоставленная середина делает сообщение бессмысленным целиком.
+
+    Клавиатура, если задана, вешается на ПОСЛЕДНЮЮ часть: иначе кнопки
+    оказались бы в середине разговора, над остатком текста.
     """
     if not is_configured():
         return "failed", "MAX_BOT_TOKEN не задан"
@@ -171,26 +252,33 @@ def send_message_result(user_id: str, text: str, fmt: str = "html") -> Tuple[str
         return "failed", "нечего отправлять: текст пуст после снятия разметки"
 
     chunks = split_text(text)
+    last = len(chunks)
     for i, chunk in enumerate(chunks, 1):
-        status, err = _send_one(user_id, chunk, fmt)
+        status, err = _send_one(user_id, chunk, fmt,
+                                buttons if i == last else None)
         if status != "sent":
-            if len(chunks) > 1:
-                err = f"часть {i} из {len(chunks)}: {err}"
+            if last > 1:
+                err = f"часть {i} из {last}: {err}"
             return status, err
     return "sent", ""
 
 
-def _send_one(user_id: str, text: str, fmt: str) -> Tuple[str, str]:
+def _send_one(user_id: str, text: str, fmt: str,
+              buttons: Optional[list] = None) -> Tuple[str, str]:
     """Одна порция текста, с повторами."""
     url = f"{api_base()}/messages"
     last = ""
+
+    body = {"text": text, "format": fmt}
+    if buttons:
+        body["attachments"] = [keyboard(buttons)]
 
     for attempt in range(1, MAX_SEND_ATTEMPTS + 1):
         try:
             r = httpx.post(
                 url,
                 params={"user_id": user_id},
-                json={"text": text, "format": fmt},
+                json=body,
                 headers=api_headers(),
                 timeout=MAX_SEND_TIMEOUT,
                 verify=ca_bundle(),
@@ -221,9 +309,30 @@ def _send_one(user_id: str, text: str, fmt: str) -> Tuple[str, str]:
     return "failed", last
 
 
-def send_message(user_id: str, text: str, fmt: str = "html") -> bool:
+def send_message(user_id: str, text: str, fmt: str = "html",
+                 buttons: Optional[list] = None) -> bool:
     """Обёртка для мест, которым нужен только факт успеха."""
-    return send_message_result(user_id, text, fmt)[0] == "sent"
+    return send_message_result(user_id, text, fmt, buttons)[0] == "sent"
+
+
+def set_commands(commands: list) -> Tuple[bool, str]:
+    """Записать меню команд в карточку бота.
+
+    Аналог setMyCommands у Telegram существует и здесь: PATCH /me/commands,
+    тело строго {"commands": [...]} — голый список отвергается с
+    «Can't deserialize body». Проверено на живом API 22.08.2026.
+
+    То есть трогать карточку на business.max.ru ради команд не нужно.
+    """
+    try:
+        r = httpx.patch(f"{api_base()}/me/commands", json={"commands": commands},
+                        headers=api_headers(), timeout=MAX_SEND_TIMEOUT,
+                        verify=ca_bundle())
+        if r.status_code == 200:
+            return True, ""
+        return False, f"HTTP {r.status_code}: {r.text[:200]}"
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
 
 
 def get_me() -> Optional[dict]:

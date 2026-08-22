@@ -1,7 +1,12 @@
 """Хендлеры бота в мессенджере MAX (id5034074017_bot).
 
-Сессия 1: приём апдейтов, /start и привязка родителя через /link.
-Остальные команды (/stop, /events, /week, /month, /news) — следующим шагом.
+Приём апдейтов, команды и кнопки под сообщением.
+
+ПРО ЕДИНСТВО КОМАНД И КНОПОК. Список того, что бот умеет, живёт в одном
+месте — ACTIONS. Текстовая команда и нажатие кнопки разрешаются в одно и то
+же имя действия и исполняются одной функцией run_action. Развилки «если
+кнопка, то одно, если команда — другое» здесь нет намеренно: два пути к
+одному результату однажды разъезжаются в поведении.
 
 ПРО РАЗМЕТКУ. Сообщения уходят с format=html и узким набором тегов —
 подробности и границы проверенного в app/services/max_bot.py. Коротко: API
@@ -50,15 +55,36 @@ def webhook_url() -> str:
     return f"{SITE_URL}/api/max/webhook/{webhook_secret()}"
 
 
-COMMANDS = (
-    "<b>Команды:</b>\n"
-    "/start — подписаться на уведомления\n"
-    "/stop — отписаться\n"
-    "/events — ближайшее событие\n"
-    "/week — события на неделю\n"
-    "/month — события на месяц\n"
-    "/news — последние новости\n"
-    "/link НОМЕР — привязать аккаунт сайта"
+# ─── Действия ────────────────────────────────────────────────────────────────
+#
+# Единственный список того, что бот умеет. И текстовая команда, и нажатие
+# кнопки разрешаются в одно и то же имя действия и выполняются одним кодом —
+# иначе кнопка и команда неизбежно разошлись бы в поведении.
+#
+# Ключ — имя действия, оно же payload кнопки (предел MAX — 1024 символа,
+# наши имена короткие). Значение — что показать в меню команд бота.
+
+ACTIONS = {
+    "start":    "Подписаться на уведомления",
+    "events":   "Ближайшее событие",
+    "week":     "События на неделю",
+    "month":    "События на месяц",
+    "news":     "Последние новости клуба",
+    "children": "Мои спортсмены",
+    "link":     "Привязать аккаунт сайта",
+    "stop":     "Отписаться от уведомлений",
+}
+
+# Команды, которые бот принимает текстом. Отдельная таблица, потому что
+# /link умеет ещё и форму «/link НОМЕР», разбираемую особо.
+COMMAND_ALIASES = {f"/{name}": name for name in ACTIONS}
+
+
+# Список для человека собирается из ACTIONS, а не пишется рядом: две
+# независимые копии однажды разошлись бы, и бот рассказывал бы о командах,
+# которых у него нет.
+COMMANDS = "<b>Команды:</b>\n" + "\n".join(
+    f"/{name} — {descr}" for name, descr in ACTIONS.items()
 )
 
 WELCOME = (
@@ -77,6 +103,31 @@ LINK_HELP = (
 )
 
 UNKNOWN = "Не понимаю эту команду.\n\n" + COMMANDS
+
+
+
+
+def main_keyboard(sub=None) -> list:
+    """Клавиатура основных действий.
+
+    Ряды короткие намеренно: подписи с эмодзи на узком экране переносятся, и
+    четыре кнопки в ряд превращаются в кашу. Пределы MAX (7 в ряду, 30 рядов)
+    здесь далеко не достигаются.
+
+    Расписание — кнопка-ссылка, а не действие: таблица schedule в базе пуста,
+    и команда показывала бы пустоту, тогда как страница сайта работает.
+    """
+    from app.services.max_bot import callback_button, link_button
+
+    rows = [
+        [callback_button("📅 Ближайшее", "events"),
+         callback_button("🗓 Неделя", "week")],
+        [callback_button("📆 Месяц", "month"),
+         callback_button("📰 Новости", "news")],
+        [callback_button("🥋 Мои спортсмены", "children")],
+        [link_button("🏫 Расписание", f"{SITE_URL}/schedule")],
+    ]
+    return rows
 
 
 def _fmt_event(e) -> str:
@@ -121,6 +172,42 @@ def _cmd_period(db, days: int, title: str, empty: str) -> str:
     if not events:
         return empty
     return f"📅 <b>{title}</b>\n\n" + "\n".join(_fmt_event(e) for e in events)
+
+
+def _cmd_children(db, sub) -> str:
+    """Спортсмены, привязанные к аккаунту нажавшего."""
+    from app.models.user import User, Athlete
+
+    if not sub.user_id:
+        return (
+            "🔗 Аккаунт сайта пока не привязан.\n\n"
+            "Отправьте <code>/link НОМЕР</code> — тот номер телефона, которым "
+            f"вы зарегистрированы на {SITE_URL}.\n\n"
+            "Пример: <code>/link 79253653597</code>"
+        )
+
+    user = db.query(User).filter(User.id == sub.user_id).first()
+    athletes = (
+        db.query(Athlete)
+        .filter(Athlete.user_id == sub.user_id, Athlete.is_archived == False)
+        .all()
+    )
+    if not athletes:
+        return (f"👤 {esc(user.full_name) if user else 'Аккаунт'}\n\n"
+                "🥋 За вами пока не закреплено ни одного спортсмена.\n"
+                "Если это ошибка — скажите тренеру.")
+
+    lines = []
+    for a in athletes:
+        rank = ""
+        if getattr(a, "dan", None):
+            rank = f" — {a.dan} дан"
+        elif getattr(a, "gup", None):
+            rank = f" — {a.gup} гып"
+        lines.append(f"• {esc(a.full_name)}{rank}")
+
+    return (f"👤 {esc(user.full_name) if user else 'Ваш аккаунт'}\n\n"
+            f"🥋 <b>Ваши спортсмены:</b>\n" + "\n".join(lines))
 
 
 def _cmd_news(db) -> str:
@@ -226,76 +313,123 @@ def _handle_link(db, sub, user_id_max: str, text: str) -> str:
     )
 
 
-def process_max_update(update: dict) -> None:
-    """Разобрать один апдейт MAX.
+def run_action(action: str, db, sub, raw_text: str = "") -> str:
+    """Выполнить действие и вернуть текст ответа.
 
-    Обрабатываются два типа:
-      * bot_started    — человек открыл диалог с ботом, аналог /start;
-      * message_created — обычное сообщение.
-    Остальные типы молча игнорируются: MAX присылает и служебные события,
-    падать на них нельзя, иначе он сочтёт эндпоинт нерабочим и снимет подписку.
+    ЕДИНСТВЕННОЕ место, где действия исполняются. Сюда приходят и текстовые
+    команды, и нажатия кнопок: у кнопки payload — это ровно имя действия.
+    Развилка «если кнопка, то одно, если команда — другое» отсутствует
+    намеренно, иначе поведение двух путей однажды разъедется.
+
+    raw_text нужен единственному действию — /link с номером в той же строке.
     """
-    from app.services.max_bot import send_message_result
+    if action == "start":
+        sub.subscribed = True
+        db.commit()
+        return WELCOME
 
-    kind = update.get("update_type") or update.get("updateType") or ""
+    if action == "stop":
+        sub.subscribed = False
+        db.commit()
+        return ("😔 Вы отписались от уведомлений.\n"
+                "Напишите /start или нажмите кнопку, чтобы подписаться снова.")
 
+    if action == "link":
+        # «/link 79…» — сразу привязка, «/link» и кнопка — подсказка.
+        if raw_text.startswith("/link "):
+            return _handle_link(db, sub, sub.external_id, raw_text)
+        db.commit()
+        return LINK_HELP
+
+    db.commit()
+
+    if action == "events":
+        return _cmd_events(db)
+    if action == "week":
+        return _cmd_period(db, 7, "События на неделю:",
+                           "📅 На этой неделе событий нет.")
+    if action == "month":
+        return _cmd_period(db, 30, "События на месяц:",
+                           "📅 В ближайший месяц событий нет.")
+    if action == "news":
+        return _cmd_news(db)
+    if action == "children":
+        return _cmd_children(db, sub)
+
+    return UNKNOWN
+
+
+def _resolve(kind: str, update: dict):
+    """Достать из апдейта отправителя и то, что он хочет.
+
+    Возвращает (external_id, username, full_name, action, raw_text,
+    callback_id) либо None, если апдейт нам не адресован.
+    """
     if kind == "bot_started":
         who = update.get("user") or {}
-        external_id = str(who.get("user_id") or "")
-        username    = who.get("username") or ""
-        full_name   = (who.get("name") or "").strip()
-        text        = "/start"
-    elif kind == "message_created":
+        return (str(who.get("user_id") or ""), who.get("username") or "",
+                (who.get("name") or "").strip(), "start", "", None)
+
+    if kind == "message_created":
         message = update.get("message") or {}
         sender  = message.get("sender") or {}
         body    = message.get("body") or {}
         # Адрес ответа — отправитель, а не recipient.chat_id (см. шапку модуля).
-        external_id = str(sender.get("user_id") or "")
-        username    = sender.get("username") or ""
-        full_name   = (sender.get("name") or "").strip()
-        text        = (body.get("text") or "").strip()
-    else:
+        text = (body.get("text") or "").strip()
+        # «/link 79…» доходит до run_action как есть, остальное — по таблице.
+        action = COMMAND_ALIASES.get(text.split()[0] if text else "", "")
+        return (str(sender.get("user_id") or ""), sender.get("username") or "",
+                (sender.get("name") or "").strip(), action, text, None)
+
+    if kind == "message_callback":
+        cb = update.get("callback") or {}
+        who = cb.get("user") or (update.get("message") or {}).get("sender") or {}
+        return (str(who.get("user_id") or ""), who.get("username") or "",
+                (who.get("name") or "").strip(),
+                (cb.get("payload") or "").strip(), "",
+                cb.get("callback_id"))
+
+    return None
+
+
+def process_max_update(update: dict) -> None:
+    """Разобрать один апдейт MAX.
+
+    Обрабатываются три типа:
+      * bot_started     — человек открыл диалог с ботом, аналог /start;
+      * message_created — обычное сообщение;
+      * message_callback — нажата кнопка под сообщением.
+    Остальные типы молча игнорируются: MAX присылает и служебные события,
+    падать на них нельзя, иначе он сочтёт эндпоинт нерабочим и снимет подписку.
+    """
+    from app.services.max_bot import send_message_result, answer_callback
+
+    kind = update.get("update_type") or update.get("updateType") or ""
+    resolved = _resolve(kind, update)
+    if resolved is None:
         logger.debug("MAX: апдейт типа %r пропущен", kind)
         return
+
+    external_id, username, full_name, action, raw_text, callback_id = resolved
 
     if not external_id:
         logger.warning("MAX: апдейт без user_id отправителя, пропущен: %s", kind)
         return
 
+    # Подтверждаем нажатие сразу, до работы с базой: у нажавшего иначе висит
+    # индикатор ожидания всё время, пока мы ходим в БД и собираем ответ.
+    if callback_id:
+        answer_callback(callback_id)
+
     db = SessionLocal()
     try:
         sub = _get_or_create(db, external_id, username, full_name)
+        reply = run_action(action, db, sub, raw_text)
 
-        if text == "/start":
-            sub.subscribed = True
-            db.commit()
-            reply = WELCOME
-        elif text == "/stop":
-            sub.subscribed = False
-            db.commit()
-            reply = ("😔 Вы отписались от уведомлений.\n"
-                     "Напишите /start, чтобы подписаться снова.")
-        elif text == "/link":
-            db.commit()
-            reply = LINK_HELP
-        elif text.startswith("/link "):
-            reply = _handle_link(db, sub, external_id, text)
-        else:
-            db.commit()
-            if text == "/events":
-                reply = _cmd_events(db)
-            elif text == "/week":
-                reply = _cmd_period(db, 7, "События на неделю:",
-                                    "📅 На этой неделе событий нет.")
-            elif text == "/month":
-                reply = _cmd_period(db, 30, "События на месяц:",
-                                    "📅 В ближайший месяц событий нет.")
-            elif text == "/news":
-                reply = _cmd_news(db)
-            else:
-                reply = UNKNOWN
-
-        status, err = send_message_result(external_id, reply)
+        # Кнопки показываем под каждым ответом: разговор с ботом идёт с
+        # телефона, и набирать «/month» руками там неудобно.
+        status, err = send_message_result(external_id, reply,
+                                          buttons=main_keyboard(sub))
         if status != "sent":
             logger.error("MAX: ответ не доставлен user_id=%s — %s", external_id, err)
     except Exception:

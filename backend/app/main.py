@@ -130,6 +130,18 @@ def register_max_webhook():
             res["deleted"], res["created"], res["already"],
         )
 
+    # Меню команд в карточке бота. Ставится отсюда, а не руками на
+    # business.max.ru: список живёт в ACTIONS, и человек, добавивший команду в
+    # код, не должен помнить про вторую копию в чужом интерфейсе.
+    from app.routes.max import ACTIONS
+    ok, err = max_bot.set_commands(
+        [{"name": name, "description": descr} for name, descr in ACTIONS.items()]
+    )
+    if ok:
+        log.info("MAX: меню команд обновлено (%s шт.)", len(ACTIONS))
+    else:
+        log.error("MAX: меню команд не обновлено — %s", err)
+
 
 @app.get("/health")
 def health():
