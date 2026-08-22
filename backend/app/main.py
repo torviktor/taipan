@@ -7,6 +7,9 @@ from app.core.net import force_ipv4
 setup_file_logging("backend")
 force_ipv4()
 
+import logging
+log = logging.getLogger(__name__)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -16,6 +19,8 @@ from slowapi.errors import RateLimitExceeded
 from app.core.database import engine, Base, SessionLocal
 from app.routes import auth, applications, schedule, users, payments
 from app.routes import events, telegram
+# Не «from app.routes import max»: имя перекрыло бы встроенную функцию max().
+from app.routes.max import router as max_router
 from app.routes.ai import router as ai_router
 from app.routes.attendance import router as attendance_router
 from app.routes.competitions import router as competitions_router
@@ -71,6 +76,7 @@ app.include_router(schedule.router,          prefix="/api/schedule",     tags=["
 app.include_router(payments.router,          prefix="/api/payments",     tags=["Оплата"])
 app.include_router(events.router,            prefix="/api/events",       tags=["Календарь"])
 app.include_router(telegram.router,          prefix="/api/telegram",     tags=["Telegram"])
+app.include_router(max_router,               prefix="/api/max",          tags=["MAX"])
 app.include_router(ai_router,                prefix="/api",              tags=["AI"])
 app.include_router(attendance_router,        prefix="/api",              tags=["Посещаемость"])
 app.include_router(competitions_router,      prefix="/api",              tags=["Соревнования"])
@@ -89,6 +95,40 @@ app.include_router(individual_training_router, prefix="/api",            tags=["
 app.include_router(invite_router,              prefix="/api",            tags=["Приглашения"])
 app.include_router(preparation_router,         prefix="/api",            tags=["Подготовка к аттестации"])
 app.include_router(season_best_router,         prefix="/api",            tags=["Лучшие сезона"])
+
+
+@app.on_event("startup")
+def register_max_webhook():
+    """Поставить подписку на вебхук MAX при старте приложения.
+
+    Почему это нужно делать каждый раз, а не однократно руками: MAX снимает
+    подписку после 8 часов без успешного ответа эндпоинта, и повторный POST
+    не заменяет прежнюю, а ДОБАВЛЯЕТ ещё одну — накопленные дубли означают
+    дубли апдейтов. ensure_subscription сначала сносит все чужие, потом
+    ставит нашу.
+
+    Старта, однако, недостаточно: контейнер живёт неделями, и снятую днём
+    подписку заметить будет некому. Периодическая сверка в celery beat —
+    следующим шагом.
+
+    Ошибки сюда не выпускаем: недоступный MAX не повод не поднять сайт.
+    """
+    from app.services import max_bot
+    from app.routes.max import webhook_url
+
+    if not max_bot.is_configured():
+        log.info("MAX: токен не задан, подписка не ставится")
+        return
+
+    url = webhook_url()
+    res = max_bot.ensure_subscription(url)
+    if res["error"]:
+        log.error("MAX: подписка не поставлена — %s", res["error"])
+    else:
+        log.info(
+            "MAX: подписка в порядке (снято чужих: %s, создана: %s, уже была: %s)",
+            res["deleted"], res["created"], res["already"],
+        )
 
 
 @app.get("/health")

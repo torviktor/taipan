@@ -318,6 +318,87 @@ def _failed_notifications_24h():
         return None
 
 
+CERT_WARN_DAYS = 30
+
+
+def _cert_days_left(host, port=443):
+    """Сколько дней осталось сертификату, который отдаёт host.
+
+    Проверка доверия намеренно отключена: нас интересует только дата, а
+    platform-api2.max.ru закрыт сертификатом УЦ Минцифры, которого нет в
+    системном наборе хоста — со штатной проверкой функция падала бы там,
+    где всё в порядке.
+    """
+    import ssl
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    try:
+        with socket.create_connection((host, port), timeout=HTTP_TIMEOUT) as s:
+            with ctx.wrap_socket(s, server_hostname=host) as ss:
+                der = ss.getpeercert(binary_form=True)
+        out = subprocess.run(["openssl", "x509", "-inform", "DER", "-noout", "-enddate"],
+                             input=der, capture_output=True, timeout=15)
+        line = out.stdout.decode().strip()          # notAfter=Oct  7 21:09:44 2026 GMT
+        exp = datetime.strptime(line.split("=", 1)[1].strip(), "%b %d %H:%M:%S %Y %Z")
+        return (exp.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)).days
+    except Exception:
+        return None
+
+
+def _bundle_sub_ca_days_left():
+    """Срок Sub CA Минцифры в bundle внутри образа backend.
+
+    Именно этот сертификат делает возможными запросы к MAX. Он истекает
+    06.03.2027 и, в отличие от нашего Let's Encrypt, никем не продлевается
+    автоматически: bundle пересобирается только при сборке образа. Молча
+    просроченный корень — это внезапно замолчавший бот.
+    """
+    sh = ('for f in $(csplit -z -f /tmp/mc -b %02d.pem "$MAX_CA_BUNDLE" '
+          '"/BEGIN CERTIFICATE/" "{*}" >/dev/null 2>&1; echo /tmp/mc*.pem); do '
+          'openssl x509 -in "$f" -noout -subject -enddate 2>/dev/null | tr "\\n" " "; echo; '
+          'done | grep "Russian Trusted Sub CA"; rm -f /tmp/mc*.pem')
+    try:
+        out = subprocess.run(
+            ["docker", "compose", "exec", "-T", "backend", "sh", "-c", sh],
+            capture_output=True, text=True, timeout=40, cwd="/opt/taipan",
+        )
+        for part in out.stdout.split("notAfter="):
+            if part and part[0].isalpha():
+                exp = datetime.strptime(part.strip(), "%b %d %H:%M:%S %Y %Z")
+                return (exp.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)).days
+    except Exception:
+        pass
+    return None
+
+
+def _cert_lines():
+    """Строки о сертификатах для сводки + список тех, что скоро истекут.
+
+    Возвращает (строки, тревоги). Тревога поднимается за CERT_WARN_DAYS дней:
+    этого хватает, чтобы успеть отреагировать спокойно, а не в ночь отказа.
+    """
+    checks = [
+        ("наш сертификат (taipan-tkd.ru)", _cert_days_left("taipan-tkd.ru")),
+        ("сертификат max.ru",              _cert_days_left("platform-api2.max.ru")),
+        ("корень Минцифры в bundle",       _bundle_sub_ca_days_left()),
+    ]
+    lines, alarms = [], []
+    for name, days in checks:
+        if days is None:
+            lines.append(f"{name}: проверить не удалось")
+            continue
+        if days < 0:
+            lines.append(f"{name}: ⛔ ИСТЁК {-days} дн. назад")
+            alarms.append(f"{name} истёк")
+        elif days <= CERT_WARN_DAYS:
+            lines.append(f"{name}: ⚠️ {days} дн.")
+            alarms.append(f"{name} истекает через {days} дн.")
+        else:
+            lines.append(f"{name}: {days} дн.")
+    return lines, alarms
+
+
 def cmd_heartbeat(cfg):
     """Ежедневное «я жив».
 
@@ -344,12 +425,21 @@ def cmd_heartbeat(cfg):
     failed_notifs = _failed_notifications_24h()
     notif_line = "нет данных (БД недоступна)" if failed_notifs is None else str(failed_notifs)
 
+    cert_lines, cert_alarms = _cert_lines()
+
     if problems:
         site_line = "ЕСТЬ ПРОБЛЕМЫ — " + escape("; ".join(problems))
         head = "🟠 <b>Тайпан: сводка за сутки</b>"
     else:
         site_line = "работает"
-        head = "✅ <b>Тайпан: сводка за сутки</b>"
+        # Истекающий сертификат — это не «сайт лежит», но и не «всё хорошо»:
+        # молчаливая смерть через полгода уже случалась, поэтому заголовок
+        # обязан отличаться от спокойной галочки.
+        head = ("⚠️ <b>Тайпан: сводка за сутки</b>" if cert_alarms
+                else "✅ <b>Тайпан: сводка за сутки</b>")
+
+    cert_block = "\n".join(escape(l) for l in cert_lines)
+    warn_block = ("\n\nВНИМАНИЕ: " + escape("; ".join(cert_alarms))) if cert_alarms else ""
 
     ok = telegram_send(cfg, (
         f"{head}\n\n"
@@ -357,6 +447,7 @@ def cmd_heartbeat(cfg):
         f"IP и A-запись: {escape(ip_line)}\n"
         f"Неудачных проверок за сутки: {fails_24h}\n"
         f"Уведомлений не доставлено: {notif_line}\n\n"
+        f"Сертификаты:\n{cert_block}{warn_block}\n\n"
         f"{now}"
     ))
     log("сводка отправлена" if ok else "сводку отправить НЕ удалось")

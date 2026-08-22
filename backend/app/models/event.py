@@ -1,4 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, ForeignKey, JSON
+from sqlalchemy import (
+    Column, Integer, String, DateTime, Text, Boolean, ForeignKey, JSON,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.core.database import Base
@@ -63,6 +66,45 @@ class TelegramSubscriber(Base):
     created_at  = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", foreign_keys=[user_id])
+
+
+class MessengerSubscriber(Base):
+    """Подписчик мессенджера — общий справочник для Telegram и MAX.
+
+    Пришёл на смену telegram_subscribers (миграция 2026_08_22). Старая таблица
+    осталась представлением над этой: телеграмный код продолжает работать без
+    правок, пока не переведён на новую модель.
+
+    ВНИМАНИЕ, главная ловушка. external_id — просто число, и одно и то же
+    значение может принадлежать разным людям на разных площадках: telegram
+    chat_id и MAX user_id внешне неотличимы. Уникальность в базе стоит на паре
+    (platform, external_id), но КАЖДЫЙ запрос по external_id обязан нести
+    фильтр по platform — этого база не гарантирует. Запрос без фильтра рано
+    или поздно отправит уведомление не тому человеку.
+
+    Что лежит в external_id:
+      * telegram — chat_id;
+      * max      — user_id ОТПРАВИТЕЛЯ из апдейта (sender.user_id). Личка в MAX
+                   адресуется по пользователю; chat_id из личного диалога сюда
+                   класть нельзя, отправка ответит 404 chat.not.found.
+    """
+    __tablename__ = "messenger_subscribers"
+
+    id          = Column(Integer, primary_key=True)
+    platform    = Column(String(20), nullable=False, default="telegram")
+    external_id = Column(String(50), nullable=False)
+    username    = Column(String(100), nullable=True)
+    full_name   = Column(String(200), nullable=True)
+    user_id     = Column(Integer, ForeignKey("users.id"), nullable=True)
+    subscribed  = Column(Boolean, default=True)
+    created_at  = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", foreign_keys=[user_id])
+
+    __table_args__ = (
+        UniqueConstraint("platform", "external_id",
+                         name="uq_messenger_subscribers_platform_external"),
+    )
 
 
 class PushSubscriber(Base):
