@@ -201,6 +201,49 @@ def enqueue_telegram_delivery() -> bool:
         return False
 
 
+def send_telegram_sync(chat_id: str, text: str):
+    """Синхронно отправить готовый HTML-текст в конкретный чат.
+
+    Вынесено из send_telegram_to_user_result, чтобы тем же путём могли ходить
+    служебные сообщения тренерам: адресат у них известен напрямую, искать его
+    по user_id не нужно.
+
+    Возвращает (статус, текст ошибки), статусы совпадают с notifications.tg_status.
+    Текст ДОЛЖЕН быть уже экранирован вызывающим — здесь он уходит как есть.
+    """
+    if not os.getenv("TELEGRAM_BOT_TOKEN", ""):
+        return "failed", "TELEGRAM_BOT_TOKEN не задан"
+
+    import httpx
+    import time
+    url = bot_api_url("sendMessage")
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+
+    # Раньше здесь была одна попытка, а результат вообще не проверялся:
+    # return True стоял после httpx.post безусловно, поэтому функция
+    # рапортовала об успехе даже когда Telegram отвечал ошибкой или запрос
+    # падал по таймауту. При потерях канала это скрывало недоставленные
+    # уведомления родителям — о взносах, сборах, аттестациях.
+    last = ""
+    for attempt in range(1, TELEGRAM_SEND_ATTEMPTS + 1):
+        try:
+            r = httpx.post(url, json=payload, timeout=TELEGRAM_SYNC_TIMEOUT,
+                           headers=bot_api_headers())
+            if r.status_code == 200:
+                if attempt > 1:
+                    logger.info("Telegram: chat_id=%s доставлено с попытки %s", chat_id, attempt)
+                return "sent", ""
+            last = f"HTTP {r.status_code}: {r.text[:200]}"
+        except Exception as e:
+            last = f"{type(e).__name__}: {e}"
+        if attempt < TELEGRAM_SEND_ATTEMPTS:
+            time.sleep(TELEGRAM_SYNC_RETRY_DELAY * attempt)
+
+    logger.error("Telegram: chat_id=%s НЕ доставлено за %s попыток — %s",
+                 chat_id, TELEGRAM_SEND_ATTEMPTS, last)
+    return "failed", last
+
+
 def send_telegram_to_user_result(user_id: int, title: str, body: str, db):
     """Как send_telegram_to_user, но возвращает (статус, текст ошибки).
 
@@ -218,46 +261,8 @@ def send_telegram_to_user_result(user_id: int, title: str, body: str, db):
         if not sub:
             return "no_account", "у пользователя нет привязанного Telegram"
 
-        token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-        if not token:
-            return "failed", "TELEGRAM_BOT_TOKEN не задан"
-
         text = f"🔔 <b>{esc(title)}</b>\n\n{esc(body)}\n\n<i>taipan-tkd.ru/cabinet</i>"
-
-        import httpx
-        import time
-        url = bot_api_url("sendMessage")
-        payload = {
-            "chat_id": sub.telegram_id,
-            "text": text,
-            "parse_mode": "HTML",
-        }
-
-        # Раньше здесь была одна попытка, а результат вообще не проверялся:
-        # return True стоял после httpx.post безусловно, поэтому функция
-        # рапортовала об успехе даже когда Telegram отвечал ошибкой или запрос
-        # падал по таймауту. При потерях канала это скрывало недоставленные
-        # уведомления родителям — о взносах, сборах, аттестациях.
-        last = ""
-        for attempt in range(1, TELEGRAM_SEND_ATTEMPTS + 1):
-            try:
-                r = httpx.post(url, json=payload, timeout=TELEGRAM_SYNC_TIMEOUT,
-                               headers=bot_api_headers())
-                if r.status_code == 200:
-                    if attempt > 1:
-                        logger.info("Telegram: user_id=%s доставлено с попытки %s", user_id, attempt)
-                    return "sent", ""
-                last = f"HTTP {r.status_code}: {r.text[:200]}"
-            except Exception as e:
-                last = f"{type(e).__name__}: {e}"
-            if attempt < TELEGRAM_SEND_ATTEMPTS:
-                time.sleep(TELEGRAM_SYNC_RETRY_DELAY * attempt)
-
-        logger.error(
-            "Telegram: уведомление user_id=%s НЕ доставлено за %s попыток — %s",
-            user_id, TELEGRAM_SEND_ATTEMPTS, last,
-        )
-        return "failed", last
+        return send_telegram_sync(sub.telegram_id, text)
     except Exception as e:
         logger.error("send_telegram_to_user: %s: %s", type(e).__name__, e)
         return "failed", f"{type(e).__name__}: {e}"

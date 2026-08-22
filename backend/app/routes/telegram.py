@@ -172,6 +172,13 @@ async def process_telegram_update(update: dict):
                         Athlete.is_archived == False
                     ).all()
 
+                    # Тренерам — только на УСПЕШНУЮ привязку, не на /start:
+                    # его пишет любой открывший бота. Ошибки глушатся внутри,
+                    # чтобы служебное сообщение не сломало саму привязку.
+                    from app.services.reach import notify_staff_new_link
+                    notify_staff_new_link(db, user, "telegram",
+                                          [a.full_name for a in athletes])
+
                     if athletes:
                         athletes_text = "\n".join([f"• {esc(a.full_name)}" for a in athletes])
                         reply = (

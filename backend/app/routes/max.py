@@ -75,9 +75,22 @@ ACTIONS = {
     "stop":     "Отписаться от уведомлений",
 }
 
+# Служебное — отдельно от ACTIONS и намеренно.
+#
+# Меню команд в карточке бота одно на всех: PATCH /me/commands не умеет
+# показывать разным людям разное. Значит, попади «subs» в ACTIONS, родители
+# увидели бы её в списке команд бота. Поэтому служебные действия живут своим
+# словарём: они исполняются, но нигде не рекламируются.
+#
+# Само право проверяется в run_action по роли, а не по тому, откуда пришёл
+# вызов: спрятанная кнопка — не защита, команду можно набрать руками.
+STAFF_ACTIONS = {
+    "subs": "Охват подписок",
+}
+
 # Команды, которые бот принимает текстом. Отдельная таблица, потому что
 # /link умеет ещё и форму «/link НОМЕР», разбираемую особо.
-COMMAND_ALIASES = {f"/{name}": name for name in ACTIONS}
+COMMAND_ALIASES = {f"/{name}": name for name in list(ACTIONS) + list(STAFF_ACTIONS)}
 
 
 # Список для человека собирается из ACTIONS, а не пишется рядом: две
@@ -127,7 +140,26 @@ def main_keyboard(sub=None) -> list:
         [callback_button("🥋 Мои спортсмены", "children")],
         [link_button("🏫 Расписание", f"{SITE_URL}/schedule")],
     ]
+
+    # Служебная кнопка — только тренерам и админам. Родитель её не видит.
+    # Это удобство, а не защита: право всё равно проверяется при исполнении,
+    # иначе достаточно было бы набрать /subs руками.
+    if sub is not None and _db_of(sub) is not None:
+        from app.services.reach import is_staff
+        if is_staff(_db_of(sub), sub.user_id):
+            rows.append([callback_button("📊 Подписки", "subs")])
+
     return rows
+
+
+def _db_of(sub):
+    """Сессия, которой принадлежит объект. Нужна, чтобы собрать клавиатуру,
+    не таща сессию отдельным параметром через полдюжины вызовов."""
+    from sqlalchemy.orm import object_session
+    try:
+        return object_session(sub)
+    except Exception:
+        return None
 
 
 def _fmt_event(e) -> str:
@@ -208,6 +240,53 @@ def _cmd_children(db, sub) -> str:
 
     return (f"👤 {esc(user.full_name) if user else 'Ваш аккаунт'}\n\n"
             f"🥋 <b>Ваши спортсмены:</b>\n" + "\n".join(lines))
+
+
+def _cmd_subs(db) -> str:
+    """Охват уведомлений: кого догонять.
+
+    Телефон печатается голым числом намеренно: мессенджеры сами делают его
+    ссылкой для звонка, а <a href="tel:…"> в MAX не проверен и в худшем случае
+    пришёл бы тренеру сырым тегом.
+
+    Длину не режем — send_message_result разобьёт по границам строк, если
+    список не влезет в 4000 символов.
+    """
+    from app.services.reach import build_report
+
+    r = build_report(db)
+    per = r["per_platform"]
+
+    head = (
+        "📊 <b>Охват уведомлений</b>\n\n"
+        f"Привязано: <b>{r['linked_count']}</b> из {r['total']} ({r['percent']}%)\n"
+        f"Telegram: {per.get('telegram', 0)}   ·   MAX: {per.get('max', 0)}"
+    )
+
+    if r["unlinked"]:
+        lines = []
+        for p in r["unlinked"]:
+            line = f"• {esc(p['full_name'])} — {esc(p['phone'])}"
+            if p["children"]:
+                line += "\n   " + esc(", ".join(p["children"]))
+            else:
+                line += "\n   (нет активных спортсменов)"
+            lines.append(line)
+        unlinked = (f"\n\n❗ <b>Не привязаны — {r['unlinked_count']}</b>\n"
+                    "Сначала те, у кого дети в текущем составе.\n\n"
+                    + "\n".join(lines))
+    else:
+        unlinked = "\n\n✅ Непривязанных нет."
+
+    if r["linked"]:
+        lines = [f"• {esc(p['full_name'])} — {esc(', '.join(p['platforms']))}"
+                 for p in r["linked"]]
+        linked = (f"\n\n✅ <b>Привязаны — {r['linked_count']}</b>\n\n"
+                  + "\n".join(lines))
+    else:
+        linked = ""
+
+    return head + unlinked + linked
 
 
 def _cmd_news(db) -> str:
@@ -297,6 +376,13 @@ def _handle_link(db, sub, user_id_max: str, text: str) -> str:
 
     logger.info("MAX /link: аккаунт %s привязан к user_id=%s", user.id, user_id_max)
 
+    # Тренерам — только на УСПЕШНУЮ привязку. На /start не шлём: его пишет
+    # любой, кто открыл бота, и такие сообщения быстро научили бы тренера их
+    # пролистывать. Падение здесь не должно ломать саму привязку, поэтому
+    # notify_staff_new_link глушит ошибки внутри себя.
+    from app.services.reach import notify_staff_new_link
+    notify_staff_new_link(db, user, "max", [a.full_name for a in athletes])
+
     if athletes:
         lst = "\n".join(f"• {esc(a.full_name)}" for a in athletes)
         return (
@@ -355,6 +441,16 @@ def run_action(action: str, db, sub, raw_text: str = "") -> str:
         return _cmd_news(db)
     if action == "children":
         return _cmd_children(db, sub)
+
+    if action == "subs":
+        # Родителю отвечаем ровно тем же, чем на любую белиберду: не «у вас нет
+        # прав», а «не понимаю команду». Иначе ответ подтверждал бы, что такая
+        # команда существует, и приглашал бы её поперебирать.
+        from app.services.reach import is_staff
+        if not is_staff(db, sub.user_id):
+            logger.info("MAX: /subs от непривилегированного user_id=%s", sub.external_id)
+            return UNKNOWN
+        return _cmd_subs(db)
 
     return UNKNOWN
 
