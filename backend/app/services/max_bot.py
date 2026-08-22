@@ -74,18 +74,121 @@ def is_configured() -> bool:
     return bool(os.getenv("MAX_BOT_TOKEN", ""))
 
 
+# ─── Разметка и длина ────────────────────────────────────────────────────────
+#
+# Что установлено опытом на живом API 22.08.2026, а не взято из документации.
+# Приём: тело запроса проверяется РАНЬШЕ поиска адресата, поэтому по коду
+# ответа для несуществующего получателя видно, принят ли payload:
+# 400 proto.payload — отвергнут, 404 dialog.not.found — принят.
+#
+#   * format принимает только html и markdown, регистр не важен.
+#     'md', 'text', 'plain', 'none' отвергаются с 400.
+#   * Предел текста — ровно 4000 СИМВОЛОВ (не байт: кириллица и латиница
+#     ведут себя одинаково). 4000 проходит, 4001 отвергается.
+#   * Сообщение, у которого нет видимого текста, отвергается: пустая строка,
+#     '<b></b>' и одиночный '<br>' одинаково дают 400. Это ловушка — пустой
+#     список событий легко превращается в такое сообщение.
+#   * А вот НАБОР ТЕГОВ API не проверяет: и <b>, и выдуманный <div> одинаково
+#     дают 404, то есть payload принят. Значит, какие теги действительно
+#     отображаются, по API узнать НЕЛЬЗЯ — нужен живой диалог и глаза.
+#     Поэтому ниже сознательно узкий список: только то, что заведомо есть в
+#     любой реализации HTML-разметки мессенджеров. Проверить остальное
+#     поможет scripts/max_markup_probe.py, когда появится собеседник.
+
+MAX_TEXT_LIMIT = 4000
+
+# Узкий список намеренно: непроверенный тег в худшем случае показывается
+# читателю сырым, и это хуже отсутствия выделения.
+ALLOWED_TAGS = ("b", "i", "u", "s", "code", "a")
+
+
+def esc(value) -> str:
+    """Экранировать данные, попадающие в размеченный текст.
+
+    Название соревнования или фамилия могут содержать «<» или «&» — без
+    экранирования такой текст ломает разбор разметки на стороне мессенджера.
+    Применять к КАЖДОЙ подстановке, теги писать вокруг, а не внутри.
+    """
+    return (str(value or "")
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;"))
+
+
+def has_visible_text(text: str) -> bool:
+    """Останется ли что-то после снятия разметки.
+
+    MAX отвергает сообщение без видимого текста с 400 proto.payload, а такое
+    сообщение получается само собой: заголовок в <b>, пустой список под ним —
+    и внезапно нечего показывать.
+    """
+    import re
+    stripped = re.sub(r"<[^>]*>", "", text)
+    return bool(stripped.replace("&nbsp;", " ").strip())
+
+
+def split_text(text: str, limit: int = MAX_TEXT_LIMIT) -> list:
+    """Разбить длинный текст на части не длиннее limit символов.
+
+    Режем по границам строк: список событий на месяц легко перерастает предел,
+    и разрыв посреди строки выглядит как потеря данных. Если одна строка сама
+    длиннее предела (такого в наших текстах быть не должно, но пусть), режем
+    её жёстко — потерять кусок хуже, чем показать некрасиво.
+    """
+    if len(text) <= limit:
+        return [text]
+
+    parts, buf = [], ""
+    for line in text.split("\n"):
+        while len(line) > limit:
+            if buf:
+                parts.append(buf.rstrip("\n"))
+                buf = ""
+            parts.append(line[:limit])
+            line = line[limit:]
+        if len(buf) + len(line) + 1 > limit:
+            parts.append(buf.rstrip("\n"))
+            buf = ""
+        buf += line + "\n"
+    if buf.strip():
+        parts.append(buf.rstrip("\n"))
+    return parts
+
+
 # ─── Отправка ────────────────────────────────────────────────────────────────
 
-def send_message_result(user_id: str, text: str) -> Tuple[str, str]:
+def send_message_result(user_id: str, text: str, fmt: str = "html") -> Tuple[str, str]:
     """Отправить сообщение в личку. Возвращает (статус, текст ошибки).
 
     Статусы совпадают со значениями notifications.tg_status, чтобы в будущем
     мультиканальном конвейере не пришлось переводить одно в другое:
     "sent" | "failed".
+
+    Длинный текст разбивается на части: предел MAX — 4000 символов, а сводка
+    событий на месяц его перерастает. Части уходят по очереди, статус общий:
+    недоставленная середина делает сообщение бессмысленным целиком.
     """
     if not is_configured():
         return "failed", "MAX_BOT_TOKEN не задан"
 
+    if not has_visible_text(text):
+        # Отправлять нечего. Без этой проверки MAX ответил бы 400
+        # proto.payload, и в лог попала бы загадочная ошибка протокола вместо
+        # понятной причины.
+        return "failed", "нечего отправлять: текст пуст после снятия разметки"
+
+    chunks = split_text(text)
+    for i, chunk in enumerate(chunks, 1):
+        status, err = _send_one(user_id, chunk, fmt)
+        if status != "sent":
+            if len(chunks) > 1:
+                err = f"часть {i} из {len(chunks)}: {err}"
+            return status, err
+    return "sent", ""
+
+
+def _send_one(user_id: str, text: str, fmt: str) -> Tuple[str, str]:
+    """Одна порция текста, с повторами."""
     url = f"{api_base()}/messages"
     last = ""
 
@@ -94,7 +197,7 @@ def send_message_result(user_id: str, text: str) -> Tuple[str, str]:
             r = httpx.post(
                 url,
                 params={"user_id": user_id},
-                json={"text": text},
+                json={"text": text, "format": fmt},
                 headers=api_headers(),
                 timeout=MAX_SEND_TIMEOUT,
                 verify=ca_bundle(),
@@ -106,10 +209,11 @@ def send_message_result(user_id: str, text: str) -> Tuple[str, str]:
 
             last = f"HTTP {r.status_code}: {r.text[:200]}"
 
-            # Повторять эти две бессмысленно: адресата не существует или бот
-            # не имеет права ему писать. Дальнейшие попытки только задержат
-            # обработку вебхука, на который MAX ждёт ответ.
-            if r.status_code in (403, 404):
+            # Повторять эти три бессмысленно: адресата не существует, бот не
+            # имеет права ему писать, либо тело запроса неверно — все три от
+            # повтора не изменятся. Лишние попытки только задержат обработку
+            # вебхука, на который MAX ждёт ответ.
+            if r.status_code in (400, 403, 404):
                 logger.warning("MAX: user_id=%s не доставлено, повтор не поможет — %s", user_id, last)
                 return "failed", last
         except Exception as e:
@@ -124,9 +228,9 @@ def send_message_result(user_id: str, text: str) -> Tuple[str, str]:
     return "failed", last
 
 
-def send_message(user_id: str, text: str) -> bool:
+def send_message(user_id: str, text: str, fmt: str = "html") -> bool:
     """Обёртка для мест, которым нужен только факт успеха."""
-    return send_message_result(user_id, text)[0] == "sent"
+    return send_message_result(user_id, text, fmt)[0] == "sent"
 
 
 def get_me() -> Optional[dict]:

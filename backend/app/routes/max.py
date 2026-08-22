@@ -3,10 +3,15 @@
 Сессия 1: приём апдейтов, /start и привязка родителя через /link.
 Остальные команды (/stop, /events, /week, /month, /news) — следующим шагом.
 
-ПРО РАЗМЕТКУ. Ответы идут ПРОСТЫМ ТЕКСТОМ, без <b> и <i>, хотя телеграмные
-тексты ими насыщены. Набор тегов, который MAX действительно понимает, ещё не
-проверен на живых сообщениях, а отправить читателю сырой «<b>» — хуже, чем
-отправить без выделения. Разметка появится отдельным шагом, после проверки.
+ПРО РАЗМЕТКУ. Сообщения уходят с format=html и узким набором тегов —
+подробности и границы проверенного в app/services/max_bot.py. Коротко: API
+принимает html и markdown, но НАБОР ТЕГОВ не валидирует вовсе, поэтому по
+ответу сервера нельзя понять, отображается тег или показывается сырым.
+Отсюда осторожность: <b>, <i>, <code> и не больше.
+
+Всё, что приходит из базы — названия событий, места, заголовки новостей,
+фамилии, — обязано проходить через esc(). Соревнование с «&» в названии
+иначе ломает разбор разметки на стороне мессенджера.
 
 ПРО АДРЕС ОТВЕТА. В личке отвечаем на sender.user_id, а не на
 recipient.chat_id: см. подробности в app/services/max_bot.py.
@@ -14,10 +19,12 @@ recipient.chat_id: см. подробности в app/services/max_bot.py.
 import hashlib
 import logging
 import os
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Request
 
 from app.core.database import SessionLocal
+from app.services.max_bot import esc
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -43,22 +50,92 @@ def webhook_url() -> str:
     return f"{SITE_URL}/api/max/webhook/{webhook_secret()}"
 
 
+COMMANDS = (
+    "<b>Команды:</b>\n"
+    "/start — подписаться на уведомления\n"
+    "/stop — отписаться\n"
+    "/events — ближайшее событие\n"
+    "/week — события на неделю\n"
+    "/month — события на месяц\n"
+    "/news — последние новости\n"
+    "/link НОМЕР — привязать аккаунт сайта"
+)
+
 WELCOME = (
-    "🥋 Добро пожаловать в клуб Тайпан!\n"
+    "🥋 <b>Добро пожаловать в клуб Тайпан!</b>\n"
     "г. Павловский Посад\n\n"
     "Вы подписаны на уведомления клуба.\n\n"
-    "Команды:\n"
-    "/start — подписаться на уведомления\n"
-    "/link НОМЕР — привязать аккаунт сайта\n\n"
+    f"{COMMANDS}\n\n"
     f"Сайт клуба: {SITE_URL}"
 )
 
 LINK_HELP = (
     "📱 Укажите номер телефона, которым вы зарегистрированы на сайте.\n\n"
-    "Формат: 79998887766\n"
+    "Формат: <code>79998887766</code>\n"
     "(11 цифр, начиная с 7, без пробелов и плюса)\n\n"
-    "Пример: /link 79253653597"
+    "Пример: <code>/link 79253653597</code>"
 )
+
+UNKNOWN = "Не понимаю эту команду.\n\n" + COMMANDS
+
+
+def _fmt_event(e) -> str:
+    """Одна строка события. Название и место — из БД, поэтому экранируются."""
+    line = f"• {e.event_date:%d.%m в %H:%M} — {esc(e.title)}"
+    if e.location:
+        line += f"\n  📍 {esc(e.location)}"
+    return line
+
+
+def _events_between(db, days: int):
+    """События от «сейчас» на days вперёд."""
+    from app.models.event import Event
+    now = datetime.utcnow()
+    return (
+        db.query(Event)
+        .filter(
+            Event.is_active == True,
+            Event.event_date >= now,
+            Event.event_date <= now + timedelta(days=days),
+        )
+        .order_by(Event.event_date)
+        .all()
+    )
+
+
+def _cmd_events(db) -> str:
+    from app.models.event import Event
+    e = (
+        db.query(Event)
+        .filter(Event.is_active == True, Event.event_date > datetime.utcnow())
+        .order_by(Event.event_date)
+        .first()
+    )
+    if not e:
+        return "📅 Ближайших событий нет."
+    return "📅 <b>Ближайшее событие:</b>\n\n" + _fmt_event(e)
+
+
+def _cmd_period(db, days: int, title: str, empty: str) -> str:
+    events = _events_between(db, days)
+    if not events:
+        return empty
+    return f"📅 <b>{title}</b>\n\n" + "\n".join(_fmt_event(e) for e in events)
+
+
+def _cmd_news(db) -> str:
+    from app.models.news import News
+    items = (
+        db.query(News)
+        .filter(News.status == "published")
+        .order_by(News.published_at.desc())
+        .limit(3)
+        .all()
+    )
+    if not items:
+        return "📰 Новостей пока нет."
+    body = "\n".join(f"• {n.published_at:%d.%m.%Y} — {esc(n.title)}" for n in items)
+    return f"📰 <b>Последние новости клуба:</b>\n\n{body}\n\n🔗 Все новости: {SITE_URL}/news"
 
 
 def _normalize_phone(raw: str) -> str:
@@ -114,7 +191,7 @@ def _handle_link(db, sub, user_id_max: str, text: str) -> str:
     if not user:
         logger.info("MAX /link: пользователь с номером не найден (user_id=%s)", user_id_max)
         return (
-            f"❌ Пользователь с номером {phone} не найден.\n\n"
+            f"❌ Пользователь с номером <code>{esc(phone)}</code> не найден.\n\n"
             f"Проверьте номер — он должен совпадать с тем, которым вы "
             f"зарегистрированы на сайте {SITE_URL}"
         )
@@ -134,17 +211,17 @@ def _handle_link(db, sub, user_id_max: str, text: str) -> str:
     logger.info("MAX /link: аккаунт %s привязан к user_id=%s", user.id, user_id_max)
 
     if athletes:
-        lst = "\n".join(f"• {a.full_name}" for a in athletes)
+        lst = "\n".join(f"• {esc(a.full_name)}" for a in athletes)
         return (
-            f"✅ Аккаунт успешно привязан!\n\n"
-            f"👤 {user.full_name}\n\n"
+            f"✅ <b>Аккаунт успешно привязан!</b>\n\n"
+            f"👤 {esc(user.full_name)}\n\n"
             f"🥋 Ваши спортсмены:\n{lst}\n\n"
             f"Теперь вы будете получать персональные уведомления "
             f"о соревнованиях, сборах и аттестациях."
         )
     return (
-        f"✅ Аккаунт успешно привязан!\n\n"
-        f"👤 {user.full_name}\n\n"
+        f"✅ <b>Аккаунт успешно привязан!</b>\n\n"
+        f"👤 {esc(user.full_name)}\n\n"
         f"Теперь вы будете получать персональные уведомления."
     )
 
@@ -193,6 +270,11 @@ def process_max_update(update: dict) -> None:
             sub.subscribed = True
             db.commit()
             reply = WELCOME
+        elif text == "/stop":
+            sub.subscribed = False
+            db.commit()
+            reply = ("😔 Вы отписались от уведомлений.\n"
+                     "Напишите /start, чтобы подписаться снова.")
         elif text == "/link":
             db.commit()
             reply = LINK_HELP
@@ -200,11 +282,18 @@ def process_max_update(update: dict) -> None:
             reply = _handle_link(db, sub, external_id, text)
         else:
             db.commit()
-            reply = (
-                "Не понимаю эту команду.\n\n"
-                "/start — подписаться на уведомления\n"
-                "/link НОМЕР — привязать аккаунт сайта"
-            )
+            if text == "/events":
+                reply = _cmd_events(db)
+            elif text == "/week":
+                reply = _cmd_period(db, 7, "События на неделю:",
+                                    "📅 На этой неделе событий нет.")
+            elif text == "/month":
+                reply = _cmd_period(db, 30, "События на месяц:",
+                                    "📅 В ближайший месяц событий нет.")
+            elif text == "/news":
+                reply = _cmd_news(db)
+            else:
+                reply = UNKNOWN
 
         status, err = send_message_result(external_id, reply)
         if status != "sent":
