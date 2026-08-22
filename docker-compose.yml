@@ -45,6 +45,7 @@ services:
       TELEGRAM_CHANNEL_ID: ${TELEGRAM_CHANNEL_ID}
       TELEGRAM_API_BASE:   ${TELEGRAM_API_BASE:-https://api.telegram.org}
       TELEGRAM_API_SECRET: ${TELEGRAM_API_SECRET:-}
+      MAX_BOT_TOKEN:       ${MAX_BOT_TOKEN:-}
       SITE_URL:            ${SITE_URL:-https://taipan-tkd.ru}
       LOG_SERVICE:         backend
       ANTHROPIC_API_KEY:   ${ANTHROPIC_API_KEY}
@@ -75,6 +76,7 @@ services:
       TELEGRAM_CHANNEL_ID: ${TELEGRAM_CHANNEL_ID}
       TELEGRAM_API_BASE:  ${TELEGRAM_API_BASE:-https://api.telegram.org}
       TELEGRAM_API_SECRET: ${TELEGRAM_API_SECRET:-}
+      MAX_BOT_TOKEN:      ${MAX_BOT_TOKEN:-}
       LOG_SERVICE:        celery_worker
     mem_limit: 512m
     restart: always
