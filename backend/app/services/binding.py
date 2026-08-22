@@ -37,8 +37,9 @@ logger = logging.getLogger(__name__)
 # Причины отказа. Тексты — ниже, в BIND_TEXT.
 OK              = "ok"
 NOT_FOUND       = "not_found"
-TAKEN           = "taken"          # номер уже привязан к другому аккаунту мессенджера
+TAKEN           = "taken"          # аккаунт сайта уже держит другой подписчик
 ALREADY_MINE    = "already_mine"   # этот же мессенджер уже привязан к этому человеку
+REBOUND         = "rebound"        # был привязан к другому — переставили и сказали об этом
 
 
 def normalize_phone(raw: str) -> str:
@@ -116,7 +117,16 @@ def bind_by_phone(db, platform: str, external_id: str, phone: str):
         return user, TAKEN
 
     if mine is not None and mine.user_id == user.id:
+        logger.info("Привязка: %s:%s уже привязан к аккаунту %s, ничего не меняем",
+                    platform, external_id, user.id)
         return user, ALREADY_MINE
+
+    # Этот аккаунт мессенджера уже привязан к КОМУ-ТО ДРУГОМУ. Такое случается
+    # при ошибочном переходе по чужой персональной ссылке, и человек чинит это
+    # сам, прислав свой номер. Перепривязку разрешаем — номер подтверждён, —
+    # но НЕ молча: 22.08.2026 именно молчаливая перестановка сделала неясным,
+    # осталась ли где-то чужая связь.
+    was_user_id = mine.user_id if mine is not None else None
 
     if mine is None:
         mine = MessengerSubscriber(
@@ -127,6 +137,12 @@ def bind_by_phone(db, platform: str, external_id: str, phone: str):
     mine.user_id = user.id
     mine.subscribed = True
     db.commit()
+
+    if was_user_id and was_user_id != user.id:
+        logger.warning("Привязка ПЕРЕСТАВЛЕНА: %s:%s был привязан к аккаунту %s, "
+                       "теперь к %s", platform, external_id, was_user_id, user.id)
+        return user, REBOUND
+
     logger.info("Привязка: аккаунт %s <- %s:%s", user.id, platform, external_id)
 
     # Тренерам — здесь, а не в роутах: путей привязки стало три (кнопка
@@ -206,3 +222,47 @@ BIND_TEXT = {
         "Делать ничего не нужно."
     ),
 }
+
+UNLINKED = (
+    "🔓 <b>Привязка снята</b>\n\n"
+    "Персональные уведомления сюда больше не приходят.\n\n"
+    "Это не то же самое, что /stop: тот лишь приостанавливает рассылку, "
+    "оставляя связь с учётной записью. Здесь связь разорвана — чтобы "
+    "получать уведомления снова, придётся привязаться заново.\n\n"
+    "Нажмите /start, когда понадобится."
+)
+
+NOT_LINKED = (
+    "🔓 Здесь нечего отвязывать: этот мессенджер не связан ни с одной "
+    "учётной записью клуба.\n\n"
+    "Нажмите /start, если хотите привязаться."
+)
+
+
+def unlink(db, platform: str, external_id: str) -> str:
+    """Разорвать связь мессенджера с аккаунтом сайта. Возвращает текст ответа.
+
+    ЗАЧЕМ ОТДЕЛЬНО ОТ /stop. /stop снимает подписку — ставит subscribed=false,
+    но user_id остаётся, и одного /start достаточно, чтобы уведомления пошли
+    снова. Для «я случайно привязался не к тому» это не годится: человек
+    считает, что отвязался, а связь с чужим аккаунтом жива.
+    """
+    from app.models.event import MessengerSubscriber
+
+    sub = (
+        db.query(MessengerSubscriber)
+        .filter(
+            MessengerSubscriber.platform == platform,   # фильтр обязателен
+            MessengerSubscriber.external_id == str(external_id),
+        )
+        .first()
+    )
+    if sub is None or not sub.user_id:
+        return NOT_LINKED
+
+    was = sub.user_id
+    sub.user_id = None
+    sub.subscribed = False
+    db.commit()
+    logger.info("Отвязка: %s:%s отвязан от аккаунта %s", platform, external_id, was)
+    return UNLINKED

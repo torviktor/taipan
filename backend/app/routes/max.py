@@ -73,6 +73,7 @@ ACTIONS = {
     "children": "Мои спортсмены",
     "link":     "Привязать аккаунт сайта",
     "stop":     "Отписаться от уведомлений",
+    "unlink":   "Отвязать аккаунт сайта",
 }
 
 # Служебное — отдельно от ACTIONS и намеренно.
@@ -205,6 +206,12 @@ def _extract_contact(message: dict, sender_id: str):
         vcf = payload.get("vcf_info") or ""
         info = payload.get("max_info") or payload.get("tam_info") or {}
 
+        # Факт получения контакта пишем ВСЕГДА, до любых решений. Без этого
+        # успешный путь «вы уже привязаны» не оставлял в логе ничего, и было
+        # не отличить «человек нажал кнопку» от «нажатие не дошло».
+        logger.info("MAX: получен контакт от user_id=%s, поля payload: %s",
+                    sender_id, sorted(payload.keys()))
+
         owner = str(info.get("user_id") or "")
         if not owner or owner != str(sender_id):
             logger.warning(
@@ -241,12 +248,18 @@ def _verify_contact_hash(got, vcf: str, hmac, hashlib) -> None:
     import base64
     variants = {digest.hex(), base64.b64encode(digest).decode()}
     if str(got) in variants:
-        logger.info("MAX: подпись контакта совпала")
+        logger.info("MAX: подпись контакта СОВПАЛА (%s)",
+                    "hex" if str(got) == digest.hex() else "base64")
     else:
+        # Кодировку подписи документация не фиксирует, поэтому при расхождении
+        # печатаем и длину, и первые символы обоих наших вариантов: этого
+        # хватит, чтобы по первому живому нажатию понять формат и ужесточить
+        # проверку до обязательной.
         logger.warning(
-            "MAX: подпись контакта НЕ совпала (ни hex, ни base64). "
-            "Привязка разрешена по совпадению отправителя. "
-            "Длина полученной подписи: %s", len(str(got)))
+            "MAX: подпись контакта НЕ совпала. Привязка разрешена по совпадению "
+            "отправителя. Пришло: длина %s, начало %r. Наш hex: %r, наш base64: %r",
+            len(str(got)), str(got)[:12], digest.hex()[:12],
+            base64.b64encode(digest).decode()[:12])
 
 
 def _fmt_event(e) -> str:
@@ -400,9 +413,13 @@ def _handle_link(db, sub, user_id_max: str, text: str) -> str:
     raw = parts[1].strip()
     user, reason = binding.bind_by_phone(db, "max", sub.external_id, raw)
 
-    if reason == binding.OK:
+    if reason in (binding.OK, binding.REBOUND):
         logger.info("MAX /link: аккаунт %s привязан к user_id=%s", user.id, user_id_max)
-        return binding.success_text(db, user)
+        text = binding.success_text(db, user)
+        if reason == binding.REBOUND:
+            text += ("\n\n⚠️ Раньше этот мессенджер был привязан к другой "
+                     "учётной записи — теперь она отвязана.")
+        return text
     if reason == binding.NOT_FOUND:
         logger.info("MAX /link: номер не найден (user_id=%s)", user_id_max)
         return binding.BIND_TEXT[binding.NOT_FOUND].format(
@@ -425,8 +442,12 @@ def run_action(action: str, db, sub, raw_text: str = "") -> str:
     # ── Контакт ──────────────────────────────────────────────────────────────
     if action == CONTACT_ACTION:
         user, reason = binding.bind_by_phone(db, "max", sub.external_id, raw_text)
-        if reason == binding.OK:
-            return binding.success_text(db, user)
+        if reason in (binding.OK, binding.REBOUND):
+            text = binding.success_text(db, user)
+            if reason == binding.REBOUND:
+                text += ("\n\n⚠️ Раньше этот мессенджер был привязан к другой "
+                         "учётной записи — теперь она отвязана.")
+            return text
         if reason == binding.NOT_FOUND:
             return binding.BIND_TEXT[binding.NOT_FOUND].format(
                 phone=esc(binding.normalize_phone(raw_text)))
@@ -466,8 +487,16 @@ def run_action(action: str, db, sub, raw_text: str = "") -> str:
     if action == "stop":
         sub.subscribed = False
         db.commit()
+        # Про разницу говорим прямо: /stop оставляет связь с учётной записью,
+        # и одного /start хватит, чтобы уведомления пошли снова. Человеку,
+        # который хотел «отвязаться», это не очевидно.
         return ("😔 Вы отписались от уведомлений.\n"
-                "Напишите /start или нажмите кнопку, чтобы подписаться снова.")
+                "Напишите /start или нажмите кнопку, чтобы подписаться снова.\n\n"
+                "Связь с учётной записью при этом сохранена. Чтобы разорвать "
+                "её совсем — /unlink")
+
+    if action == "unlink":
+        return binding.unlink(db, "max", sub.external_id)
 
     if action == "link":
         # «/link 79…» — сразу привязка, «/link» и кнопка — подсказка.

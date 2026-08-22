@@ -43,6 +43,12 @@ async def _handle_contact(db, message: dict, chat_id: str) -> bool:
     sender_id = str((message.get("from") or {}).get("id") or "")
     owner_id  = str(contact.get("user_id") or "")
 
+    # Факт получения пишем ВСЕГДА, до решений: иначе успешный путь «вы уже
+    # привязаны» не оставляет в логе ничего, и не отличить нажатие кнопки от
+    # его отсутствия.
+    logger.info("Telegram: получен контакт от chat_id=%s (владелец карточки %s)",
+                chat_id, owner_id or "не указан")
+
     if not owner_id or owner_id != sender_id:
         logger.warning(
             "Telegram: контакт отклонён — карточка принадлежит %r, прислал %r "
@@ -59,9 +65,12 @@ async def _handle_contact(db, message: dict, chat_id: str) -> bool:
     phone = contact.get("phone_number") or ""
     user, reason = binding.bind_by_phone(db, "telegram", chat_id, phone)
 
-    if reason == binding.OK:
-        await send_telegram_message(chat_id, binding.success_text(db, user),
-                                    reply_markup=HIDE_KEYBOARD)
+    if reason in (binding.OK, binding.REBOUND):
+        text = binding.success_text(db, user)
+        if reason == binding.REBOUND:
+            text += ("\n\n⚠️ Раньше этот мессенджер был привязан к другой "
+                     "учётной записи — теперь она отвязана.")
+        await send_telegram_message(chat_id, text, reply_markup=HIDE_KEYBOARD)
     elif reason == binding.NOT_FOUND:
         await send_telegram_message(chat_id, binding.BIND_TEXT[binding.NOT_FOUND].format(
             phone=esc(binding.normalize_phone(phone))))
@@ -145,7 +154,8 @@ async def process_telegram_update(update: dict):
                 "/week — события на неделю\n"
                 "/month — события на месяц\n"
                 "/news — последние новости\n"
-                "/link НОМЕР — привязать аккаунт сайта\n\n"
+                "/link НОМЕР — привязать аккаунт сайта\n"
+                "/unlink — отвязать аккаунт\n\n"
                 "📢 Наш канал: t.me/taipan_tkd"
             )
             await send_telegram_message(chat_id, reply)
@@ -154,7 +164,19 @@ async def process_telegram_update(update: dict):
             if subscriber:
                 subscriber.subscribed = False
                 db.commit()
-            await send_telegram_message(chat_id, "😔 Ты отписался от уведомлений.\nНапиши /start чтобы подписаться снова.")
+            # Разницу называем прямо: /stop оставляет связь с учётной записью,
+            # и одного /start хватит, чтобы уведомления пошли снова.
+            await send_telegram_message(chat_id,
+                "😔 Ты отписался от уведомлений.\n"
+                "Напиши /start чтобы подписаться снова.\n\n"
+                "Связь с учётной записью при этом сохранена. Чтобы разорвать "
+                "её совсем — /unlink")
+
+        elif text == "/unlink":
+            from app.services import binding
+            await send_telegram_message(chat_id,
+                                        binding.unlink(db, "telegram", chat_id),
+                                        reply_markup=HIDE_KEYBOARD)
 
         elif text == "/events":
             e = db.query(Event).filter(
