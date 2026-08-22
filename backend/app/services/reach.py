@@ -97,6 +97,70 @@ def _active_athletes_by_user(db) -> dict:
     return out
 
 
+def format_report(db, with_links: bool = True) -> str:
+    """Текст отчёта об охвате — общий для обоих ботов.
+
+    Живёт здесь, а не в роутах: две копии одного отчёта разойдутся, и тренер
+    в Telegram однажды увидит не то же, что в MAX.
+
+    Телефон печатается голым числом намеренно: мессенджеры сами делают его
+    ссылкой для звонка, а <a href="tel:…"> в MAX не проверен и в худшем случае
+    пришёл бы сырым тегом.
+
+    Длину не режем — отправитель разобьёт по границам строк.
+    """
+    from app.core.markup import esc
+    from app.services import link_tokens
+
+    r = build_report(db)
+    per = r["per_platform"]
+
+    head = (
+        "📊 <b>Охват уведомлений</b>\n\n"
+        f"Привязано: <b>{r['linked_count']}</b> из {r['total']} ({r['percent']}%)\n"
+        f"Telegram: {per.get('telegram', 0)}   ·   MAX: {per.get('max', 0)}"
+    )
+
+    # Самая лёгкая добыча: человек уже нашёл бота и нажал «Начать», осталась
+    # одна команда. Поэтому строка идёт сразу под охватом, а не в конце.
+    d = r["dangling"]
+    if sum(d.values()):
+        head += (
+            f"\n\n💬 Написали боту, но не привязались: <b>{sum(d.values())}</b>"
+            f"\n   Telegram: {d.get('telegram', 0)}   ·   MAX: {d.get('max', 0)}"
+        )
+
+    if r["unlinked"]:
+        lines = []
+        for p in r["unlinked"]:
+            line = f"• {esc(p['full_name'])} — {esc(p['phone'])}"
+            line += "\n   " + (esc(", ".join(p["children"]))
+                               if p["children"] else "(нет активных спортсменов)")
+            if with_links:
+                # Персональная ссылка прямо в списке: тренеру остаётся её
+                # переслать, без промежуточного шага «где взять ссылку».
+                lk = link_tokens.links_for(db, p["user_id"])
+                line += f"\n   MAX: {lk['max']}\n   TG:  {lk['telegram']}"
+            lines.append(line)
+        unlinked = (f"\n\n❗ <b>Не привязаны — {r['unlinked_count']}</b>\n"
+                    "Сначала те, у кого дети в текущем составе.\n"
+                    "Ссылка одноразовая и действует 14 дней — перешлите её "
+                    "лично тому, чьё имя стоит выше.\n\n"
+                    + "\n\n".join(lines))
+    else:
+        unlinked = "\n\n✅ Непривязанных нет."
+
+    if r["linked"]:
+        lines = [f"• {esc(p['full_name'])} — {esc(', '.join(p['platforms']))}"
+                 for p in r["linked"]]
+        linked = (f"\n\n✅ <b>Привязаны — {r['linked_count']}</b>\n\n"
+                  + "\n".join(lines))
+    else:
+        linked = ""
+
+    return head + unlinked + linked
+
+
 def build_report(db) -> dict:
     """Собрать всё разом: сводку, непривязанных и привязанных.
 

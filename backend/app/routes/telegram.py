@@ -39,7 +39,7 @@ async def process_telegram_update(update: dict):
             TelegramSubscriber.telegram_id == chat_id
         ).first()
 
-        if text == "/start":
+        if text.startswith("/start"):
             if not subscriber:
                 sub = TelegramSubscriber(telegram_id=chat_id, username=username, full_name=full_name, subscribed=True)
                 db.add(sub)
@@ -47,6 +47,20 @@ async def process_telegram_update(update: dict):
             else:
                 subscriber.subscribed = True
                 db.commit()
+
+            # Переход по персональной ссылке t.me/бот?start=lnk_ТОКЕН приходит
+            # обычным сообщением «/start lnk_ТОКЕН». Ручной /link с номером
+            # остаётся запасным путём и ниже не меняется.
+            parts = text.split(maxsplit=1)
+            payload = parts[1].strip() if len(parts) > 1 else ""
+            from app.services import link_tokens
+            if link_tokens.is_link_payload(payload):
+                await send_telegram_message(
+                    chat_id,
+                    link_tokens.redeem_and_reply(db, payload, "telegram", chat_id),
+                )
+                return
+
             reply = (
                 "🥋 <b>Добро пожаловать в клуб Тайпан!</b>\n"
                 "г. Павловский Посад\n\n"
@@ -214,6 +228,23 @@ async def process_telegram_update(update: dict):
                     if e.location:
                         reply += f"  📍 {esc(e.location)}\n"
             await send_telegram_message(chat_id, reply)
+
+        elif text == "/subs":
+            # Служебная: охват подписок. Право проверяется по РОЛИ, а не по
+            # площадке. Родителю отвечаем ровно тем же, чем на любую другую
+            # неизвестную команду — молчанием: иначе ответ подтверждал бы, что
+            # такая команда существует.
+            from app.services.reach import is_staff, format_report
+            from app.services.max_bot import split_text
+
+            if not (subscriber and is_staff(db, subscriber.user_id)):
+                logger.info("Telegram: /subs от непривилегированного chat_id=%s", chat_id)
+                return
+
+            # Отчёт со ссылками перерастает лимит Telegram (4096) так же, как
+            # лимит MAX, поэтому режем тем же split_text — по границам строк.
+            for part in split_text(format_report(db), 4000):
+                await send_telegram_message(chat_id, part)
 
     finally:
         db.close()

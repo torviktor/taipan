@@ -107,6 +107,39 @@ class MessengerSubscriber(Base):
     )
 
 
+class LinkToken(Base):
+    """Одноразовый токен привязки аккаунта к мессенджеру.
+
+    Родитель получает от тренера персональную ссылку вида
+    https://max.ru/<бот>?start=lnk_ТОКЕН — нажал, и аккаунт привязался, без
+    ручного ввода телефона. Ручной путь «/link 79XXXXXXXXX» остаётся запасным.
+
+    ПОЧЕМУ ТОКЕН, А НЕ НОМЕР В ССЫЛКЕ. Ссылку пересылают. Лежи в параметре
+    телефон или user_id — первый же, кому её переслали, привязал бы к себе
+    чужой аккаунт и стал получать чужие уведомления. Отсюда три свойства,
+    каждое обязательно:
+      * неугадываемость — 128 бит из secrets, не производная ни от чего;
+      * одноразовость   — used_at гасит токен при первом использовании;
+      * срок жизни      — expires_at, две недели.
+
+    Алфавит токена ограничен A-Za-z0-9_- не для красоты: MAX отбрасывает
+    параметр целиком и БЕЗ ОШИБКИ, если встретит что-то ещё.
+    """
+    __tablename__ = "link_tokens"
+
+    id          = Column(Integer, primary_key=True)
+    user_id     = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token       = Column(String(64), unique=True, nullable=False)
+    created_at  = Column(DateTime, default=datetime.utcnow, nullable=False)
+    expires_at  = Column(DateTime, nullable=False)
+
+    used_at          = Column(DateTime, nullable=True)
+    used_platform    = Column(String(20), nullable=True)
+    used_external_id = Column(String(50), nullable=True)
+
+    user = relationship("User", foreign_keys=[user_id])
+
+
 class PushSubscriber(Base):
     """
     Подписки на Web Push уведомления в браузере.

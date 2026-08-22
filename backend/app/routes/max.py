@@ -243,60 +243,9 @@ def _cmd_children(db, sub) -> str:
 
 
 def _cmd_subs(db) -> str:
-    """Охват уведомлений: кого догонять.
-
-    Телефон печатается голым числом намеренно: мессенджеры сами делают его
-    ссылкой для звонка, а <a href="tel:…"> в MAX не проверен и в худшем случае
-    пришёл бы тренеру сырым тегом.
-
-    Длину не режем — send_message_result разобьёт по границам строк, если
-    список не влезет в 4000 символов.
-    """
-    from app.services.reach import build_report
-
-    r = build_report(db)
-    per = r["per_platform"]
-
-    head = (
-        "📊 <b>Охват уведомлений</b>\n\n"
-        f"Привязано: <b>{r['linked_count']}</b> из {r['total']} ({r['percent']}%)\n"
-        f"Telegram: {per.get('telegram', 0)}   ·   MAX: {per.get('max', 0)}"
-    )
-
-    # Самая лёгкая добыча: человек уже нашёл бота и нажал «Начать», осталась
-    # одна команда. Поэтому строка идёт сразу под охватом, а не в конце.
-    d = r["dangling"]
-    if sum(d.values()):
-        head += (
-            f"\n\n💬 Написали боту, но не привязались: <b>{sum(d.values())}</b>"
-            f"\n   Telegram: {d.get('telegram', 0)}   ·   MAX: {d.get('max', 0)}"
-            "\n   Им достаточно отправить /link с номером."
-        )
-
-    if r["unlinked"]:
-        lines = []
-        for p in r["unlinked"]:
-            line = f"• {esc(p['full_name'])} — {esc(p['phone'])}"
-            if p["children"]:
-                line += "\n   " + esc(", ".join(p["children"]))
-            else:
-                line += "\n   (нет активных спортсменов)"
-            lines.append(line)
-        unlinked = (f"\n\n❗ <b>Не привязаны — {r['unlinked_count']}</b>\n"
-                    "Сначала те, у кого дети в текущем составе.\n\n"
-                    + "\n".join(lines))
-    else:
-        unlinked = "\n\n✅ Непривязанных нет."
-
-    if r["linked"]:
-        lines = [f"• {esc(p['full_name'])} — {esc(', '.join(p['platforms']))}"
-                 for p in r["linked"]]
-        linked = (f"\n\n✅ <b>Привязаны — {r['linked_count']}</b>\n\n"
-                  + "\n".join(lines))
-    else:
-        linked = ""
-
-    return head + unlinked + linked
+    """Охват уведомлений: кого догонять. Текст общий с телеграмным ботом."""
+    from app.services.reach import format_report
+    return format_report(db)
 
 
 def _cmd_news(db) -> str:
@@ -422,6 +371,17 @@ def run_action(action: str, db, sub, raw_text: str = "") -> str:
     if action == "start":
         sub.subscribed = True
         db.commit()
+
+        # Переход по персональной ссылке: параметр приходит либо в bot_started
+        # (тогда raw_text — это он сам), либо текстом «/start lnk_…».
+        payload = raw_text
+        if payload.startswith("/start "):
+            payload = payload.split(maxsplit=1)[1].strip()
+
+        from app.services import link_tokens
+        if link_tokens.is_link_payload(payload):
+            return link_tokens.redeem_and_reply(db, payload, "max", sub.external_id)
+
         return WELCOME
 
     if action == "stop":
@@ -473,8 +433,11 @@ def _resolve(kind: str, update: dict):
     """
     if kind == "bot_started":
         who = update.get("user") or {}
+        # Переход по персональной ссылке привязки. Параметр лежит на верхнем
+        # уровне апдейта (поле payload у BotStarted), а не внутри user.
+        payload = (update.get("payload") or "").strip()
         return (str(who.get("user_id") or ""), who.get("username") or "",
-                (who.get("name") or "").strip(), "start", "", None)
+                (who.get("name") or "").strip(), "start", payload, None)
 
     if kind == "message_created":
         message = update.get("message") or {}
@@ -482,7 +445,8 @@ def _resolve(kind: str, update: dict):
         body    = message.get("body") or {}
         # Адрес ответа — отправитель, а не recipient.chat_id (см. шапку модуля).
         text = (body.get("text") or "").strip()
-        # «/link 79…» доходит до run_action как есть, остальное — по таблице.
+        # «/link 79…» и «/start lnk_…» доходят до run_action как есть,
+        # остальное разрешается по таблице.
         action = COMMAND_ALIASES.get(text.split()[0] if text else "", "")
         return (str(sender.get("user_id") or ""), sender.get("username") or "",
                 (sender.get("name") or "").strip(), action, text, None)
