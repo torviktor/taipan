@@ -87,63 +87,59 @@ celery_app.conf.update(
         },
         # Подбор уведомлений, оставшихся в pending: страховка на случай, если
         # задачу не поставили (перезапуск воркера, потеря сообщения в Redis).
-        "deliver-telegram": {
-            "task":     "app.tasks.deliver_telegram",
+        "deliver-notifications": {
+            "task":     "app.tasks.deliver_notifications",
             "schedule": crontab(minute="*/10"),
         },
     },
 )
 
 
-@celery_app.task(name="app.tasks.deliver_telegram")
-def deliver_telegram_task(limit: int = 500):
-    """Разослать уведомления, помеченные tg_status='pending'.
+@celery_app.task(name="app.tasks.deliver_notifications")
+def deliver_notifications_task(limit: int = 500):
+    """Разложить уведомления по каналам и разослать.
 
-    Вынесено из HTTP-обработчиков: раньше рассылка шла синхронным циклом прямо
-    в роуте, и при 30 получателях по 18 с в худшем случае тренер получал 504 от
-    nginx (proxy_read_timeout 60 с) на середине рассылки.
+    Пришла на смену deliver_telegram, когда мессенджеров стало два. Логика
+    целиком в app/services/delivery.py — здесь только обёртка задачи, чтобы
+    её можно было вызывать и из тестов, и из beat, и руками.
 
-    Строки забираются по одной с FOR UPDATE SKIP LOCKED: параллельный воркер
-    пропустит занятую и не отправит её второй раз.
+    Вынесено из HTTP-обработчиков ещё раньше и не возвращается туда: рассылка
+    синхронным циклом прямо в роуте при 30 получателях давала тренеру 504 от
+    nginx на середине.
     """
     from app.core.database import SessionLocal
-    from app.models.certification import Notification
-    from app.services.notifications import send_telegram_to_user_result
+    from app.services.delivery import deliver_pending
     import logging
     log = logging.getLogger(__name__)
 
     db = SessionLocal()
-    stats = {"sent": 0, "failed": 0, "no_account": 0}
     try:
-        for _ in range(limit):
-            n = (
-                db.query(Notification)
-                .filter(Notification.tg_status == "pending")
-                .order_by(Notification.id)
-                .limit(1)
-                .with_for_update(skip_locked=True)
-                .first()
-            )
-            if not n:
-                break
-            status, err = send_telegram_to_user_result(n.user_id, n.title, n.body, db)
-            n.tg_status = status
-            n.tg_error  = err or None
-            stats[status] = stats.get(status, 0) + 1
-            db.commit()   # снимает блокировку строки
-
+        stats = deliver_pending(db, limit=limit)
         if any(stats.values()):
             log.info(
-                "deliver_telegram: доставлено %s, не доставлено %s, без привязки %s",
-                stats["sent"], stats["failed"], stats["no_account"],
+                "deliver_notifications: разложено %s, доставлено %s, "
+                "не доставлено %s, без каналов %s",
+                stats["fanned"], stats["sent"], stats["failed"], stats["no_account"],
             )
         return stats
     except Exception:
         db.rollback()
-        log.exception("deliver_telegram: задача упала")
+        log.exception("deliver_notifications: задача упала")
         raise
     finally:
         db.close()
+
+
+@celery_app.task(name="app.tasks.deliver_telegram")
+def deliver_telegram_task(limit: int = 500):
+    """Псевдоним прежнего имени задачи.
+
+    Оставлен намеренно и ненадолго: в очереди Redis на момент выката могут
+    лежать задачи, поставленные старым кодом под старым именем. Без этой
+    обёртки воркер отверг бы их как неизвестные, и соответствующие уведомления
+    молча зависли бы в pending.
+    """
+    return deliver_notifications_task(limit=limit)
 
 
 @celery_app.task(name="app.tasks.send_reminders")

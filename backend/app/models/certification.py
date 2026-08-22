@@ -2,7 +2,7 @@
 
 from sqlalchemy import (
     Column, Integer, String, Date, DateTime, Boolean,
-    ForeignKey, Text, func
+    ForeignKey, Text, func, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 import enum
@@ -78,11 +78,51 @@ class Notification(Base):
 
     # Доставка в Telegram. NULL — уведомление не предназначено для отправки
     # (создано, например, недельным дайджестом и живёт только в кабинете).
-    # "pending" — поставлено в очередь, разбирает app.tasks.deliver_telegram.
+    # "pending" — поставлено в очередь, разбирает app.tasks.deliver_notifications.
     # Дальше: "sent" | "failed" | "no_account" (у пользователя нет привязки).
     # Раньше результат отправки выбрасывался, и узнать, дошло ли уведомление,
     # было нельзя в принципе.
+    # С появлением второго мессенджера смысл поля изменился: теперь это
+    # СВОДНЫЙ признак по всем каналам, а подробности — в
+    # notification_deliveries, строка на пару (уведомление, площадка).
+    # Поле оставлено и продолжает заполняться, потому что на него смотрят
+    # кабинет и ежедневная сводка монитора.
+    #
+    # Важно: "no_account" теперь значит «нет НИ ОДНОГО канала», а не «нет
+    # Telegram». У родителя может не быть Telegram, но быть MAX.
     tg_status = Column(String(20), nullable=True, index=True)
     tg_error  = Column(Text, nullable=True)      # текст последней ошибки
 
     user = relationship("User", foreign_keys=[user_id])
+
+
+class NotificationDelivery(Base):
+    """Доставка одного уведомления в одну площадку.
+
+    Появилась, когда каналов стало два: «доставлено» перестало быть одним
+    значением — в Telegram могло уйти, в MAX упасть. Двумя колонками на
+    notifications это не выражается, а третий канал потребовал бы ещё двух.
+
+    Строка создаётся ТОЛЬКО если у получателя есть привязка к этой площадке.
+    Поэтому статуса "no_account" здесь нет: отсутствие каналов — свойство
+    уведомления целиком, оно живёт в notifications.tg_status.
+    """
+    __tablename__ = "notification_deliveries"
+    __table_args__ = (
+        UniqueConstraint("notification_id", "platform",
+                         name="uq_notification_deliveries"),
+    )
+
+    id              = Column(Integer, primary_key=True)
+    notification_id = Column(Integer,
+                             ForeignKey("notifications.id", ondelete="CASCADE"),
+                             nullable=False)
+    platform        = Column(String(20), nullable=False)
+    status          = Column(String(20), nullable=False, default="pending")
+    error           = Column(Text, nullable=True)
+    attempts        = Column(Integer, nullable=False, default=0)
+    created_at      = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at      = Column(DateTime(timezone=True), server_default=func.now())
+    sent_at         = Column(DateTime(timezone=True), nullable=True)
+
+    notification = relationship("Notification", foreign_keys=[notification_id])

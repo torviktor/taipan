@@ -130,6 +130,22 @@ def format_report(db, with_links: bool = True) -> str:
             f"\n   Telegram: {d.get('telegram', 0)}   ·   MAX: {d.get('max', 0)}"
         )
 
+    # Доставка за сутки. Показываем только если что-то было: пустой блок
+    # «0 · 0 · 0» в отчёте, который и без того на четыре сообщения, — шум.
+    from app.services.delivery import stats_24h
+    delivered = stats_24h(db)
+    if delivered:
+        rows = []
+        for platform in PLATFORMS:
+            s = delivered.get(platform)
+            if not s:
+                continue
+            parts = [f"{v} {k}" for k, v in sorted(s.items())]
+            rows.append(f"   {PLATFORM_NAMES.get(platform, platform)}: "
+                        + ", ".join(parts))
+        if rows:
+            head += "\n\n📨 <b>Доставка за сутки</b>\n" + "\n".join(rows)
+
     if r["unlinked"]:
         lines = []
         for p in r["unlinked"]:

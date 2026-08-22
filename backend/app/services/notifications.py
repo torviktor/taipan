@@ -188,10 +188,15 @@ def enqueue_telegram_delivery() -> bool:
     Вызывается роутами вместо синхронного цикла отправок. Ошибку постановки
     намеренно проглатываем: HTTP-обработчик не должен падать из-за недоступного
     Redis, а beat всё равно подберёт зависшие pending раз в 10 минут.
+
+    Имя осталось телеграмным, хотя задача давно мультиканальная: его зовут из
+    одиннадцати мест, и переименование ради точности стоило бы одиннадцати
+    правок с одиннадцатью шансами промахнуться. Переименуем, когда рядом
+    появится другая причина трогать эти файлы.
     """
     try:
-        from app.celery_app import deliver_telegram_task
-        deliver_telegram_task.delay()
+        from app.celery_app import deliver_notifications_task
+        deliver_notifications_task.delay()
         return True
     except Exception as e:
         logger.warning(
