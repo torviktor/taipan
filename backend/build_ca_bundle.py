@@ -8,97 +8,110 @@
 20 падали с CERTIFICATE_VERIFY_FAILED, при том что TLS-рукопожатие доходило
 до сервера за 14 мс — ломалась ровно проверка цепочки, а не сеть.
 
-Почему bundle собирается здесь, а не лежит .pem-файлом в репозитории
-────────────────────────────────────────────────────────────────────
-Скачанный кем-то однажды сертификат в репозитории через год превращается в
-файл без происхождения: неизвестно, откуда взят, кем и не подменён ли. Здесь
-же источник, проверка и срок годности видны в одном месте и попадают в лог
-сборки, а расхождение контрольной суммы ломает сборку громко и сразу.
+httpx берёт набор из certifi, а НЕ из /etc/ssl/certs, поэтому привычный
+update-ca-certificates задачу не решает: нужен отдельный bundle, путь к
+которому уходит в MAX_CA_BUNDLE и подставляется в verify=.
 
-Почему httpx, а не системное хранилище
-──────────────────────────────────────
-httpx берёт набор из certifi, а НЕ из /etc/ssl/certs. Поэтому привычный
-update-ca-certificates эту задачу не решает — нужен именно отдельный bundle,
-путь к которому уходит в MAX_CA_BUNDLE и подставляется в verify=.
+Почему сертификаты лежат в репозитории (backend/certs/)
+───────────────────────────────────────────────────────
+Первая версия скачивала их с gu-st.ru прямо при сборке. Так делать нельзя:
+деплой начинал зависеть от доступности постороннего сайта, и падение gu-st.ru
+останавливало выкат любых правок, даже никак не связанных с MAX. Вдобавок в
+момент плановой ротации Sub CA закреплённая контрольная сумма перестала бы
+совпадать — и сборка ломалась бы внезапно и с неочевидной причиной.
 
-Срок годности
-─────────────
-Sub CA истекает 06.03.2027. Скрипт печатает дату в лог сборки и ругается,
-если до истечения осталось меньше 60 дней. Дополнительно за сроком следит
-ежедневная сводка taipan-monitor.
+Поэтому ЭТОТ СКРИПТ В СЕТЬ НЕ ХОДИТ. Он только собирает bundle из локальных
+файлов и проверяет, что они те самые. Вопрос «не пора ли обновить»
+решает scripts/check_ca_certs.py — отдельно, еженедельно, вне сборки.
+
+Что делает проверка контрольных сумм
+────────────────────────────────────
+Теперь она защищает не от подмены по сети (сети нет), а от случайной порчи
+файла: перекодировки при переносе, «полезного» автоформатирования, обрезанного
+копипаста. Расхождение останавливает сборку с явным указанием, что делать.
 """
 
 import hashlib
-import ssl
 import subprocess
 import sys
-import urllib.request
 from datetime import datetime, timezone
+from pathlib import Path
 
 import certifi
 
 BUNDLE = "/etc/ssl/max_ca_bundle.pem"
-BASE = "https://gu-st.ru/content/Other/doc"
+CERT_DIR = Path(__file__).parent / "certs"
 
-# Контрольные суммы сняты 22.08.2026. Сертификаты УЦ живут годами и меняться
-# не должны: расхождение — это либо плановая замена корня (тогда обновить
-# суммы осознанно, сверившись с gu-st.ru), либо подмена. Оба случая обязаны
-# останавливать сборку, а не проезжать молча.
+# Порядок важен только для читаемости лога: bundle — это просто набор.
+# Суммы и даты сняты 22.08.2026, порядок обновления описан в certs/README.md.
 CERTS = {
-    "russian_trusted_root_ca":
+    "russian_trusted_root_ca.pem":
         "936a43fea6e8e525bcc0f81acd9c3d21b4fc4b9b68acea7906d698005afc6504",
-    "russian_trusted_sub_ca":
+    "russian_trusted_sub_ca.pem":
         "f0ae589f36774f29ef3648f7984b08d42fcce6f1ffeeb6236d773daeb2744ea6",
 }
 
-# Сам gu-st.ru закрыт сертификатом GlobalSign, то есть общедоверенным:
-# скачивание проверяется штатно, замкнутого круга «нужен корень, чтобы
-# скачать корень» здесь нет.
-ctx = ssl.create_default_context(cafile=certifi.where())
+# За 60 дней до истечения сборка начинает ворчать в лог. Это дублирующий
+# рубеж: основной — ежедневная сводка монитора с порогом 30 дней. Сборка
+# при этом НЕ падает: просроченный корень ломает бота в MAX, но не повод
+# запретить выкатывать сайт.
+WARN_DAYS = 60
 
-parts = [open(certifi.where(), encoding="utf-8").read()]
+parts = [Path(certifi.where()).read_text(encoding="utf-8")]
+problems = []
 
 for name, want in CERTS.items():
-    url = f"{BASE}/{name}.cer"
-    with urllib.request.urlopen(url, timeout=30, context=ctx) as r:
-        raw = r.read()
+    path = CERT_DIR / name
 
+    if not path.is_file():
+        sys.exit(
+            f"\nСБОРКА ОСТАНОВЛЕНА: нет файла {path}.\n"
+            f"Сертификаты УЦ Минцифры должны лежать в backend/certs/ —\n"
+            f"см. backend/certs/README.md, раздел «Как обновить».\n"
+        )
+
+    raw = path.read_bytes()
     got = hashlib.sha256(raw).hexdigest()
     if got != want:
         sys.exit(
-            f"\nСБОРКА ОСТАНОВЛЕНА: {name} не совпал с ожидаемым.\n"
-            f"  ожидалось: {want}\n  получено : {got}\n"
-            f"  источник : {url}\n"
-            f"Сверьтесь с gu-st.ru и обновите суммы осознанно.\n"
+            f"\nСБОРКА ОСТАНОВЛЕНА: {name} не совпал с ожидаемой суммой.\n"
+            f"  ожидалось: {want}\n"
+            f"  получено : {got}\n\n"
+            f"Это либо порча файла при переносе, либо ПЛАНОВОЕ ОБНОВЛЕНИЕ\n"
+            f"сертификата. Если обновление намеренное — пересчитайте сумму\n"
+            f"(sha256sum backend/certs/{name}) и впишите её в CERTS здесь же,\n"
+            f"а даты поправьте в backend/certs/README.md.\n"
         )
 
-    # Файлы отдаются в PEM, но полагаться на это вслепую не будем.
-    text = raw.decode("ascii", errors="replace")
-    if "BEGIN CERTIFICATE" not in text:
-        pem = subprocess.run(
-            ["openssl", "x509", "-inform", "DER"],
-            input=raw, capture_output=True, check=True,
-        ).stdout.decode()
-    else:
-        pem = text
+    pem = raw.decode("ascii", errors="replace")
+    if "BEGIN CERTIFICATE" not in pem:
+        sys.exit(
+            f"\nСБОРКА ОСТАНОВЛЕНА: {name} не похож на PEM.\n"
+            f"Файлы с gu-st.ru отдаются с расширением .cer, но внутри PEM.\n"
+            f"Если попался DER — сконвертируйте:\n"
+            f"  openssl x509 -inform DER -in {name} -out {name}\n"
+        )
 
     info = subprocess.run(
         ["openssl", "x509", "-noout", "-subject", "-enddate"],
-        input=pem.encode(), capture_output=True, check=True,
-    ).stdout.decode().strip()
+        input=raw, capture_output=True, check=True,
+    ).stdout.decode()
 
-    not_after = [l for l in info.splitlines() if l.startswith("notAfter=")][0]
+    not_after = next(l for l in info.splitlines() if l.startswith("notAfter="))
     exp = datetime.strptime(not_after[len("notAfter="):].strip(),
                             "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
     left = (exp - datetime.now(timezone.utc)).days
 
     print(f"[ca-bundle] {name}: sha256 ok, истекает {exp:%d.%m.%Y} (через {left} дн.)")
-    if left < 60:
-        print(f"[ca-bundle] ВНИМАНИЕ: до истечения {name} осталось {left} дней!")
+    if left < 0:
+        problems.append(f"{name} ИСТЁК {-left} дн. назад")
+    elif left < WARN_DAYS:
+        problems.append(f"{name} истекает через {left} дн.")
 
     parts.append(pem)
 
-with open(BUNDLE, "w", encoding="utf-8") as f:
-    f.write("\n".join(parts))
-
+Path(BUNDLE).write_text("\n".join(parts), encoding="utf-8")
 print(f"[ca-bundle] собран {BUNDLE}: certifi + {len(CERTS)} сертификата Минцифры")
+
+for p in problems:
+    print(f"[ca-bundle] ВНИМАНИЕ: {p} — обновите backend/certs/, см. README.md там же")

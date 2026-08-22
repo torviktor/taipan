@@ -1,0 +1,24 @@
+[Unit]
+Description=Недельная проверка: дамп разворачивается, корни Минцифры не устарели
+Documentation=file:/opt/taipan/monitoring/README.md
+After=network-online.target
+Wants=network-online.target
+# В отличие от остальных юнитов монитора, этому docker НУЖЕН: разворот дампа
+# идёт в контейнере db. Требование мягкое (Wants), чтобы отсутствие docker
+# давало понятный отчёт об ошибке, а не отказ запускать юнит.
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/taipan-monitor/taipan_monitor.py --weekly
+# Запас на разворот дампа (сам разворот ~секунды, но база растёт), поход в
+# сеть за сертификатами и повторные попытки доставки в Telegram.
+TimeoutStartSec=600
+# Найденная проблема — ожидаемый исход проверки, а не поломка юнита.
+SuccessExitStatus=0 1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

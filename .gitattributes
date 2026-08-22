@@ -6,3 +6,9 @@ monitoring/*.py            text eol=lf
 monitoring/*.service       text eol=lf
 monitoring/*.timer         text eol=lf
 monitoring/*.env.example   text eol=lf
+
+# Сертификаты УЦ Минцифры и шелл-скрипты — по той же причине: CRLF внутри PEM
+# ломает разбор молча, а в .sh даёт «bad interpreter».
+*.pem                      text eol=lf
+*.cer                      text eol=lf
+scripts/*.sh               text eol=lf

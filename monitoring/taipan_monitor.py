@@ -297,6 +297,170 @@ def cmd_check(cfg, force_fail=False):
     return 1 if problems else 0
 
 
+PG_USER = "taipan_user"
+PG_DB   = "taipan_db"
+
+RESTORE_TEST_DB     = "taipan_restore_test"
+RESTORE_TEST_TABLES = ["users", "athletes", "attendance"]
+CHECK_CA_SCRIPT     = "/opt/taipan/scripts/check_ca_certs.py"
+
+
+def _psql(db, sql, timeout=60, stdin=None):
+    """Выполнить SQL в контейнере db. Возвращает (текст, ошибка)."""
+    cmd = ["docker", "compose", "exec", "-T", "db",
+           "psql", "-U", PG_USER, "-d", db, "-tAc", sql]
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True,
+                             timeout=timeout, cwd="/opt/taipan", input=stdin)
+        if out.returncode != 0:
+            return None, (out.stderr or "").strip()[:200]
+        return out.stdout.strip(), None
+    except Exception as e:
+        return None, f"{type(e).__name__}: {e}"
+
+
+def _restore_test():
+    """Развернуть последний дамп в одноразовую БД и сверить с боевой.
+
+    Смысл: бэкап, который ни разу не разворачивали, — не бэкап. Файл может
+    существовать, иметь правдоподобный размер и при этом не восстанавливаться:
+    обрезанный при записи, побитый диском, снятый с ошибкой, о которой никто
+    не узнал. Ежедневная сводка ловит «пусто и мало», но не «не разворачивается».
+
+    Сверяем количество строк в трёх таблицах, по которым сразу видно подмену
+    масштаба: users, athletes, attendance. Расхождение допустимо в одну
+    сторону и на немного — дамп снят раньше, чем идёт проверка, и за это время
+    строки могли добавиться. Уменьшение относительно дампа означает, что в
+    дампе лишнее, и это уже странно.
+
+    Одноразовая БД удаляется в любом случае, включая аварийный выход.
+    """
+    lines, alarms = [], []
+
+    try:
+        files = [f for f in os.listdir(BACKUP_DIR)
+                 if f.startswith("backup_") and f.endswith(".sql")]
+        if not files:
+            return ["восстановление: нет ни одного дампа"], ["дампов нет вовсе"]
+        latest = max((os.path.join(BACKUP_DIR, f) for f in files),
+                     key=os.path.getmtime)
+    except Exception as e:
+        return [f"восстановление: каталог недоступен ({type(e).__name__})"], \
+               ["каталог дампов недоступен"]
+
+    lines.append(f"проверялся: {os.path.basename(latest)}")
+    t0 = time.time()
+
+    try:
+        _psql("postgres", f"DROP DATABASE IF EXISTS {RESTORE_TEST_DB}")
+        _, err = _psql("postgres", f"CREATE DATABASE {RESTORE_TEST_DB}")
+        if err:
+            return lines + [f"восстановление: не создать БД — {err}"], \
+                   ["не удалось создать тестовую БД"]
+
+        # Дамп лежит на хосте, в контейнере db его нет — подаём через stdin.
+        with open(latest, "r", encoding="utf-8", errors="replace") as fh:
+            dump_sql = fh.read()
+
+        restore = subprocess.run(
+            ["docker", "compose", "exec", "-T", "db",
+             "psql", "-U", PG_USER, "-d", RESTORE_TEST_DB, "-q",
+             "-v", "ON_ERROR_STOP=1"],
+            input=dump_sql, capture_output=True, text=True,
+            timeout=300, cwd="/opt/taipan",
+        )
+        if restore.returncode != 0:
+            tail = (restore.stderr or "").strip().splitlines()
+            reason = tail[-1][:160] if tail else "без сообщения"
+            lines.append(f"восстановление: ⛔ НЕ УДАЛОСЬ — {reason}")
+            alarms.append("дамп НЕ восстанавливается")
+            return lines, alarms
+
+        mismatch = []
+        for table in RESTORE_TEST_TABLES:
+            prod, e1 = _psql(PG_DB, f"select count(*) from {table}")
+            test, e2 = _psql(RESTORE_TEST_DB, f"select count(*) from {table}")
+            if e1 or e2 or prod is None or test is None:
+                lines.append(f"{table}: сверить не удалось")
+                mismatch.append(table)
+                continue
+            p, t = int(prod), int(test)
+            if t == p:
+                lines.append(f"{table}: {t} — совпадает")
+            elif t < p:
+                # Норма: дамп старше боевой БД, за сутки строки прибавились.
+                lines.append(f"{table}: {t} в дампе / {p} в боевой — норма")
+            else:
+                lines.append(f"{table}: {t} в дампе / {p} в боевой ⚠️ в дампе БОЛЬШЕ")
+                mismatch.append(table)
+
+        if mismatch:
+            alarms.append("расхождение в таблицах: " + ", ".join(mismatch))
+
+        lines.append(f"развернулся за {time.time() - t0:.0f} с")
+    finally:
+        # Одноразовая БД не должна пережить проверку ни при каком исходе:
+        # 600 КБ мусора в кластере — мелочь, но такие мелочи копятся годами.
+        _psql("postgres", f"DROP DATABASE IF EXISTS {RESTORE_TEST_DB}")
+
+    return lines, alarms
+
+
+def _ca_freshness():
+    """Не выпустили ли Минцифры замену нашим сертификатам.
+
+    Живёт отдельно от сборки образа намеренно: сборка берёт файлы из
+    backend/certs/ и в сеть не ходит, чтобы падение gu-st.ru не блокировало
+    выкат. Ходить в сеть — дело этой проверки, и её неудача ничего не ломает.
+    """
+    try:
+        out = subprocess.run(
+            ["/usr/bin/python3", CHECK_CA_SCRIPT, "--json"],
+            capture_output=True, text=True, timeout=90,
+        )
+        data = json.loads(out.stdout.strip() or "{}")
+    except Exception as e:
+        return [f"сертификаты: проверить не удалось ({type(e).__name__})"], []
+
+    lines = []
+    for c in data.get("certs", []):
+        if "error" in c:
+            lines.append(f"{c['file']}: {c['error']}")
+        else:
+            lines.append(f"{c['file']}: до {c['expires']}, у источника {c['upstream']}")
+    return lines, data.get("problems", [])
+
+
+def cmd_weekly(cfg):
+    """Еженедельная глубокая проверка: разворот бэкапа и свежесть корней.
+
+    Отдельно от ежедневной сводки, потому что стоит дорого: разворот дампа в
+    одноразовую БД и поход в сеть за сертификатами. Раз в неделю достаточно —
+    оба сюжета меняются медленно.
+    """
+    now = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC")
+
+    restore_lines, restore_alarms = _restore_test()
+    ca_lines, ca_alarms = _ca_freshness()
+    alarms = restore_alarms + ca_alarms
+
+    head = ("⚠️ <b>Тайпан: недельная проверка</b>" if alarms
+            else "✅ <b>Тайпан: недельная проверка</b>")
+
+    body = (
+        f"{head}\n\n"
+        f"<b>Разворот бэкапа</b>\n" + "\n".join(escape(l) for l in restore_lines) + "\n\n"
+        f"<b>Корни Минцифры</b>\n" + "\n".join(escape(l) for l in ca_lines)
+    )
+    if alarms:
+        body += "\n\nВНИМАНИЕ: " + escape("; ".join(alarms))
+    body += f"\n\n{now}"
+
+    ok = telegram_send(cfg, body)
+    log("недельная проверка отправлена" if ok else "недельную проверку отправить НЕ удалось")
+    return 0 if (ok and not alarms) else 1
+
+
 def _failed_notifications_24h():
     """Сколько уведомлений за сутки осталось со статусом failed.
 
@@ -307,18 +471,82 @@ def _failed_notifications_24h():
     sql = ("SELECT count(*) FROM notifications "
            "WHERE tg_status = 'failed' AND created_at >= now() - interval '24 hours';")
     try:
-        out = subprocess.run(
-            ["docker", "compose", "exec", "-T", "db", "psql", "-U", "taipan_user",
-             "-d", "taipan_db", "-tAc", sql],
-            capture_output=True, text=True, timeout=30, cwd="/opt/taipan",
-        )
-        val = out.stdout.strip()
-        return int(val) if val.isdigit() else None
+        val, err = _psql(PG_DB, sql, timeout=30)
+        return int(val) if val and val.isdigit() else None
     except Exception:
         return None
 
 
 CERT_WARN_DAYS = 30
+
+BACKUP_DIR       = "/var/backups/taipan/auto"
+BACKUP_MAX_AGE_H = 26     # дамп суточный; 26 часов = сутки + запас на дрейф
+BACKUP_MIN_RATIO = 0.5    # доля от медианы предыдущих, ниже которой — тревога
+
+
+def _backup_status():
+    """Свежесть и правдоподобность последнего суточного дампа.
+
+    Нулевые дампы уже случались: 2 файла из 50 весили 0 байт, потому что
+    перенаправление создавало файл до запуска pg_dump. Нашлись они случайно.
+    Теперь скрипт бэкапа отбраковывает пустые, но это защита от одной
+    известной причины — а молчаливо усохший дамп (обрезанная таблица, права,
+    отвалившийся диск) выглядел бы так же безобидно.
+
+    Поэтому смотрим на две вещи: не устарел ли последний дамп и не выбивается
+    ли его размер вниз относительно медианы предыдущих. Медиана, а не среднее:
+    один аномальный файл не должен утаскивать порог за собой.
+
+    Возвращает (строки для сводки, список тревог).
+    """
+    try:
+        files = sorted(
+            (f for f in os.listdir(BACKUP_DIR)
+             if f.startswith("backup_") and f.endswith(".sql")),
+        )
+    except Exception as e:
+        return [f"дампы: каталог недоступен ({type(e).__name__})"], ["каталог дампов недоступен"]
+
+    if not files:
+        return ["дампы: НЕТ НИ ОДНОГО"], ["дампов нет вовсе"]
+
+    paths = [os.path.join(BACKUP_DIR, f) for f in files]
+    paths.sort(key=lambda p: os.path.getmtime(p))
+    last = paths[-1]
+
+    size = os.path.getsize(last)
+    age_h = (time.time() - os.path.getmtime(last)) / 3600
+    when = datetime.fromtimestamp(os.path.getmtime(last), timezone.utc)
+
+    lines = [
+        f"последний: {os.path.basename(last)}",
+        f"снят: {when:%d.%m %H:%M} UTC ({age_h:.0f} ч назад), {size / 1024:.0f} КБ",
+    ]
+    alarms = []
+
+    if age_h > BACKUP_MAX_AGE_H:
+        lines[-1] += "  ⚠️ УСТАРЕЛ"
+        alarms.append(f"свежего дампа нет {age_h:.0f} ч")
+
+    # Медиана предыдущих — берём до семи, чтобы попасть в текущий порядок
+    # величин, а не в прошлогодний объём базы.
+    prev = [os.path.getsize(p) for p in paths[-8:-1]]
+    if prev:
+        prev.sort()
+        median = prev[len(prev) // 2]
+        if median > 0:
+            ratio = size / median
+            lines.append(f"к медиане прошлых: {ratio * 100:.0f}%")
+            if ratio < BACKUP_MIN_RATIO:
+                lines[-1] += "  ⚠️ ПОДОЗРИТЕЛЬНО МАЛ"
+                alarms.append(
+                    f"дамп {size / 1024:.0f} КБ против медианы {median / 1024:.0f} КБ"
+                )
+
+    if size == 0:
+        alarms.append("последний дамп ПУСТОЙ")
+
+    return lines, alarms
 
 
 def _cert_days_left(host, port=443):
@@ -435,20 +663,23 @@ def cmd_heartbeat(cfg):
     notif_line = "нет данных (БД недоступна)" if failed_notifs is None else str(failed_notifs)
 
     cert_lines, cert_alarms = _cert_lines()
+    backup_lines, backup_alarms = _backup_status()
+    warnings = cert_alarms + backup_alarms
 
     if problems:
         site_line = "ЕСТЬ ПРОБЛЕМЫ — " + escape("; ".join(problems))
         head = "🟠 <b>Тайпан: сводка за сутки</b>"
     else:
         site_line = "работает"
-        # Истекающий сертификат — это не «сайт лежит», но и не «всё хорошо»:
-        # молчаливая смерть через полгода уже случалась, поэтому заголовок
-        # обязан отличаться от спокойной галочки.
-        head = ("⚠️ <b>Тайпан: сводка за сутки</b>" if cert_alarms
+        # Истекающий сертификат или протухший бэкап — это не «сайт лежит», но
+        # и не «всё хорошо»: молчаливая смерть через полгода уже случалась,
+        # поэтому заголовок обязан отличаться от спокойной галочки.
+        head = ("⚠️ <b>Тайпан: сводка за сутки</b>" if warnings
                 else "✅ <b>Тайпан: сводка за сутки</b>")
 
-    cert_block = "\n".join(escape(l) for l in cert_lines)
-    warn_block = ("\n\nВНИМАНИЕ: " + escape("; ".join(cert_alarms))) if cert_alarms else ""
+    cert_block   = "\n".join(escape(l) for l in cert_lines)
+    backup_block = "\n".join(escape(l) for l in backup_lines)
+    warn_block   = ("\n\nВНИМАНИЕ: " + escape("; ".join(warnings))) if warnings else ""
 
     ok = telegram_send(cfg, (
         f"{head}\n\n"
@@ -456,6 +687,7 @@ def cmd_heartbeat(cfg):
         f"IP и A-запись: {escape(ip_line)}\n"
         f"Неудачных проверок за сутки: {fails_24h}\n"
         f"Уведомлений не доставлено: {notif_line}\n\n"
+        f"Резервные копии:\n{backup_block}\n\n"
         f"Сертификаты:\n{cert_block}{warn_block}\n\n"
         f"{now}"
     ))
@@ -523,6 +755,8 @@ def main():
         return cmd_test(cfg)
     if "--heartbeat" in args:
         return cmd_heartbeat(cfg)
+    if "--weekly" in args:
+        return cmd_weekly(cfg)
     if "--status" in args:
         return cmd_status(cfg)
     if "--resolve-chat" in args:
