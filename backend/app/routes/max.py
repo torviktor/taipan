@@ -426,6 +426,14 @@ def process_max_update(update: dict) -> None:
         sub = _get_or_create(db, external_id, username, full_name)
         reply = run_action(action, db, sub, raw_text)
 
+        # Успешная обработка раньше не оставляла в логе НИЧЕГО: писались только
+        # ошибки. Из-за этого по логу нельзя было отличить «нажатие не дошло»
+        # от «дошло и отработало» — при разборе первого же нажатия это сразу
+        # оказалось неудобно. Строка короткая, на объём лога не влияет.
+        logger.info("MAX: %s от user_id=%s -> действие %r",
+                    "нажатие" if callback_id else "сообщение",
+                    external_id, action or "(неизвестное)")
+
         # Кнопки показываем под каждым ответом: разговор с ботом идёт с
         # телефона, и набирать «/month» руками там неудобно.
         status, err = send_message_result(external_id, reply,
