@@ -354,22 +354,31 @@ def _bundle_sub_ca_days_left():
     автоматически: bundle пересобирается только при сборке образа. Молча
     просроченный корень — это внезапно замолчавший бот.
     """
-    sh = ('for f in $(csplit -z -f /tmp/mc -b %02d.pem "$MAX_CA_BUNDLE" '
-          '"/BEGIN CERTIFICATE/" "{*}" >/dev/null 2>&1; echo /tmp/mc*.pem); do '
-          'openssl x509 -in "$f" -noout -subject -enddate 2>/dev/null | tr "\\n" " "; echo; '
-          'done | grep "Russian Trusted Sub CA"; rm -f /tmp/mc*.pem')
+    # Разбор идёт внутри контейнера: bundle лежит в образе, снаружи его нет.
+    # Через cryptography, а не через openssl с нарезкой файла — bundle это
+    # больше сотни склеенных PEM, и любая нарезка текста на них хрупка.
+    code = (
+        "from cryptography import x509;"
+        "import os,sys;"
+        "d=open(os.environ['MAX_CA_BUNDLE'],'rb').read();"
+        "c=[c for c in x509.load_pem_x509_certificates(d)"
+        " if 'Russian Trusted Sub CA' in c.subject.rfc4514_string()];"
+        "print(c[0].not_valid_after_utc.isoformat() if c else '')"
+    )
     try:
         out = subprocess.run(
-            ["docker", "compose", "exec", "-T", "backend", "sh", "-c", sh],
+            ["docker", "compose", "exec", "-T", "backend", "python", "-c", code],
             capture_output=True, text=True, timeout=40, cwd="/opt/taipan",
         )
-        for part in out.stdout.split("notAfter="):
-            if part and part[0].isalpha():
-                exp = datetime.strptime(part.strip(), "%b %d %H:%M:%S %Y %Z")
-                return (exp.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)).days
+        val = out.stdout.strip()
+        if not val:
+            return None
+        exp = datetime.fromisoformat(val)
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        return (exp - datetime.now(timezone.utc)).days
     except Exception:
-        pass
-    return None
+        return None
 
 
 def _cert_lines():
