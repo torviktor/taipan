@@ -110,17 +110,15 @@ services:
       # же выгрузки оказывались прямо в рабочем дереве ПУБЛИЧНОГО репозитория.
       # Теперь единственное место — /var/backups/taipan с правами 700 root.
       - /var/backups/taipan/auto:/backups
+      # Скрипт вместо однострочника: логику дампа нужно было чинить, а в
+      # YAML-строке её невозможно ни прочитать, ни прокомментировать.
+      - ./scripts/db_backup.sh:/usr/local/bin/db_backup.sh:ro
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-    # Ротация 30 дней стоит здесь, а не в logrotate на хосте: правило уезжает
-    # вместе с репозиторием и не может потеряться при переезде сервера.
-    # Удаление идёт через && — если pg_dump упал, старые дампы остаются на
-    # месте, иначе неудачная ночь стоила бы сразу и свежей копии, и месячной.
-    command: >
-      sh -c "while true; do
-      pg_dump $$DATABASE_URL > /backups/backup_$$(date +%Y%m%d_%H%M%S).sql
-      && find /backups -maxdepth 1 -name 'backup_*.sql' -mtime +30 -delete;
-      sleep 86400; done"
+    # Дамп, проверка на пустой файл и ротация 30 дней — в scripts/db_backup.sh.
+    # Правило уезжает вместе с репозиторием и не может потеряться при
+    # переезде сервера, в отличие от конфига logrotate на хосте.
+    command: sh /usr/local/bin/db_backup.sh
     restart: always
 
 volumes:
