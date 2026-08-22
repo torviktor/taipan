@@ -373,6 +373,13 @@ def _get_or_create(db, external_id: str, username: str, full_name: str):
             subscribed  = True,
         )
         db.add(sub)
+        # Коммит СРАЗУ, а не «когда-нибудь ниже». Сессия создана с
+        # autoflush=False, поэтому несохранённый объект НЕ виден последующим
+        # запросам в той же сессии: binding.bind_by_phone искал подписчика,
+        # не находил и добавлял второго — INSERT падал на уникальности пары
+        # (platform, external_id), апдейт обрывался, привязка не происходила.
+        # Поймано тестом привязки по контакту 22.08.2026.
+        db.commit()
     return sub
 
 
