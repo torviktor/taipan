@@ -8,10 +8,18 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+
+      # Версия Node фиксируется явно: иначе сборка едет вместе с образом
+      # раннера, и однажды упадёт на ровном месте.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Проверка сборки фронтенда
-        run: cd frontend && npm install && npm run build
+        run: cd frontend && npm ci && npm run build
 
       - name: Проверка синтаксиса бэкенда
         run: |
@@ -24,7 +32,7 @@ jobs:
     needs: check
     steps:
       - name: Deploy на сервер
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host:     ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
@@ -47,7 +55,17 @@ jobs:
             docker compose down
             docker compose up -d --remove-orphans
 
-            # 4. Чистка dangling-образов
+            # 4. Монитор живёт ВНЕ /opt/taipan и своей копией — деплой его
+            #    раньше не трогал. 22.08.2026 из-за этого правка пролежала
+            #    в репозитории, не доехав на сервер: в git проверка сроков
+            #    сертификатов была, в работающем мониторе — нет.
+            if [ -d /opt/taipan-monitor ]; then
+              install -m 755 /opt/taipan/monitoring/taipan_monitor.py \
+                             /opt/taipan-monitor/taipan_monitor.py
+              echo "Монитор синхронизирован"
+            fi
+
+            # 5. Чистка dangling-образов
             docker image prune -f
             docker builder prune -f
 
