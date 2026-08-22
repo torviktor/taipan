@@ -103,10 +103,22 @@ services:
     depends_on:
       - db
     volumes:
-      - db_backups:/backups
+      # Каталог на хосте вместо docker-тома. Дамп — это ФИО родителей и детей,
+      # телефоны и суммы взносов; в томе он лежал с правами 644, а раньше такие
+      # же выгрузки оказывались прямо в рабочем дереве ПУБЛИЧНОГО репозитория.
+      # Теперь единственное место — /var/backups/taipan с правами 700 root.
+      - /var/backups/taipan/auto:/backups
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-    command: sh -c "while true; do pg_dump $$DATABASE_URL > /backups/backup_$$(date +%Y%m%d_%H%M%S).sql; sleep 86400; done"
+    # Ротация 30 дней стоит здесь, а не в logrotate на хосте: правило уезжает
+    # вместе с репозиторием и не может потеряться при переезде сервера.
+    # Удаление идёт через && — если pg_dump упал, старые дампы остаются на
+    # месте, иначе неудачная ночь стоила бы сразу и свежей копии, и месячной.
+    command: >
+      sh -c "while true; do
+      pg_dump $$DATABASE_URL > /backups/backup_$$(date +%Y%m%d_%H%M%S).sql
+      && find /backups -maxdepth 1 -name 'backup_*.sql' -mtime +30 -delete;
+      sleep 86400; done"
     restart: always
 
 volumes:
@@ -115,4 +127,3 @@ volumes:
   analytics_files:
   hof_files:
   static_files:
-  db_backups:

@@ -1,4 +1,13 @@
 .env
+# Бэкапы .env с боевыми секретами (делаются на сервере при правке).
+# Голый шаблон `.env` их НЕ покрывает — без этой строки они видны git add -A.
+.env.bak-*
+.env.*.bak
+
+# Дампы БД: персональные данные родителей и детей. Публиковать нельзя.
+backups/
+*.sql
+!backend/migrations/**/*.sql
 
 # QR-poster fonts (downloaded locally; SIL OFL but binary, no need in repo)
 scripts/fonts/
