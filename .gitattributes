@@ -7,8 +7,13 @@ monitoring/*.service       text eol=lf
 monitoring/*.timer         text eol=lf
 monitoring/*.env.example   text eol=lf
 
-# Сертификаты УЦ Минцифры и шелл-скрипты — по той же причине: CRLF внутри PEM
-# ломает разбор молча, а в .sh даёт «bad interpreter».
-*.pem                      text eol=lf
-*.cer                      text eol=lf
+# Шелл-скрипты — по той же причине, что и питон выше.
 scripts/*.sh               text eol=lf
+
+# Сертификаты — НАОБОРОТ, побайтово как есть. Их целостность проверяется по
+# sha256, закреплённой в backend/build_ca_bundle.py, а файлы с gu-st.ru
+# приходят с CRLF. Правило «text eol=lf» переписывало их в LF при коммите,
+# и сумма переставала совпадать: сборка на Linux падала, хотя на Windows
+# рабочая копия выглядела правильной. Помечены как binary — git их не трогает.
+*.pem                      binary
+*.cer                      binary
