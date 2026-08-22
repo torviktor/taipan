@@ -6,6 +6,7 @@ from typing import Optional
 from datetime import date
 
 from app.core.database import get_db
+from app.core.markup import esc
 from app.core.security import get_current_user
 from app.models.user import User, Athlete
 from app.models.certification import (
@@ -445,6 +446,19 @@ def _send_telegram_notifications(results, cert, db):
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
         return
+    # ВНИМАНИЕ: эта рассылка НИЧЕГО НЕ ОТПРАВЛЯЕТ и не отправляла никогда.
+    # У модели User нет поля telegram_chat_id — getattr ниже всегда возвращает
+    # None, и цикл всегда доходит до continue. Обнаружено 22.08.2026.
+    #
+    # Оживление — отдельное решение, а не побочный эффект правки экранирования:
+    # получателя надо искать в messenger_subscribers по user_id (как это делает
+    # send_telegram_to_user_result), и родители, которые сейчас таких сообщений
+    # не получают, начнут их получать. Плюс прямой вызов api.telegram.org в
+    # обход релея теряет около половины запросов с этого сервера.
+    #
+    # Разметка приведена в порядок заранее, чтобы при оживлении путь был уже
+    # безопасным: HTML вместо Markdown (как во всех остальных отправках) и
+    # экранирование данных из базы.
     for r in results:
         if not r.athlete or not r.athlete.user:
             continue
@@ -453,16 +467,16 @@ def _send_telegram_notifications(results, cert, db):
             continue
         target_str = f"{r.target_dan} дан" if r.target_dan else f"{r.target_gup} гып" if r.target_gup else ""
         text = (
-            f"🥋 *{cert.name}*\n\n"
-            f"{r.athlete.full_name} отобран для сдачи экзамена на *{target_str}*.\n"
+            f"🥋 <b>{esc(cert.name)}</b>\n\n"
+            f"{esc(r.athlete.full_name)} отобран для сдачи экзамена на <b>{esc(target_str)}</b>.\n"
             f"📅 Дата: {cert.date.strftime('%d.%m.%Y')}"
         )
         if cert.location:
-            text += f"\n📍 {cert.location}"
+            text += f"\n📍 {esc(cert.location)}"
         try:
             httpx.post(
                 f"https://api.telegram.org/bot{token}/sendMessage",
-                json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+                json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
                 timeout=5
             )
         except Exception:

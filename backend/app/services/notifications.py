@@ -12,6 +12,8 @@ import os
 
 logger = logging.getLogger(__name__)
 
+from app.core.markup import esc
+
 BOT_USERNAME = "taipan_tkd_bot"
 
 # Канал до api.telegram.org с этого сервера нестабилен: TCP на 443
@@ -143,8 +145,8 @@ async def notify_news_telegram(title: str, body: Optional[str] = None, photo_url
 
     caption = (
         f"📰 <b>Новость клуба Тайпан</b>\n\n"
-        f"<b>{title}</b>\n\n"
-        f"{body[:800] if body else ''}\n\n"
+        f"<b>{esc(title)}</b>\n\n"
+        f"{esc(body[:800]) if body else ''}\n\n"
         f"🔗 Читать полностью: https://taipan-tkd.ru/news"
     )
     if len(caption) > 1024:
@@ -220,7 +222,7 @@ def send_telegram_to_user_result(user_id: int, title: str, body: str, db):
         if not token:
             return "failed", "TELEGRAM_BOT_TOKEN не задан"
 
-        text = f"🔔 <b>{title}</b>\n\n{body}\n\n<i>taipan-tkd.ru/cabinet</i>"
+        text = f"🔔 <b>{esc(title)}</b>\n\n{esc(body)}\n\n<i>taipan-tkd.ru/cabinet</i>"
 
         import httpx
         import time
@@ -285,14 +287,14 @@ def build_reminder_message(event, days_before: int) -> str:
     text = (
         f"🥋 <b>Тайпан — Напоминание</b>\n\n"
         f"{when}\n"
-        f"<b>{event.title}</b>\n\n"
+        f"<b>{esc(event.title)}</b>\n\n"
         f"🗓 {date_str}\n"
     )
 
     if event.location:
-        text += f"📍 {event.location}\n"
+        text += f"📍 {esc(event.location)}\n"
     if event.description:
-        text += f"\n{event.description}\n"
+        text += f"\n{esc(event.description)}\n"
 
     text += f"\n<a href='https://t.me/{BOT_USERNAME}'>Открыть в боте</a>"
     return text

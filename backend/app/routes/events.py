@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
+from app.core.markup import esc
 from app.core.database import get_db
 from app.core.security import get_current_user, require_manager
 from app.models.user import User
@@ -117,13 +118,13 @@ def create_event(
     date_str = event.event_date.strftime("%d.%m.%Y в %H:%M")
     text = (
         f"📅 <b>Новое событие</b>\n\n"
-        f"<b>{event.title}</b>\n"
+        f"<b>{esc(event.title)}</b>\n"
         f"🗓 {date_str}\n"
     )
     if event.location:
-        text += f"📍 {event.location}\n"
+        text += f"📍 {esc(event.location)}\n"
     if event.description:
-        text += f"\n{event.description[:150]}"
+        text += f"\n{esc(event.description[:150])}"
     text += "\n\n🔗 https://taipan-tkd.ru/calendar"
     background_tasks.add_task(notify_channel, text)
 

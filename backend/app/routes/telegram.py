@@ -5,6 +5,7 @@ import os
 import logging
 from fastapi import APIRouter, Request
 from app.core.database import SessionLocal
+from app.core.markup import esc
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -77,9 +78,9 @@ async def process_telegram_update(update: dict):
                 reply = "📅 Ближайших событий нет."
             else:
                 date_str = e.event_date.strftime("%d.%m в %H:%M")
-                reply = f"📅 <b>Ближайшее событие:</b>\n\n• {date_str} — {e.title}"
+                reply = f"📅 <b>Ближайшее событие:</b>\n\n• {date_str} — {esc(e.title)}"
                 if e.location:
-                    reply += f"\n  📍 {e.location}"
+                    reply += f"\n  📍 {esc(e.location)}"
             await send_telegram_message(chat_id, reply)
 
         elif text == "/week":
@@ -95,9 +96,9 @@ async def process_telegram_update(update: dict):
                 reply = "📅 <b>События на неделю:</b>\n\n"
                 for e in events:
                     date_str = e.event_date.strftime("%d.%m в %H:%M")
-                    reply += f"• {date_str} — {e.title}\n"
+                    reply += f"• {date_str} — {esc(e.title)}\n"
                     if e.location:
-                        reply += f"  📍 {e.location}\n"
+                        reply += f"  📍 {esc(e.location)}\n"
             await send_telegram_message(chat_id, reply)
 
         elif text == "/news":
@@ -111,7 +112,7 @@ async def process_telegram_update(update: dict):
                 reply = "📰 <b>Последние новости клуба:</b>\n\n"
                 for n in news_list:
                     date_str = n.published_at.strftime("%d.%m.%Y")
-                    reply += f"• {date_str} — {n.title}\n"
+                    reply += f"• {date_str} — {esc(n.title)}\n"
                 reply += "\n🔗 Все новости: https://taipan-tkd.ru/news"
             await send_telegram_message(chat_id, reply)
 
@@ -146,7 +147,7 @@ async def process_telegram_update(update: dict):
 
                 if not user:
                     await send_telegram_message(chat_id,
-                        f"❌ Пользователь с номером <code>{phone}</code> не найден.\n\n"
+                        f"❌ Пользователь с номером <code>{esc(phone)}</code> не найден.\n\n"
                         f"Проверьте номер — он должен совпадать с тем, "
                         f"которым вы зарегистрированы на сайте taipan-tkd.ru"
                     )
@@ -172,10 +173,10 @@ async def process_telegram_update(update: dict):
                     ).all()
 
                     if athletes:
-                        athletes_text = "\n".join([f"• {a.full_name}" for a in athletes])
+                        athletes_text = "\n".join([f"• {esc(a.full_name)}" for a in athletes])
                         reply = (
                             f"✅ Аккаунт успешно привязан!\n\n"
-                            f"👤 {user.full_name}\n\n"
+                            f"👤 {esc(user.full_name)}\n\n"
                             f"🥋 Ваши спортсмены:\n{athletes_text}\n\n"
                             f"Теперь вы будете получать персональные уведомления "
                             f"о соревнованиях, сборах и аттестациях."
@@ -183,7 +184,7 @@ async def process_telegram_update(update: dict):
                     else:
                         reply = (
                             f"✅ Аккаунт успешно привязан!\n\n"
-                            f"👤 {user.full_name}\n\n"
+                            f"👤 {esc(user.full_name)}\n\n"
                             f"Теперь вы будете получать персональные уведомления."
                         )
 
@@ -202,9 +203,9 @@ async def process_telegram_update(update: dict):
                 reply = "📅 <b>События на месяц:</b>\n\n"
                 for e in events:
                     date_str = e.event_date.strftime("%d.%m в %H:%M")
-                    reply += f"• {date_str} — {e.title}\n"
+                    reply += f"• {date_str} — {esc(e.title)}\n"
                     if e.location:
-                        reply += f"  📍 {e.location}\n"
+                        reply += f"  📍 {esc(e.location)}\n"
             await send_telegram_message(chat_id, reply)
 
     finally:
