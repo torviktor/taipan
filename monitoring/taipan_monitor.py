@@ -477,6 +477,14 @@ def _failed_notifications_24h():
         return None
 
 
+# Метка версии файла. Монитор живёт ОТДЕЛЬНОЙ копией в /opt/taipan-monitor/,
+# и она уже расходилась с репозиторием: правка лежала в git, а на сервере
+# работал старый файл, о чём никто не знал. Пока синхронизацию не делает
+# деплой, эта строка — способ проверить расхождение одной командой:
+#     python3 /opt/taipan-monitor/taipan_monitor.py --status | head -1
+# и сравнить с тем, что в репозитории.
+MONITOR_REVISION = "2026-08-22.1"
+
 CERT_WARN_DAYS = 30
 
 BACKUP_DIR       = "/var/backups/taipan/auto"
@@ -711,6 +719,7 @@ def cmd_test(cfg):
 
 def cmd_status(cfg):
     problems = run_checks()
+    log(f"ревизия монитора: {MONITOR_REVISION}")
     log(f"публичный IP: {get_public_ip()}   A-запись: {get_dns_ip()}")
     log("состояние: " + ("OK" if not problems else "; ".join(problems)))
     log(f"файл состояния: {load_state()}")
