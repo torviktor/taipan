@@ -146,9 +146,37 @@ def build_report(db) -> dict:
         "unlinked_count": len(unlinked),
         "percent":      round(len(linked) * 100 / total) if total else 0,
         "per_platform": per_platform,
+        "dangling":     dangling_subscribers(db),
         "unlinked":     unlinked,
         "linked":       linked,
     }
+
+
+def dangling_subscribers(db) -> dict:
+    """Кто написал боту, но так и не привязал аккаунт.
+
+    Отдельная и самая полезная категория: человек уже нашёл бота и нажал
+    «Начать», ему остаётся отправить одну команду. Догонять его несравнимо
+    легче, чем того, кто про бота не слышал. На 22.08.2026 таких девять —
+    больше, чем привязанных.
+
+    Имён здесь нет намеренно: пока привязки нет, мы не знаем, кто это, а
+    показывать тренеру ник из мессенджера — значит выдавать за факт догадку.
+    """
+    from app.models.event import MessengerSubscriber
+
+    out = {}
+    for platform in PLATFORMS:
+        out[platform] = (
+            db.query(MessengerSubscriber)
+            .filter(
+                MessengerSubscriber.platform == platform,   # фильтр обязателен
+                MessengerSubscriber.subscribed == True,
+                MessengerSubscriber.user_id == None,
+            )
+            .count()
+        )
+    return out
 
 
 def staff_recipients(db) -> List[dict]:

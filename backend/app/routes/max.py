@@ -263,6 +263,16 @@ def _cmd_subs(db) -> str:
         f"Telegram: {per.get('telegram', 0)}   ·   MAX: {per.get('max', 0)}"
     )
 
+    # Самая лёгкая добыча: человек уже нашёл бота и нажал «Начать», осталась
+    # одна команда. Поэтому строка идёт сразу под охватом, а не в конце.
+    d = r["dangling"]
+    if sum(d.values()):
+        head += (
+            f"\n\n💬 Написали боту, но не привязались: <b>{sum(d.values())}</b>"
+            f"\n   Telegram: {d.get('telegram', 0)}   ·   MAX: {d.get('max', 0)}"
+            "\n   Им достаточно отправить /link с номером."
+        )
+
     if r["unlinked"]:
         lines = []
         for p in r["unlinked"]:
