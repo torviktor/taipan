@@ -174,7 +174,7 @@ def _db_of(sub):
         return None
 
 
-def _extract_contact(message: dict, sender_id: str):
+def _extract_contact(attachments: list, sender_id: str):
     """Достать подтверждённый номер из вложения contact. Иначе None.
 
     ЗАЧЕМ ПРОВЕРКА. Карточку контакта можно ПЕРЕСЛАТЬ. Приняв номер не глядя,
@@ -199,8 +199,11 @@ def _extract_contact(message: dict, sender_id: str):
     import hmac
     import re as _re
 
-    for att in (message.get("attachments") or []):
+    for att in (attachments or []):
         if (att.get("type") or "") != "contact":
+            # Фото, стикер, файл — не наше дело, но в лог занесём: иначе
+            # непонятно, почему бот промолчал на присланную картинку.
+            logger.info("MAX: вложение типа %r пропущено", att.get("type"))
             continue
         payload = att.get("payload") or {}
         vcf = payload.get("vcf_info") or ""
@@ -558,11 +561,26 @@ def _resolve(kind: str, update: dict):
         # Нажатие «Поделиться контактом» приходит обычным сообщением с
         # вложением. Номер извлекается только после проверки, что карточка
         # принадлежит отправителю, — иначе _extract_contact вернёт None.
-        if message.get("attachments"):
-            phone = _extract_contact(message, external_id)
+        #
+        # ВЛОЖЕНИЯ ЛЕЖАТ В body, А НЕ НА message. Проверено на живом нажатии
+        # 22.08.2026: я искал message["attachments"], там всегда пусто, контакт
+        # не находился, и бот отвечал «не понимаю эту команду» на нажатие
+        # собственной кнопки. Схема MessageBody в официальной библиотеке
+        # подтверждает: mid, seq, text, attachments, markup — всё внутри body.
+        # Запасной путь по message оставлен на случай, если формат изменится.
+        attachments = body.get("attachments") or message.get("attachments") or []
+        if attachments:
+            phone = _extract_contact(attachments, external_id)
             action = CONTACT_ACTION if phone else CONTACT_REJECTED
             return (external_id, sender.get("username") or "",
                     (sender.get("name") or "").strip(), action, phone or "", None)
+
+        # Сообщение без текста и без понятных вложений: чтобы такой случай
+        # больше не превращался в молчаливое «не понимаю команду», пишем в лог
+        # его структуру. Ключи, а не содержимое — внутри персональные данные.
+        if not text:
+            logger.warning("MAX: сообщение без текста и вложений, ключи body: %s, "
+                           "ключи message: %s", sorted(body.keys()), sorted(message.keys()))
 
         # «/link 79…» и «/start lnk_…» доходят до run_action как есть,
         # остальное разрешается по таблице.
