@@ -237,6 +237,7 @@ def notify_staff_new_link(db, user, platform: str, children: List[str]) -> None:
         f"🥋 Спортсмены:\n{kids}"
     )
 
+    sent, failed = 0, 0
     for who in staff_recipients(db):
         # Себе же уведомление о собственной привязке не шлём.
         if who["user_id"] == user.id:
@@ -248,8 +249,17 @@ def notify_staff_new_link(db, user, platform: str, children: List[str]) -> None:
             else:
                 from app.services.notifications import send_telegram_sync
                 status, err = send_telegram_sync(who["external_id"], text)
-            if status != "sent":
+            if status == "sent":
+                sent += 1
+            else:
+                failed += 1
                 logger.warning("Охват: тренеру %s в %s не доставлено — %s",
                                who["full_name"], who["platform"], err)
         except Exception:
+            failed += 1
             logger.exception("Охват: уведомление тренеру %s упало", who["full_name"])
+
+    # Успех тоже пишем: без этой строки «уведомление не пришло» и «уведомление
+    # ушло, но тренер его не заметил» выглядят в логе одинаково — тишиной.
+    logger.info("Охват: о привязке %s (%s) уведомлено тренеров: %s, не удалось: %s",
+                user.full_name, platform, sent, failed)
