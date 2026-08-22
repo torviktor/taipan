@@ -88,6 +88,11 @@ STAFF_ACTIONS = {
     "subs": "Охват подписок",
 }
 
+# Внутренние имена: их нельзя набрать текстом, они возникают только из
+# вложения с контактом. Поэтому и в ACTIONS, и в COMMAND_ALIASES их нет.
+CONTACT_ACTION   = "__contact__"
+CONTACT_REJECTED = "__contact_rejected__"
+
 # Команды, которые бот принимает текстом. Отдельная таблица, потому что
 # /link умеет ещё и форму «/link НОМЕР», разбираемую особо.
 COMMAND_ALIASES = {f"/{name}": name for name in list(ACTIONS) + list(STAFF_ACTIONS)}
@@ -130,7 +135,13 @@ def main_keyboard(sub=None) -> list:
     Расписание — кнопка-ссылка, а не действие: таблица schedule в базе пуста,
     и команда показывала бы пустоту, тогда как страница сайта работает.
     """
-    from app.services.max_bot import callback_button, link_button
+    from app.services.max_bot import callback_button, link_button, request_contact_button
+
+    # Пока человек не привязан, всё остальное для него бесполезно: события он
+    # и так видит на сайте, а персональных уведомлений без привязки не будет.
+    # Поэтому одна кнопка и никакого выбора — так меньше поводов не дойти.
+    if sub is not None and not sub.user_id:
+        return [[request_contact_button("📱 Поделиться контактом")]]
 
     rows = [
         [callback_button("📅 Ближайшее", "events"),
@@ -160,6 +171,82 @@ def _db_of(sub):
         return object_session(sub)
     except Exception:
         return None
+
+
+def _extract_contact(message: dict, sender_id: str):
+    """Достать подтверждённый номер из вложения contact. Иначе None.
+
+    ЗАЧЕМ ПРОВЕРКА. Карточку контакта можно ПЕРЕСЛАТЬ. Приняв номер не глядя,
+    мы дали бы любому переслать боту карточку соседа и привязать к себе чужой
+    аккаунт — чужих детей, взносы и уведомления. Поэтому номер принимается
+    только если контакт принадлежит отправителю.
+
+    Доказательств два, и они разной силы:
+
+      1. max_info.user_id == sender.user_id — ОБЯЗАТЕЛЬНО. Именно это ловит
+         пересылку: у чужой карточки внутри чужой профиль. Прямой аналог
+         телеграмной проверки contact.user_id.
+
+      2. hash = HMAC-SHA256(токен_бота, vcf_info) — платформа подписывает
+         данные, и подпись доказывает вдобавок, что номер не подменён по
+         дороге. Проверяем и логируем, но кодировку подписи (hex или base64)
+         документация не фиксирует, поэтому расхождение НЕ блокирует привязку:
+         принадлежность уже доказана пунктом 1, а ложный отказ по кодировке
+         оставил бы родителей без уведомлений.
+    """
+    import hashlib
+    import hmac
+    import re as _re
+
+    for att in (message.get("attachments") or []):
+        if (att.get("type") or "") != "contact":
+            continue
+        payload = att.get("payload") or {}
+        vcf = payload.get("vcf_info") or ""
+        info = payload.get("max_info") or payload.get("tam_info") or {}
+
+        owner = str(info.get("user_id") or "")
+        if not owner or owner != str(sender_id):
+            logger.warning(
+                "MAX: контакт отклонён — карточка принадлежит %r, а прислал %r "
+                "(похоже на пересланный чужой контакт)", owner or "неизвестно", sender_id)
+            return None
+
+        _verify_contact_hash(payload.get("hash"), vcf, hmac, hashlib)
+
+        # Номер лежит в строке вида «TEL;TYPE=cell:79990000000».
+        m = _re.search(r"TEL[^:]*:\s*([+\d][\d\s()\-]*)", vcf)
+        if m:
+            return m.group(1)
+
+        # Запасной вариант, если формат карточки изменится.
+        phone = info.get("phone") or payload.get("phone")
+        if phone:
+            return str(phone)
+
+        logger.warning("MAX: во вложении contact не нашёлся номер")
+        return None
+    return None
+
+
+def _verify_contact_hash(got, vcf: str, hmac, hashlib) -> None:
+    """Сверить подпись платформы. Только логирует — см. пункт 2 выше."""
+    if not got or not vcf:
+        return
+    token = os.getenv("MAX_BOT_TOKEN", "").encode()
+    # Документация отдельно оговаривает, что перед хешированием
+    # последовательности \r\n должны быть настоящими переносами строк.
+    body = vcf.replace("\\r\\n", "\r\n").encode()
+    digest = hmac.new(token, body, hashlib.sha256).digest()
+    import base64
+    variants = {digest.hex(), base64.b64encode(digest).decode()}
+    if str(got) in variants:
+        logger.info("MAX: подпись контакта совпала")
+    else:
+        logger.warning(
+            "MAX: подпись контакта НЕ совпала (ни hex, ни base64). "
+            "Привязка разрешена по совпадению отправителя. "
+            "Длина полученной подписи: %s", len(str(got)))
 
 
 def _fmt_event(e) -> str:
@@ -263,14 +350,6 @@ def _cmd_news(db) -> str:
     return f"📰 <b>Последние новости клуба:</b>\n\n{body}\n\n🔗 Все новости: {SITE_URL}/news"
 
 
-def _normalize_phone(raw: str) -> str:
-    """Привести номер к виду 7XXXXXXXXXX — так же, как это делает Telegram."""
-    phone = raw.strip().lstrip("+").lstrip("8")
-    if len(phone) == 10 and phone.startswith("9"):
-        phone = "7" + phone
-    return phone
-
-
 def _get_or_create(db, external_id: str, username: str, full_name: str):
     """Найти подписчика MAX или завести нового.
 
@@ -298,64 +377,30 @@ def _get_or_create(db, external_id: str, username: str, full_name: str):
 
 
 def _handle_link(db, sub, user_id_max: str, text: str) -> str:
-    """Привязка аккаунта сайта. Возвращает текст ответа."""
-    from app.models.user import User, Athlete
+    """Ручная привязка по номеру. Запасной путь: основной — кнопка контакта.
+
+    Идёт через тот же binding.bind_by_phone, что и кнопка. Раньше здесь была
+    своя нормализация номера и своя привязка, которая МОЛЧА перепривязывала
+    аккаунт, если его уже занимал другой подписчик той же площадки. Теперь оба
+    пути ведут себя одинаково, и «занято» объясняется человеку.
+    """
+    from app.services import binding
 
     parts = text.split(maxsplit=1)
     if len(parts) < 2 or not parts[1].strip():
-        return "Укажите номер телефона: /link 79998887766"
+        return LINK_HELP
 
-    phone = _normalize_phone(parts[1])
+    raw = parts[1].strip()
+    user, reason = binding.bind_by_phone(db, "max", sub.external_id, raw)
 
-    user = (
-        db.query(User).filter(User.phone == phone).first()
-        or db.query(User).filter(User.phone == "7" + phone).first()
-        or db.query(User).filter(User.phone == "8" + phone).first()
-    )
-
-    if not user:
-        logger.info("MAX /link: пользователь с номером не найден (user_id=%s)", user_id_max)
-        return (
-            f"❌ Пользователь с номером <code>{esc(phone)}</code> не найден.\n\n"
-            f"Проверьте номер — он должен совпадать с тем, которым вы "
-            f"зарегистрированы на сайте {SITE_URL}"
-        )
-
-    # Строки подписчика может не быть: человек мог начать сразу с /link, минуя
-    # /start. В телеграмной версии это когда-то приводило к молчаливому
-    # пропуску привязки при внешне успешном ответе — здесь подписчик создаётся.
-    sub.user_id = user.id
-    sub.subscribed = True
-    db.commit()
-
-    athletes = db.query(Athlete).filter(
-        Athlete.user_id == user.id,
-        Athlete.is_archived == False,
-    ).all()
-
-    logger.info("MAX /link: аккаунт %s привязан к user_id=%s", user.id, user_id_max)
-
-    # Тренерам — только на УСПЕШНУЮ привязку. На /start не шлём: его пишет
-    # любой, кто открыл бота, и такие сообщения быстро научили бы тренера их
-    # пролистывать. Падение здесь не должно ломать саму привязку, поэтому
-    # notify_staff_new_link глушит ошибки внутри себя.
-    from app.services.reach import notify_staff_new_link
-    notify_staff_new_link(db, user, "max", [a.full_name for a in athletes])
-
-    if athletes:
-        lst = "\n".join(f"• {esc(a.full_name)}" for a in athletes)
-        return (
-            f"✅ <b>Аккаунт успешно привязан!</b>\n\n"
-            f"👤 {esc(user.full_name)}\n\n"
-            f"🥋 Ваши спортсмены:\n{lst}\n\n"
-            f"Теперь вы будете получать персональные уведомления "
-            f"о соревнованиях, сборах и аттестациях."
-        )
-    return (
-        f"✅ <b>Аккаунт успешно привязан!</b>\n\n"
-        f"👤 {esc(user.full_name)}\n\n"
-        f"Теперь вы будете получать персональные уведомления."
-    )
+    if reason == binding.OK:
+        logger.info("MAX /link: аккаунт %s привязан к user_id=%s", user.id, user_id_max)
+        return binding.success_text(db, user)
+    if reason == binding.NOT_FOUND:
+        logger.info("MAX /link: номер не найден (user_id=%s)", user_id_max)
+        return binding.BIND_TEXT[binding.NOT_FOUND].format(
+            phone=esc(binding.normalize_phone(raw)))
+    return binding.BIND_TEXT[reason].format(name=esc(user.full_name))
 
 
 def run_action(action: str, db, sub, raw_text: str = "") -> str:
@@ -368,6 +413,30 @@ def run_action(action: str, db, sub, raw_text: str = "") -> str:
 
     raw_text нужен единственному действию — /link с номером в той же строке.
     """
+    from app.services import binding
+
+    # ── Контакт ──────────────────────────────────────────────────────────────
+    if action == CONTACT_ACTION:
+        user, reason = binding.bind_by_phone(db, "max", sub.external_id, raw_text)
+        if reason == binding.OK:
+            return binding.success_text(db, user)
+        if reason == binding.NOT_FOUND:
+            return binding.BIND_TEXT[binding.NOT_FOUND].format(
+                phone=esc(binding.normalize_phone(raw_text)))
+        return binding.BIND_TEXT[reason].format(name=esc(user.full_name))
+
+    if action == CONTACT_REJECTED:
+        # Карточка не прошла проверку принадлежности. Формулировка нейтральная:
+        # человек мог просто переслать чей-то контакт по ошибке, и обвинять его
+        # незачем — но и привязывать нельзя.
+        return (
+            "🔗 Этот контакт не ваш.\n\n"
+            "Привязать можно только собственный номер — нажмите кнопку "
+            "«Поделиться контактом» под сообщением бота.\n\n"
+            "Если номер в мессенджере не тот, которым вы регистрировались на "
+            "сайте, отправьте нужный вручную: <code>/link 79998887766</code>"
+        )
+
     if action == "start":
         sub.subscribed = True
         db.commit()
@@ -382,6 +451,9 @@ def run_action(action: str, db, sub, raw_text: str = "") -> str:
         if link_tokens.is_link_payload(payload):
             return link_tokens.redeem_and_reply(db, payload, "max", sub.external_id)
 
+        # Пришёл по общей ссылке. Пока не знаем, кто это — просим контакт.
+        if not sub.user_id:
+            return binding.ASK_CONTACT
         return WELCOME
 
     if action == "stop":
@@ -444,11 +516,22 @@ def _resolve(kind: str, update: dict):
         sender  = message.get("sender") or {}
         body    = message.get("body") or {}
         # Адрес ответа — отправитель, а не recipient.chat_id (см. шапку модуля).
+        external_id = str(sender.get("user_id") or "")
         text = (body.get("text") or "").strip()
+
+        # Нажатие «Поделиться контактом» приходит обычным сообщением с
+        # вложением. Номер извлекается только после проверки, что карточка
+        # принадлежит отправителю, — иначе _extract_contact вернёт None.
+        if message.get("attachments"):
+            phone = _extract_contact(message, external_id)
+            action = CONTACT_ACTION if phone else CONTACT_REJECTED
+            return (external_id, sender.get("username") or "",
+                    (sender.get("name") or "").strip(), action, phone or "", None)
+
         # «/link 79…» и «/start lnk_…» доходят до run_action как есть,
         # остальное разрешается по таблице.
         action = COMMAND_ALIASES.get(text.split()[0] if text else "", "")
-        return (str(sender.get("user_id") or ""), sender.get("username") or "",
+        return (external_id, sender.get("username") or "",
                 (sender.get("name") or "").strip(), action, text, None)
 
     if kind == "message_callback":

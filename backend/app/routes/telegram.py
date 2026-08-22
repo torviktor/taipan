@@ -13,6 +13,64 @@ router = APIRouter()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
 
+CONTACT_KEYBOARD = {
+    "keyboard": [[{"text": "📱 Поделиться контактом", "request_contact": True}]],
+    "resize_keyboard": True,
+    "one_time_keyboard": True,
+}
+
+# Убирает клавиатуру после привязки: кнопка «поделиться контактом» больше не
+# нужна и только мешала бы полю ввода.
+HIDE_KEYBOARD = {"remove_keyboard": True}
+
+
+async def _handle_contact(db, message: dict, chat_id: str) -> bool:
+    """Обработать вложенный контакт. True — сообщение было контактом.
+
+    ПРОВЕРКА ПРИНАДЛЕЖНОСТИ ОБЯЗАТЕЛЬНА. Контакт можно переслать: без сверки
+    любой переслал бы боту карточку соседа и привязал к себе чужой аккаунт —
+    чужих детей, взносы и уведомления. Telegram кладёт в contact.user_id
+    идентификатор владельца карточки; у собственного контакта он равен id
+    отправителя, у пересланного — нет либо отсутствует вовсе.
+    """
+    contact = message.get("contact")
+    if not contact:
+        return False
+
+    from app.services import binding
+    from app.services.notifications import send_telegram_message
+
+    sender_id = str((message.get("from") or {}).get("id") or "")
+    owner_id  = str(contact.get("user_id") or "")
+
+    if not owner_id or owner_id != sender_id:
+        logger.warning(
+            "Telegram: контакт отклонён — карточка принадлежит %r, прислал %r "
+            "(похоже на пересланный чужой контакт)", owner_id or "неизвестно", sender_id)
+        await send_telegram_message(chat_id, (
+            "🔗 Этот контакт не ваш.\n\n"
+            "Привязать можно только собственный номер — нажмите кнопку "
+            "«Поделиться контактом» под полем ввода.\n\n"
+            "Если номер в мессенджере не тот, которым вы регистрировались на "
+            "сайте, отправьте нужный вручную: <code>/link 79998887766</code>"
+        ))
+        return True
+
+    phone = contact.get("phone_number") or ""
+    user, reason = binding.bind_by_phone(db, "telegram", chat_id, phone)
+
+    if reason == binding.OK:
+        await send_telegram_message(chat_id, binding.success_text(db, user),
+                                    reply_markup=HIDE_KEYBOARD)
+    elif reason == binding.NOT_FOUND:
+        await send_telegram_message(chat_id, binding.BIND_TEXT[binding.NOT_FOUND].format(
+            phone=esc(binding.normalize_phone(phone))))
+    else:
+        await send_telegram_message(chat_id, binding.BIND_TEXT[reason].format(
+            name=esc(user.full_name)), reply_markup=HIDE_KEYBOARD)
+    return True
+
+
 async def process_telegram_update(update: dict):
     message = update.get("message", {})
     if not message:
@@ -39,10 +97,16 @@ async def process_telegram_update(update: dict):
             TelegramSubscriber.telegram_id == chat_id
         ).first()
 
+        # Нажатие «Поделиться контактом» приходит без текста, поэтому
+        # разбирается раньше команд.
+        if await _handle_contact(db, message, chat_id):
+            return
+
         if text.startswith("/start"):
             if not subscriber:
-                sub = TelegramSubscriber(telegram_id=chat_id, username=username, full_name=full_name, subscribed=True)
-                db.add(sub)
+                subscriber = TelegramSubscriber(telegram_id=chat_id, username=username,
+                                                full_name=full_name, subscribed=True)
+                db.add(subscriber)
                 db.commit()
             else:
                 subscriber.subscribed = True
@@ -59,6 +123,15 @@ async def process_telegram_update(update: dict):
                     chat_id,
                     link_tokens.redeem_and_reply(db, payload, "telegram", chat_id),
                 )
+                return
+
+            # Пришёл по общей ссылке и ещё не привязан — просим контакт.
+            # Список команд ему сейчас бесполезен: без привязки персональных
+            # уведомлений не будет, а события видны и на сайте.
+            if not subscriber.user_id:
+                from app.services.binding import ASK_CONTACT
+                await send_telegram_message(chat_id, ASK_CONTACT,
+                                            reply_markup=CONTACT_KEYBOARD)
                 return
 
             reply = (
@@ -139,77 +212,33 @@ async def process_telegram_update(update: dict):
             )
 
         elif text.startswith("/link "):
-            parts = text.split(maxsplit=1)
-            if len(parts) < 2:
-                await send_telegram_message(chat_id,
-                    "Укажите номер телефона: /link 79998887766")
-            else:
-                phone = parts[1].strip().lstrip('+').lstrip('8')
-                if len(phone) == 10 and phone.startswith('9'):
-                    phone = '7' + phone
+            # Запасной путь: основной — кнопка «Поделиться контактом».
+            # Идёт через тот же binding.bind_by_phone, что и кнопка, и что бот
+            # в MAX. Раньше здесь была своя нормализация номера, свой поиск
+            # тремя вариантами написания и молчаливая перепривязка, если
+            # аккаунт уже занят другим подписчиком.
+            from app.services import binding
 
-                print(f"DEBUG /link: searching phone={phone}")
-
-                from app.models.user import User, Athlete
-                user = (
-                    db.query(User).filter(User.phone == phone).first() or
-                    db.query(User).filter(User.phone == '7' + phone).first() or
-                    db.query(User).filter(User.phone == '8' + phone).first()
+            if not subscriber:
+                subscriber = TelegramSubscriber(
+                    telegram_id=chat_id, username=username,
+                    full_name=full_name, subscribed=True,
                 )
+                db.add(subscriber)
+                db.commit()
 
-                print(f"DEBUG /link: user found={user is not None}, phone tried={phone}")
+            raw = text.split(maxsplit=1)[1].strip()
+            user, reason = binding.bind_by_phone(db, "telegram", chat_id, raw)
 
-                if not user:
-                    await send_telegram_message(chat_id,
-                        f"❌ Пользователь с номером <code>{esc(phone)}</code> не найден.\n\n"
-                        f"Проверьте номер — он должен совпадать с тем, "
-                        f"которым вы зарегистрированы на сайте taipan-tkd.ru"
-                    )
-                else:
-                    # Строки подписчика может не быть: человек начал сразу с
-                    # /link, минуя /start. Раньше привязка в этом случае молча
-                    # пропускалась (`if subscriber:`), а ответ всё равно уходил
-                    # успешный — снаружи неотличимо от «сработало».
-                    if not subscriber:
-                        subscriber = TelegramSubscriber(
-                            telegram_id = chat_id,
-                            username    = username,
-                            full_name   = full_name,
-                            subscribed  = True,
-                        )
-                        db.add(subscriber)
-                    subscriber.user_id = user.id
-                    db.commit()
-
-                    athletes = db.query(Athlete).filter(
-                        Athlete.user_id == user.id,
-                        Athlete.is_archived == False
-                    ).all()
-
-                    # Тренерам — только на УСПЕШНУЮ привязку, не на /start:
-                    # его пишет любой открывший бота. Ошибки глушатся внутри,
-                    # чтобы служебное сообщение не сломало саму привязку.
-                    from app.services.reach import notify_staff_new_link
-                    notify_staff_new_link(db, user, "telegram",
-                                          [a.full_name for a in athletes])
-
-                    if athletes:
-                        athletes_text = "\n".join([f"• {esc(a.full_name)}" for a in athletes])
-                        reply = (
-                            f"✅ Аккаунт успешно привязан!\n\n"
-                            f"👤 {esc(user.full_name)}\n\n"
-                            f"🥋 Ваши спортсмены:\n{athletes_text}\n\n"
-                            f"Теперь вы будете получать персональные уведомления "
-                            f"о соревнованиях, сборах и аттестациях."
-                        )
-                    else:
-                        reply = (
-                            f"✅ Аккаунт успешно привязан!\n\n"
-                            f"👤 {esc(user.full_name)}\n\n"
-                            f"Теперь вы будете получать персональные уведомления."
-                        )
-
-                    await send_telegram_message(chat_id, reply)
+            if reason == binding.OK:
+                await send_telegram_message(chat_id, binding.success_text(db, user),
+                                            reply_markup=HIDE_KEYBOARD)
+            elif reason == binding.NOT_FOUND:
+                await send_telegram_message(chat_id, binding.BIND_TEXT[binding.NOT_FOUND].format(
+                    phone=esc(binding.normalize_phone(raw))))
+            else:
+                await send_telegram_message(chat_id, binding.BIND_TEXT[reason].format(
+                    name=esc(user.full_name)), reply_markup=HIDE_KEYBOARD)
 
         elif text == "/month":
             now = datetime.utcnow()

@@ -155,6 +155,20 @@ def callback_button(text: str, payload: str) -> dict:
     return {"type": "callback", "text": text, "payload": payload}
 
 
+def request_contact_button(text: str) -> dict:
+    """Кнопка «поделиться контактом».
+
+    Нажатие приходит обычным message_created с вложением type="contact".
+    Внутри — vcf_info (карточка vCard с номером), max_info (профиль
+    поделившегося) и hash: HMAC-SHA256 от vcf_info на токене бота.
+
+    Проверять принадлежность контакта отправителю ОБЯЗАТЕЛЬНО: карточку можно
+    переслать. Этим занимается routes/max.py перед тем, как отдать номер в
+    binding.bind_by_phone.
+    """
+    return {"type": "request_contact", "text": (text or "").strip()[:BUTTON_TEXT_LIMIT]}
+
+
 def link_button(text: str, url: str) -> dict:
     """Кнопка-ссылка. Нажатие к нам не приходит — браузер открывается сам."""
     return {"type": "link", "text": (text or "").strip()[:BUTTON_TEXT_LIMIT], "url": url}

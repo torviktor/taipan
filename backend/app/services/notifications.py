@@ -70,10 +70,14 @@ def bot_api_headers() -> dict:
 
 # ─── Telegram Bot ─────────────────────────────────────────────────────────────
 
-async def send_telegram_message(chat_id: str, text: str) -> bool:
+async def send_telegram_message(chat_id: str, text: str, reply_markup: Optional[dict] = None) -> bool:
     """Отправить сообщение в Telegram. С повторами — канал ненадёжен."""
     url = bot_api_url("sendMessage")
     payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    if reply_markup is not None:
+        # Клавиатура под полем ввода. Нужна кнопке «Поделиться
+        # контактом»: у Telegram это reply-клавиатура, а не inline.
+        payload["reply_markup"] = reply_markup
 
     last = ""
     for attempt in range(1, TELEGRAM_SEND_ATTEMPTS + 1):
@@ -206,7 +210,7 @@ def enqueue_telegram_delivery() -> bool:
         return False
 
 
-def send_telegram_sync(chat_id: str, text: str):
+def send_telegram_sync(chat_id: str, text: str, reply_markup: Optional[dict] = None):
     """Синхронно отправить готовый HTML-текст в конкретный чат.
 
     Вынесено из send_telegram_to_user_result, чтобы тем же путём могли ходить
@@ -223,6 +227,8 @@ def send_telegram_sync(chat_id: str, text: str):
     import time
     url = bot_api_url("sendMessage")
     payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
 
     # Раньше здесь была одна попытка, а результат вообще не проверялся:
     # return True стоял после httpx.post безусловно, поэтому функция
