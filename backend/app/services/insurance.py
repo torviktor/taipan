@@ -66,8 +66,35 @@ def _already_notified(db, athlete_id: int) -> bool:
     ).first() is not None
 
 
-def _notified_about_expiry(db, athlete_id: int, expires) -> bool:
-    """Сообщали ли уже про ЭТУ просрочку.
+def _requeue_if_undelivered(db, notification, user_id) -> bool:
+    """Вернуть недоставленное уведомление в очередь, если появился канал.
+
+    Смысл: «отправлено» — это про доставку, а не про создание строки. Пока
+    охват нулевой, уведомление о страховке почти наверняка получит
+    no_account, и без этой проверки родитель, привязавшийся назавтра, не
+    узнал бы о просрочке никогда.
+
+    Возвращаем ту же строку в pending, а не создаём новую: у родителя в
+    кабинете она уже есть, дубликат выглядел бы ошибкой.
+    """
+    from app.services.delivery import channels_for
+
+    if notification.tg_status == "sent":
+        return False                      # дошло, повторять незачем
+    if notification.tg_status == "pending":
+        return False                      # ещё в пути
+    if not channels_for(db, user_id):
+        return False                      # каналов по-прежнему нет
+
+    notification.tg_status = "pending"
+    notification.tg_error = None
+    logger.info("Страховка: уведомление %s возвращено в очередь — "
+                "у родителя появился мессенджер", notification.id)
+    return True
+
+
+def _prior_notice(db, athlete_id: int, expires):
+    """Уведомление про ЭТУ просрочку, если оно уже создавалось.
 
     Отдельно от окна в трое суток и намеренно. День истечения бывает раз, и
     точное сравнение «осталось 0 дней» ловит его только если задача в этот
@@ -87,7 +114,7 @@ def _notified_about_expiry(db, athlete_id: int, expires) -> bool:
         Notification.link_type == LINK_TYPE,
         Notification.link_id == athlete_id,
         Notification.created_at >= expires,
-    ).first() is not None
+    ).order_by(Notification.created_at.desc()).first()
 
 
 def _text_for(athlete, days_left: int):
@@ -134,6 +161,7 @@ def run_reminders(db) -> dict:
     today = date.today()
     stats = {t: 0 for t in THRESHOLDS}
     stats["skipped"] = 0
+    stats["requeued"] = 0
 
     for athlete, user in _athlete_users(db):
         left = (athlete.insurance_expiry - today).days
@@ -142,8 +170,16 @@ def run_reminders(db) -> dict:
             # Просрочка: сообщаем один раз на полис, а не в единственный день
             # истечения. Иначе те, у кого срок вышел до появления функции, не
             # узнали бы никогда — при том что страховки у них нет сейчас.
-            if _notified_about_expiry(db, athlete.id, athlete.insurance_expiry):
-                stats["skipped"] += 1
+            prior = _prior_notice(db, athlete.id, athlete.insurance_expiry)
+            if prior is not None:
+                # Уведомление было. Считать его «отправленным» можно только
+                # если оно ДОШЛО: строка со статусом no_account означает, что
+                # у родителя тогда не было ни одного мессенджера. Появился —
+                # возвращаем ту же строку в очередь, а не плодим новую.
+                if _requeue_if_undelivered(db, prior, user.id):
+                    stats["requeued"] += 1
+                else:
+                    stats["skipped"] += 1
                 continue
             left = 0          # текст один и тот же для «сегодня» и «давно»
         elif left in THRESHOLDS:
@@ -165,7 +201,9 @@ def run_reminders(db) -> dict:
         ))
         stats[left] += 1
 
-    if any(stats[t] for t in THRESHOLDS):
+    # Возвращённые в очередь считаем наравне с новыми: они тоже меняют строки
+    # и тоже требуют, чтобы задача доставки проснулась.
+    if any(stats[t] for t in THRESHOLDS) or stats["requeued"]:
         db.commit()
         from app.services.notifications import enqueue_telegram_delivery
         enqueue_telegram_delivery()

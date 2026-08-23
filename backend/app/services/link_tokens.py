@@ -202,6 +202,14 @@ def redeem_and_reply(db, payload: str, platform: str, external_id: str) -> str:
         .all()
     )
 
+    # Догоняем недоставленное — как и при привязке по контакту. Путей
+    # привязки три, и все три должны вести себя одинаково.
+    try:
+        from app.services.catchup import catch_up
+        catch_up(db, user.id)
+    except Exception:
+        logger.exception("Привязка по ссылке: догонялка упала")
+
     # Тренерам — как и при ручной привязке. Ошибки глушатся внутри.
     notify_staff_new_link(db, user, platform, [a.full_name for a in athletes])
 

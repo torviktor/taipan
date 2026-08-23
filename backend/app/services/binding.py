@@ -145,6 +145,15 @@ def bind_by_phone(db, platform: str, external_id: str, phone: str):
 
     logger.info("Привязка: аккаунт %s <- %s:%s", user.id, platform, external_id)
 
+    # Догоняем недоставленное: уведомления, созданные до привязки, получили
+    # no_account — доставить было некуда. Теперь есть куда. Досылается только
+    # то, на что ещё можно повлиять (см. app/services/catchup.py).
+    try:
+        from app.services.catchup import catch_up
+        catch_up(db, user.id)
+    except Exception:
+        logger.exception("Привязка: догонялка упала")
+
     # Тренерам — здесь, а не в роутах: путей привязки стало три (кнопка
     # контакта, /link, персональная ссылка), и уведомление, разложенное по
     # роутам, рано или поздно забыли бы добавить в четвёртый.
