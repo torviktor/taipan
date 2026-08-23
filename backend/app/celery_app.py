@@ -91,6 +91,19 @@ celery_app.conf.update(
             "task":     "app.tasks.deliver_notifications",
             "schedule": crontab(minute="*/10"),
         },
+        # Страховка: напоминания родителям за 30, 7 и 0 дней до истечения.
+        # Раз в сутки в 09:00 МСК — чтобы сообщение не пришло ночью.
+        "insurance-reminders": {
+            "task":     "app.tasks.insurance_reminders",
+            "schedule": crontab(hour=6, minute=0),
+        },
+        # Сводка тренерам. Раз в неделю, понедельник 09:30 МСК: незаполненных
+        # дат много, разбирать их удобнее пачкой. Замолкает сама, когда
+        # разбирать становится нечего.
+        "insurance-staff-digest": {
+            "task":     "app.tasks.insurance_staff_digest",
+            "schedule": crontab(hour=6, minute=30, day_of_week=1),
+        },
     },
 )
 
@@ -347,5 +360,87 @@ def weekly_news_digest_task():
             log.warning("weekly_news_digest: no draft created")
     except Exception:
         log.exception("weekly_news_digest failed")
+    finally:
+        db.close()
+
+
+@celery_app.task(name="app.tasks.insurance_reminders")
+def insurance_reminders_task():
+    """Напоминания родителям о страховке за 30, 7 и 0 дней до истечения."""
+    from app.core.database import SessionLocal
+    from app.services.insurance import run_reminders
+    import logging
+    log = logging.getLogger(__name__)
+
+    db = SessionLocal()
+    try:
+        stats = run_reminders(db)
+        if any(v for k, v in stats.items() if k != "skipped"):
+            log.info("insurance_reminders: за 30 дн. %s, за 7 дн. %s, "
+                     "в день истечения %s, пропущено дублей %s",
+                     stats.get(30, 0), stats.get(7, 0), stats.get(0, 0),
+                     stats.get("skipped", 0))
+        return stats
+    except Exception:
+        db.rollback()
+        log.exception("insurance_reminders: задача упала")
+        raise
+    finally:
+        db.close()
+
+
+@celery_app.task(name="app.tasks.insurance_staff_digest")
+def insurance_staff_digest_task():
+    """Еженедельная сводка тренерам о состоянии страховок.
+
+    Молчит, когда разбирать нечего: сводка «всё в порядке» раз в неделю
+    научила бы её пролистывать, и в неделю, когда порядок кончится, её тоже
+    пролистают.
+    """
+    from app.core.database import SessionLocal
+    from app.services.insurance import club_summary, format_club_summary
+    from app.services.reach import staff_recipients
+    import logging
+    log = logging.getLogger(__name__)
+
+    db = SessionLocal()
+    try:
+        s = club_summary(db)
+        if not (s["expired"] or s["soon"] or s["missing"]):
+            log.info("insurance_staff_digest: разбирать нечего, молчим")
+            return {"sent": 0, "nothing_to_report": True}
+
+        text = format_club_summary(db)
+        sent = 0
+        for who in staff_recipients(db):
+            try:
+                if who["platform"] == "max":
+                    from app.services.max_bot import send_message_result
+                    status, err = send_message_result(who["external_id"], text)
+                else:
+                    from app.services.notifications import send_telegram_sync
+                    from app.services.max_bot import split_text
+                    status, err = "sent", ""
+                    for part in split_text(text, 4000):
+                        status, err = send_telegram_sync(who["external_id"], part)
+                        if status != "sent":
+                            break
+                if status == "sent":
+                    sent += 1
+                else:
+                    log.warning("insurance_staff_digest: %s в %s — %s",
+                                who["full_name"], who["platform"], err)
+            except Exception:
+                log.exception("insurance_staff_digest: отправка упала")
+
+        log.info("insurance_staff_digest: отправлено %s (просрочено %s, "
+                 "истекают %s, без данных %s)",
+                 sent, len(s["expired"]), len(s["soon"]), len(s["missing"]))
+        return {"sent": sent, "expired": len(s["expired"]),
+                "soon": len(s["soon"]), "missing": len(s["missing"])}
+    except Exception:
+        db.rollback()
+        log.exception("insurance_staff_digest: задача упала")
+        raise
     finally:
         db.close()

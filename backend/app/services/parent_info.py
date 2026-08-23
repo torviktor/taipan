@@ -29,6 +29,8 @@ TAB = {
     "achievements": f"{SITE}/cabinet?tab=achievements",
     "fees":         f"{SITE}/cabinet?tab=fees",
     "attendance":   f"{SITE}/cabinet?tab=attendance",
+    "insurance":    f"{SITE}/cabinet?tab=insurance",
+    "competitions": f"{SITE}/cabinet?tab=competitions",
 }
 
 MONTHS = ("январь", "февраль", "март", "апрель", "май", "июнь",
@@ -271,3 +273,127 @@ def attendance(db, user_id) -> str:
     return (f"📊 <b>Посещаемость за {MONTHS[today.month - 1]}</b>\n\n"
             + "\n\n".join(blocks)
             + _footer("attendance", "Помесячно и по каждой тренировке:"))
+
+
+# ─── Страховка ───────────────────────────────────────────────────────────────
+#
+# Самый ценный раздел из всех: страховка — это срок, который родители
+# забывают, а без действующей ребёнка не допустят к соревнованиям. Поэтому
+# здесь не только «посмотреть», но и упреждающие уведомления (см.
+# app/services/insurance.py).
+
+INSURANCE_OK_DAYS = 30      # с этого запаса считаем, что всё спокойно
+
+
+def insurance(db, user_id) -> str:
+    from app.core.markup import esc
+
+    mine = _athletes(db, user_id)
+    if not mine:
+        return _no_athletes()
+
+    today = date.today()
+    blocks = []
+    for a in mine:
+        exp = getattr(a, "insurance_expiry", None)
+        name = f"🥋 <b>{esc(a.full_name)}</b>"
+
+        if exp is None:
+            # Незаполненную дату родителю в вину не ставим: это пробел в
+            # данных клуба, а не его забывчивость. Отсюда и формулировка.
+            blocks.append(f"{name}\n"
+                          "Данных о страховке нет.\n"
+                          "Если полис есть — покажите его тренеру, "
+                          "дату внесут.")
+            continue
+
+        left = (exp - today).days
+        if left < 0:
+            blocks.append(f"{name}\n"
+                          f"🔴 Просрочена {-left} дн. назад "
+                          f"(действовала до {exp:%d.%m.%Y})\n"
+                          "Без действующей страховки к соревнованиям "
+                          "не допускают.")
+        elif left == 0:
+            blocks.append(f"{name}\n🔴 Заканчивается сегодня ({exp:%d.%m.%Y})")
+        elif left <= INSURANCE_OK_DAYS:
+            blocks.append(f"{name}\n"
+                          f"🟠 Действует до {exp:%d.%m.%Y} — осталось {left} дн.")
+        else:
+            blocks.append(f"{name}\n✅ Действует до {exp:%d.%m.%Y}")
+
+    return ("🛡 <b>Страховка</b>\n\n" + "\n\n".join(blocks)
+            + _footer("insurance", "Подробности в кабинете:"))
+
+
+# ─── Соревнования ────────────────────────────────────────────────────────────
+
+# Дисциплины: поле места -> как называется. Порядок важен для вывода.
+DISCIPLINES = (
+    ("sparring_place", "спарринг"),
+    ("stopball_place", "стопбол"),
+    ("tegtim_place",   "тэгтим"),
+    ("tuli_place",     "туль"),
+)
+
+MEDAL = {1: "🥇", 2: "🥈", 3: "🥉"}
+
+
+def competitions(db, user_id) -> str:
+    """Медали и последние выступления ребёнка."""
+    from app.core.markup import esc
+    from app.models.competition import Competition, CompetitionResult
+
+    mine = _athletes(db, user_id)
+    if not mine:
+        return _no_athletes()
+
+    blocks = []
+    for a in mine:
+        rows = (
+            db.query(CompetitionResult, Competition)
+            .join(Competition, Competition.id == CompetitionResult.competition_id)
+            .filter(CompetitionResult.athlete_id == a.id)
+            .order_by(Competition.date.desc())
+            .all()
+        )
+        if not rows:
+            verb = "выступала" if _is_female(a) else "выступал"
+            blocks.append(f"🥋 <b>{esc(a.full_name)}</b>\n"
+                          f"Пока не {verb} на соревнованиях.\n"
+                          "Здесь появятся результаты после первого турнира.")
+            continue
+
+        # Медали за всё время: по каждой дисциплине своё место, поэтому
+        # считаем по всем четырём.
+        medals = {1: 0, 2: 0, 3: 0}
+        for res, _c in rows:
+            for field, _label in DISCIPLINES:
+                place = getattr(res, field, None)
+                if place in medals:
+                    medals[place] += 1
+
+        head = f"🥋 <b>{esc(a.full_name)}</b>\nТурниров: {len(rows)}"
+        if sum(medals.values()):
+            head += ("\nМедали: "
+                     + "   ".join(f"{MEDAL[p]} {medals[p]}"
+                                  for p in (1, 2, 3) if medals[p]))
+        else:
+            head += "\nМедалей пока нет — они впереди."
+
+        # Последние три турнира: полная история в кабинете, в боте — свежее.
+        recent = []
+        for res, comp in rows[:3]:
+            places = []
+            for field, label in DISCIPLINES:
+                place = getattr(res, field, None)
+                if place:
+                    places.append(f"{MEDAL.get(place, f'{place} место')} {label}"
+                                  if place in MEDAL else f"{label} — {place} место")
+            tail = ", ".join(places) if places else "без призового места"
+            recent.append(f"• {comp.date:%d.%m.%Y} — {esc(comp.name)}\n   {tail}")
+
+        blocks.append(head + "\n\n" + "\n".join(recent))
+
+    return ("🏅 <b>Соревнования</b>\n\n" + "\n\n".join(blocks)
+            + _footer("competitions", "Все выступления и протоколы:"))

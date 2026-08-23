@@ -25,7 +25,7 @@ HIDE_KEYBOARD = {"remove_keyboard": True}
 
 # Служебные команды тренера. Как и в MAX, они нигде не публикуются:
 # в /start родителю о них не сказано, а право проверяется по роли.
-STAFF_COMMANDS = ("/subs", "/unlinked", "/invite")
+STAFF_COMMANDS = ("/subs", "/unlinked", "/invite", "/insurance_club")
 
 # Разделы про конкретного ребёнка: команда -> функция в parent_info.
 # Все четыре требуют привязанного аккаунта — без него бот не знает, чей ребёнок.
@@ -34,6 +34,8 @@ PARENT_COMMANDS = {
     "/achievements": "achievements",
     "/fees":         "fees",
     "/attendance":   "attendance",
+    "/insurance":    "insurance",
+    "/competitions": "competitions",
 }
 
 NEED_ACCOUNT = (
@@ -177,7 +179,9 @@ async def process_telegram_update(update: dict):
                 "/rating — место в рейтинге клуба\n"
                 "/achievements — ачивки\n"
                 "/fees — взносы за месяц\n"
-                "/attendance — посещаемость за месяц\n\n"
+                "/attendance — посещаемость за месяц\n"
+                "/competitions — соревнования и медали\n"
+                "/insurance — страховка\n\n"
                 "<b>Про клуб:</b>\n"
                 "/events — ближайшее событие\n"
                 "/week — события на неделю\n"
@@ -341,6 +345,9 @@ async def process_telegram_update(update: dict):
                 reply = reach.format_summary(db)
             elif cmd == "/unlinked":
                 reply = reach.format_unlinked(db)
+            elif cmd == "/insurance_club":
+                from app.services.insurance import format_club_summary
+                reply = format_club_summary(db)
             else:
                 parts = text.split(maxsplit=1)
                 reply = reach.format_invite(db, parts[1] if len(parts) > 1 else "")

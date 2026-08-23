@@ -71,6 +71,8 @@ ACTIONS = {
     "achievements": "Достижения ребёнка",
     "fees":        "Взносы за месяц",
     "attendance":  "Посещаемость за месяц",
+    "insurance":   "Страховка ребёнка",
+    "competitions": "Соревнования и медали",
     "events":      "Ближайшее событие",
     "week":        "События на неделю",
     "month":       "События на месяц",
@@ -83,7 +85,8 @@ ACTIONS = {
 # Действия, которым нужен привязанный аккаунт: они про КОНКРЕТНОГО ребёнка.
 # Без привязки бот не знает, чей ребёнок, и честнее сказать это, чем показать
 # пустоту.
-NEEDS_ACCOUNT = ("children", "rating", "achievements", "fees", "attendance")
+NEEDS_ACCOUNT = ("children", "rating", "achievements", "fees", "attendance",
+                 "insurance", "competitions")
 
 # Служебное — отдельно от ACTIONS и намеренно.
 #
@@ -95,9 +98,10 @@ NEEDS_ACCOUNT = ("children", "rating", "achievements", "fees", "attendance")
 # Само право проверяется в run_action по роли, а не по тому, откуда пришёл
 # вызов: спрятанная кнопка — не защита, команду можно набрать руками.
 STAFF_ACTIONS = {
-    "subs":     "Охват подписок",
-    "unlinked": "Кто не привязан",
-    "invite":   "Персональная ссылка для одного",
+    "subs":      "Охват подписок",
+    "unlinked":  "Кто не привязан",
+    "invite":    "Персональная ссылка для одного",
+    "insurance_club": "Страховки по клубу",
 }
 
 # Внутренние имена: их нельзя набрать текстом, они возникают только из
@@ -176,6 +180,8 @@ def main_keyboard(sub=None) -> list:
          callback_button("🎖 Достижения", "achievements")],
         [callback_button("💰 Взносы", "fees"),
          callback_button("📊 Посещаемость", "attendance")],
+        [callback_button("🏅 Соревнования", "competitions"),
+         callback_button("🛡 Страховка", "insurance")],
         [callback_button("🥋 Мои спортсмены", "children")],
 
         [callback_button("📅 Ближайшее", "events"),
@@ -193,6 +199,7 @@ def main_keyboard(sub=None) -> list:
         if is_staff(_db_of(sub), sub.user_id):
             rows.append([callback_button("📊 Подписки", "subs"),
                          callback_button("📋 Не привязаны", "unlinked")])
+            rows.append([callback_button("🛡 Страховки клуба", "insurance_club")])
 
     return rows
 
@@ -583,7 +590,8 @@ def run_action(action: str, db, sub, raw_text: str = "") -> str:
     if action == "children":
         return _cmd_children(db, sub)
 
-    if action in ("rating", "achievements", "fees", "attendance"):
+    if action in ("rating", "achievements", "fees", "attendance",
+                  "insurance", "competitions"):
         from app.services import parent_info
         return getattr(parent_info, action)(db, sub.user_id)
 
@@ -605,6 +613,9 @@ def run_action(action: str, db, sub, raw_text: str = "") -> str:
             # «/invite Абрамова» — запрос идёт хвостом команды.
             parts = raw_text.split(maxsplit=1)
             return reach.format_invite(db, parts[1] if len(parts) > 1 else "")
+        if action == "insurance_club":
+            from app.services.insurance import format_club_summary
+            return format_club_summary(db)
 
     return UNKNOWN
 
