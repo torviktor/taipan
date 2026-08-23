@@ -45,6 +45,12 @@ def _athletes(db, user_id):
     )
 
 
+def _is_female(athlete) -> bool:
+    """Пол спортсмена строкой: в модели это Enum, сравнивать удобнее с текстом."""
+    g = getattr(athlete, "gender", None)
+    return (getattr(g, "value", g) or "") == "female"
+
+
 def _no_athletes() -> str:
     return ("🥋 За вами пока не закреплено ни одного спортсмена.\n\n"
             "Если это ошибка — скажите тренеру.")
@@ -97,9 +103,10 @@ def rating(db, user_id) -> str:
         pts = round(float(totals.get(a.id, 0) or 0), 1)
         cnt = int(counts.get(a.id, 0) or 0)
         if cnt == 0:
+            verb = "участвовала" if _is_female(a) else "участвовал"
             blocks.append(
                 f"🥋 <b>{esc(a.full_name)}</b>\n"
-                "Пока не участвовал в соревнованиях — рейтинга ещё нет.\n"
+                f"Пока не {verb} в соревнованиях — рейтинга ещё нет.\n"
                 "Он появится после первого выступления."
             )
         else:
@@ -253,7 +260,10 @@ def attendance(db, user_id) -> str:
         total = len(rows)
         last = max((s.date for att, s in rows if att.present), default=None)
 
-        line = f"Был на <b>{been}</b> из {total} тренировок"
+        # Половина клуба — девочки, и «Был на трёх тренировках» про Веронику
+        # читается как небрежность. Пол у спортсмена есть, глагол дешёвый.
+        verb = "Была" if _is_female(a) else "Был"
+        line = f"{verb} на <b>{been}</b> из {total} тренировок"
         if last:
             line += f"\nПоследняя: {last:%d.%m}"
         blocks.append(f"🥋 <b>{esc(a.full_name)}</b>\n{line}")
