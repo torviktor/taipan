@@ -27,6 +27,24 @@ HIDE_KEYBOARD = {"remove_keyboard": True}
 # в /start родителю о них не сказано, а право проверяется по роли.
 STAFF_COMMANDS = ("/subs", "/unlinked", "/invite")
 
+# Разделы про конкретного ребёнка: команда -> функция в parent_info.
+# Все четыре требуют привязанного аккаунта — без него бот не знает, чей ребёнок.
+PARENT_COMMANDS = {
+    "/rating":       "rating",
+    "/achievements": "achievements",
+    "/fees":         "fees",
+    "/attendance":   "attendance",
+}
+
+NEED_ACCOUNT = (
+    "🔗 Сначала нужно привязать аккаунт сайта — иначе я не знаю, о чьём "
+    "ребёнке рассказывать.\n\n"
+    "Нажмите /start и кнопку «📱 Поделиться контактом».\n\n"
+    "Если номер в мессенджере отличается от того, которым вы регистрировались "
+    "на сайте — отправьте нужный вручную: <code>/link</code> и через пробел "
+    "ваш номер с сайта."
+)
+
 
 async def _handle_contact(db, message: dict, chat_id: str) -> bool:
     """Обработать вложенный контакт. True — сообщение было контактом.
@@ -155,15 +173,20 @@ async def process_telegram_update(update: dict):
                 "🥋 <b>Добро пожаловать в клуб Тайпан!</b>\n"
                 "г. Павловский Посад\n\n"
                 "Вы подписаны на уведомления клуба.\n\n"
-                "<b>Команды:</b>\n"
-                "/start — подписаться на уведомления\n"
-                "/stop — отписаться\n"
+                "<b>Про вашего ребёнка:</b>\n"
+                "/rating — место в рейтинге клуба\n"
+                "/achievements — ачивки\n"
+                "/fees — взносы за месяц\n"
+                "/attendance — посещаемость за месяц\n\n"
+                "<b>Про клуб:</b>\n"
                 "/events — ближайшее событие\n"
                 "/week — события на неделю\n"
                 "/month — события на месяц\n"
-                "/news — последние новости\n"
+                "/news — последние новости\n\n"
+                "<b>Прочее:</b>\n"
                 "/link НОМЕР — привязать аккаунт сайта\n"
-                "/unlink — отвязать аккаунт\n\n"
+                "/unlink — отвязать аккаунт\n"
+                "/stop — отписаться\n\n"
                 "📢 Наш канал: t.me/taipan_tkd"
             )
             await send_telegram_message(chat_id, reply)
@@ -232,6 +255,20 @@ async def process_telegram_update(update: dict):
                     reply += f"• {date_str} — {esc(n.title)}\n"
                 reply += "\n🔗 Все новости: https://taipan-tkd.ru/news"
             await send_telegram_message(chat_id, reply)
+
+        elif cmd in PARENT_COMMANDS:
+            # Разделы про конкретного ребёнка. Тексты берутся из общего
+            # parent_info — того же, что у бота в MAX: два ответа на один
+            # вопрос разъезжаются, это уже проверено на отчёте охвата.
+            from app.services import parent_info
+            from app.services.max_bot import split_text
+
+            if not (subscriber and subscriber.user_id):
+                await send_telegram_message(chat_id, NEED_ACCOUNT)
+            else:
+                reply = getattr(parent_info, PARENT_COMMANDS[cmd])(db, subscriber.user_id)
+                for part in split_text(reply, 4000):
+                    await send_telegram_message(chat_id, part)
 
         elif text == "/link":
             await send_telegram_message(chat_id,

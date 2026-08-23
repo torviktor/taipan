@@ -1,6 +1,15 @@
 import { useState, useEffect, useMemo, lazy, Suspense, Component } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
+
+// Вкладки кабинета родителя, на которые можно сослаться ссылкой ?tab=.
+// Список нужен, чтобы чужое значение в адресе не открыло несуществующий
+// раздел; имена совпадают с TAB в backend/app/services/parent_info.py —
+// оттуда приходят ссылки из бота.
+const PARENT_TABS = [
+  'athletes', 'attendance', 'competitions', 'achievements',
+  'rating', 'notifications', 'insurance', 'fees', 'info', 'analytics',
+]
 import './Cabinet.css'
 import './Competitions.css'
 import CompApplicationMatrix from './CompApplicationMatrix'
@@ -245,8 +254,24 @@ export default function Cabinet() {
   const [search,       setSearch]       = useState('')
   const [view,         setView]         = useState('athletes')
   const [resetUser,    setResetUser]    = useState(null)
-  const [parentView,   setParentView]   = useState('athletes') // для кабинета родителя
+  // Вкладка кабинета родителя. Начальное значение берём из ?tab= — по таким
+  // ссылкам приходят из бота: «посмотреть подробнее» должно открывать нужный
+  // раздел, а не «Спортсменов». Неизвестное значение молча игнорируется.
+  const [parentView,   setParentView]   = useState(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    return PARENT_TABS.includes(t) ? t : 'athletes'
+  })
   const [analyticsModal, setAnalyticsModal] = useState(null) // { athlete_id, athlete_name, application_id }
+  // Держим ?tab= в адресе в согласии с открытой вкладкой: обновление страницы
+  // тогда не выбрасывает родителя обратно на «Спортсменов», а ссылку можно
+  // отправить как есть. replaceState, а не push — иначе «назад» листало бы
+  // вкладки вместо возврата на предыдущую страницу.
+  useEffect(() => {
+    const u = new URL(window.location.href)
+    if (parentView === 'athletes') u.searchParams.delete('tab')
+    else u.searchParams.set('tab', parentView)
+    window.history.replaceState(null, '', u)
+  }, [parentView])
   const [deleteAppConfirm, setDeleteAppConfirm] = useState(null) // { id, full_name }
   const [cf, setCfState] = useState({ gender:'', group:'', gup_dan:'', parent_name:'' })
   const setCf = (k, v) => setCfState(f => ({ ...f, [k]: v }))
