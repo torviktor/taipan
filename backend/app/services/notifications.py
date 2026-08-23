@@ -168,24 +168,6 @@ async def notify_news_telegram(title: str, body: Optional[str] = None, photo_url
         traceback.print_exc()
 
 
-async def notify_all_subscribers(db, message: str):
-    """Отправить личное уведомление подписчикам с привязанным аккаунтом."""
-    from app.models.event import TelegramSubscriber
-    subscribers = db.query(TelegramSubscriber).filter(
-        TelegramSubscriber.subscribed == True,
-        TelegramSubscriber.user_id    != None,
-    ).all()
-
-    sent = 0
-    for sub in subscribers:
-        ok = await send_telegram_message(sub.telegram_id, message)
-        if ok:
-            sent += 1
-
-    logger.info(f"Telegram: отправлено {sent}/{len(subscribers)}")
-    return sent
-
-
 def enqueue_telegram_delivery() -> bool:
     """Поставить фоновую задачу на рассылку уведомлений с tg_status='pending'.
 
@@ -255,69 +237,6 @@ def send_telegram_sync(chat_id: str, text: str, reply_markup: Optional[dict] = N
     return "failed", last
 
 
-def send_telegram_to_user_result(user_id: int, title: str, body: str, db):
-    """Как send_telegram_to_user, но возвращает (статус, текст ошибки).
-
-    Статус — одно из значений notifications.tg_status: "sent", "failed",
-    "no_account". Нужен фоновой задаче, чтобы записать в БД не только факт
-    неудачи, но и её причину.
-    """
-    try:
-        from app.models.event import TelegramSubscriber
-        sub = db.query(TelegramSubscriber).filter(
-            TelegramSubscriber.user_id == user_id,
-            TelegramSubscriber.subscribed == True
-        ).first()
-
-        if not sub:
-            return "no_account", "у пользователя нет привязанного Telegram"
-
-        text = f"🔔 <b>{esc(title)}</b>\n\n{esc(body)}\n\n<i>taipan-tkd.ru/cabinet</i>"
-        return send_telegram_sync(sub.telegram_id, text)
-    except Exception as e:
-        logger.error("send_telegram_to_user: %s: %s", type(e).__name__, e)
-        return "failed", f"{type(e).__name__}: {e}"
-
-
-def send_telegram_to_user(user_id: int, title: str, body: str, db) -> bool:
-    """Отправить уведомление пользователю. True — Telegram принял сообщение.
-
-    Тонкая обёртка над send_telegram_to_user_result: сохранена ради вызовов,
-    которым достаточно факта успеха.
-    """
-    status, _ = send_telegram_to_user_result(user_id, title, body, db)
-    return status == "sent"
-
-
-def build_reminder_message(event, days_before: int) -> str:
-    """Сформировать текст напоминания."""
-    date_str = event.event_date.strftime("%d.%m.%Y в %H:%M")
-
-    if days_before == 0:
-        when = "⏰ <b>СЕГОДНЯ</b>"
-    elif days_before == 1:
-        when = "📅 <b>ЗАВТРА</b>"
-    else:
-        when = f"📅 Через <b>{days_before} дней</b>"
-
-    text = (
-        f"🥋 <b>Тайпан — Напоминание</b>\n\n"
-        f"{when}\n"
-        f"<b>{esc(event.title)}</b>\n\n"
-        f"🗓 {date_str}\n"
-    )
-
-    if event.location:
-        text += f"📍 {esc(event.location)}\n"
-    if event.description:
-        text += f"\n{esc(event.description)}\n"
-
-    text += f"\n<a href='https://t.me/{BOT_USERNAME}'>Открыть в боте</a>"
-    return text
-
-
-# ─── Планирование напоминаний ──────────────────────────────────────────────────
-
 def schedule_reminders(event):
     """
     Планируем напоминания для события.
@@ -332,11 +251,62 @@ def schedule_reminders(event):
 
 # ─── Celery задача (запускается по расписанию) ────────────────────────────────
 
+def reminder_audience(db, event):
+    """Кому адресовано напоминание о событии из календаря.
+
+    ПОЧЕМУ НЕ «ВСЕМ ПОДПИСЧИКАМ», КАК БЫЛО. Прежняя рассылка читала
+    TelegramSubscriber напрямую и слала всем, у кого есть привязка. Это давало
+    две беды сразу: родители с одним только MAX не получали ничего вовсе, а
+    те, чьи дети давно ушли из клуба, продолжали получать напоминания о
+    тренировках.
+
+    ПОЧЕМУ НЕ ПО КОНКРЕТНЫМ СПОРТСМЕНАМ. У Event нет списка участников — это
+    календарь клуба, а не мероприятие с отбором. События, которые касаются
+    конкретных детей, живут отдельными сущностями (Camp, Competition,
+    Certification), у них есть списки участников, и они УЖЕ уведомляют
+    родителей поимённо. Разделение верное, ломать его незачем.
+
+    Поэтому аудитория здесь — те, кого календарь клуба вообще касается:
+    активные родители, у которых есть хоть один неархивный спортсмен, плюс
+    тренеры и админы.
+    """
+    from app.models.user import Athlete, User
+
+    parents = (
+        db.query(User)
+        .join(Athlete, Athlete.user_id == User.id)
+        .filter(
+            User.is_active == True,
+            User.role == "parent",
+            Athlete.is_archived == False,
+        )
+        .distinct()
+        .all()
+    )
+    staff = (
+        db.query(User)
+        .filter(User.is_active == True, User.role.in_(("manager", "admin")))
+        .all()
+    )
+    # dict, а не set: у одного человека роль одна, но подстраховаться дешевле,
+    # чем однажды прислать напоминание дважды.
+    return list({u.id: u for u in parents + staff}.values())
+
+
 def check_and_send_reminders(db):
+    """Напоминания о событиях календаря. Запускается раз в 10 минут.
+
+    ЧЕРЕЗ ОБЩИЙ КОНВЕЙЕР. Раньше здесь был прямой широковещательный вызов в
+    Telegram, минуя Notification: родители с одним только MAX не получали
+    напоминаний вовсе, статусы доставки не писались, в статистику ничего не
+    попадало. Теперь создаются обычные Notification, и дальше работает та же
+    цепочка, что для взносов, сборов и страховки.
+
+    Насколько это было сломано, видно по данным: у всех двенадцати
+    отправленных до сих пор напоминаний sent_count = 0. То есть за всё время
+    ни одно не дошло ни до кого.
     """
-    Проверяет нужно ли отправить напоминания.
-    Запускается каждые 10 минут через Celery Beat.
-    """
+    from app.models.certification import Notification
     from app.models.event import Event, EventReminder
 
     now    = datetime.utcnow()
@@ -350,32 +320,77 @@ def check_and_send_reminders(db):
             continue
 
         for days in event.notify_before_days:
-            # Когда нужно отправить напоминание
             remind_at = event.event_date - timedelta(days=days)
 
-            # Уже отправляли?
             already_sent = db.query(EventReminder).filter(
                 EventReminder.event_id    == event.id,
                 EventReminder.days_before == days,
             ).first()
-
             if already_sent:
                 continue
 
-            # Пора отправлять? (±10 минут)
+            # Пора отправлять? (±10 минут — задача просыпается раз в 10 минут)
             diff = abs((remind_at - now).total_seconds())
-            if diff <= 600:
-                message = build_reminder_message(event, days)
+            if diff > 600:
+                continue
 
-                # Отправляем в Telegram
-                sent_count = asyncio.run(notify_all_subscribers(db, message))
-
-                # Фиксируем что отправили
-                reminder = EventReminder(
-                    event_id    = event.id,
-                    days_before = days,
-                    sent_count  = sent_count,
-                )
-                db.add(reminder)
+            # notify_everyone=False читаем буквально: «не уведомлять всех».
+            # Другой аудитории у Event нет — списка участников в нём не
+            # предусмотрено, — поэтому не выдумываем её, а пропускаем и
+            # оставляем след в логе.
+            if not event.notify_everyone:
+                logger.info("Напоминание пропущено: у события %s снят флаг "
+                            "notify_everyone, а другой аудитории у календаря нет",
+                            event.id)
+                db.add(EventReminder(event_id=event.id, days_before=days,
+                                     sent_count=0))
                 db.commit()
-                logger.info(f"Напоминание отправлено: {event.title}, за {days} дней")
+                continue
+
+            title, body = build_reminder_notification(event, days)
+            audience = reminder_audience(db, event)
+
+            for user in audience:
+                db.add(Notification(
+                    user_id   = user.id,
+                    type      = "general",
+                    title     = title,
+                    body      = body,
+                    link_type = "event",
+                    link_id   = event.id,
+                    tg_status = "pending",
+                ))
+
+            db.add(EventReminder(
+                event_id    = event.id,
+                days_before = days,
+                sent_count  = len(audience),
+            ))
+            db.commit()
+
+            enqueue_telegram_delivery()
+            logger.info("Напоминание поставлено в очередь: %s, за %s дней, "
+                        "получателей %s", event.title, days, len(audience))
+
+
+def build_reminder_notification(event, days_before: int):
+    """(заголовок, тело) напоминания.
+
+    У уведомления есть свой заголовок, а разметку добавляет конвейер
+    доставки. Дублировать «🥋 Тайпан — Напоминание» в теле незачем — это и
+    так видно по отправителю.
+    """
+    when = ("СЕГОДНЯ" if days_before == 0
+            else "ЗАВТРА" if days_before == 1
+            else f"через {days_before} дн.")
+
+    title = f"{event.title} — {when}"
+
+    body = f"{when}, {event.event_date:%d.%m.%Y} в {event.event_date:%H:%M}"
+    if event.location:
+        body += f"\nМесто: {event.location}"
+    if event.description:
+        body += f"\n\n{event.description}"
+    # Экранирование делает конвейер доставки (delivery._send_one),
+    # поэтому здесь чистый текст без разметки.
+    return title, body
