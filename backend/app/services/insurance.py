@@ -66,6 +66,30 @@ def _already_notified(db, athlete_id: int) -> bool:
     ).first() is not None
 
 
+def _notified_about_expiry(db, athlete_id: int, expires) -> bool:
+    """Сообщали ли уже про ЭТУ просрочку.
+
+    Отдельно от окна в трое суток и намеренно. День истечения бывает раз, и
+    точное сравнение «осталось 0 дней» ловит его только если задача в этот
+    день отработала. У двоих спортсменов срок вышел 54 и 108 дней назад —
+    до появления этой функции, — и по точному сравнению они не узнали бы
+    никогда, хотя страховки у них нет прямо сейчас.
+
+    Поэтому просрочка проверяется не днём, а фактом: есть ли хоть одно
+    уведомление про страховку, созданное ПОСЛЕ даты истечения. Это даёт
+    ровно одно сообщение на один полис и само сбрасывается при продлении —
+    у продлённого полиса дата истечения новая, и старые уведомления в окно
+    не попадают.
+    """
+    from app.models.certification import Notification
+
+    return db.query(Notification).filter(
+        Notification.link_type == LINK_TYPE,
+        Notification.link_id == athlete_id,
+        Notification.created_at >= expires,
+    ).first() is not None
+
+
 def _text_for(athlete, days_left: int):
     """(заголовок, тело) для родителя.
 
@@ -113,10 +137,20 @@ def run_reminders(db) -> dict:
 
     for athlete, user in _athlete_users(db):
         left = (athlete.insurance_expiry - today).days
-        if left not in THRESHOLDS:
-            continue
-        if _already_notified(db, athlete.id):
-            stats["skipped"] += 1
+
+        if left <= 0:
+            # Просрочка: сообщаем один раз на полис, а не в единственный день
+            # истечения. Иначе те, у кого срок вышел до появления функции, не
+            # узнали бы никогда — при том что страховки у них нет сейчас.
+            if _notified_about_expiry(db, athlete.id, athlete.insurance_expiry):
+                stats["skipped"] += 1
+                continue
+            left = 0          # текст один и тот же для «сегодня» и «давно»
+        elif left in THRESHOLDS:
+            if _already_notified(db, athlete.id):
+                stats["skipped"] += 1
+                continue
+        else:
             continue
 
         title, body = _text_for(athlete, left)
