@@ -97,84 +97,144 @@ def _active_athletes_by_user(db) -> dict:
     return out
 
 
-def format_report(db, with_links: bool = True) -> str:
-    """Текст отчёта об охвате — общий для обоих ботов.
+def format_summary(db) -> str:
+    """Короткая сводка охвата — то, что показывается по /subs.
 
-    Живёт здесь, а не в роутах: две копии одного отчёта разойдутся, и тренер
-    в Telegram однажды увидит не то же, что в MAX.
-
-    Телефон печатается голым числом намеренно: мессенджеры сами делают его
-    ссылкой для звонка, а <a href="tel:…"> в MAX не проверен и в худшем случае
-    пришёл бы сырым тегом.
-
-    Длину не режем — отправитель разобьёт по границам строк.
+    Раньше сюда же валился список всех непривязанных с двумя персональными
+    ссылками на каждого: 12 тысяч символов, четыре сообщения. Тренер открывает
+    /subs, чтобы узнать «сколько нас», а не чтобы листать портянку, поэтому
+    списки уехали в отдельные действия, а здесь осталось ровно одно сообщение.
     """
-    from app.core.markup import esc
-    from app.services import link_tokens
+    from app.services.delivery import stats_24h
 
     r = build_report(db)
     per = r["per_platform"]
 
-    head = (
-        "📊 <b>Охват уведомлений</b>\n\n"
-        f"Привязано: <b>{r['linked_count']}</b> из {r['total']} ({r['percent']}%)\n"
-        f"Telegram: {per.get('telegram', 0)}   ·   MAX: {per.get('max', 0)}"
-    )
+    out = [
+        "📊 <b>Охват уведомлений</b>",
+        "",
+        f"Привязано: <b>{r['linked_count']}</b> из {r['total']} ({r['percent']}%)",
+        f"Telegram: {per.get('telegram', 0)}   ·   MAX: {per.get('max', 0)}",
+        f"Не привязаны: <b>{r['unlinked_count']}</b>",
+    ]
 
-    # Самая лёгкая добыча: человек уже нашёл бота и нажал «Начать», осталась
-    # одна команда. Поэтому строка идёт сразу под охватом, а не в конце.
+    # Самая лёгкая добыча: человек уже нашёл бота и нажал «Начать», осталось
+    # одно нажатие кнопки. Поэтому строка идёт сразу под охватом.
     d = r["dangling"]
     if sum(d.values()):
-        head += (
-            f"\n\n💬 Написали боту, но не привязались: <b>{sum(d.values())}</b>"
-            f"\n   Telegram: {d.get('telegram', 0)}   ·   MAX: {d.get('max', 0)}"
-        )
+        out += ["",
+                f"💬 Написали боту, но не привязались: <b>{sum(d.values())}</b>",
+                f"   Telegram: {d.get('telegram', 0)}   ·   MAX: {d.get('max', 0)}"]
 
-    # Доставка за сутки. Показываем только если что-то было: пустой блок
-    # «0 · 0 · 0» в отчёте, который и без того на четыре сообщения, — шум.
-    from app.services.delivery import stats_24h
+    # Доставка за сутки. Пустой блок «0 · 0 · 0» был бы шумом, поэтому при
+    # отсутствии доставок пишем это словами — одной строкой.
     delivered = stats_24h(db)
-    if delivered:
-        rows = []
-        for platform in PLATFORMS:
-            s = delivered.get(platform)
-            if not s:
-                continue
-            parts = [f"{v} {k}" for k, v in sorted(s.items())]
-            rows.append(f"   {PLATFORM_NAMES.get(platform, platform)}: "
-                        + ", ".join(parts))
-        if rows:
-            head += "\n\n📨 <b>Доставка за сутки</b>\n" + "\n".join(rows)
-
-    if r["unlinked"]:
-        lines = []
-        for p in r["unlinked"]:
-            line = f"• {esc(p['full_name'])} — {esc(p['phone'])}"
-            line += "\n   " + (esc(", ".join(p["children"]))
-                               if p["children"] else "(нет активных спортсменов)")
-            if with_links:
-                # Персональная ссылка прямо в списке: тренеру остаётся её
-                # переслать, без промежуточного шага «где взять ссылку».
-                lk = link_tokens.links_for(db, p["user_id"])
-                line += f"\n   MAX: {lk['max']}\n   TG:  {lk['telegram']}"
-            lines.append(line)
-        unlinked = (f"\n\n❗ <b>Не привязаны — {r['unlinked_count']}</b>\n"
-                    "Сначала те, у кого дети в текущем составе.\n"
-                    "Ссылка одноразовая и действует 14 дней — перешлите её "
-                    "лично тому, чьё имя стоит выше.\n\n"
-                    + "\n\n".join(lines))
+    rows = []
+    for platform in PLATFORMS:
+        st = delivered.get(platform)
+        if not st:
+            continue
+        rows.append(f"   {PLATFORM_NAMES.get(platform, platform)}: "
+                    + ", ".join(f"{v} {k}" for k, v in sorted(st.items())))
+    if rows:
+        out += ["", "📨 <b>Доставка за сутки</b>"] + rows
     else:
-        unlinked = "\n\n✅ Непривязанных нет."
+        out += ["", "📨 Доставок за сутки не было"]
 
-    if r["linked"]:
-        lines = [f"• {esc(p['full_name'])} — {esc(', '.join(p['platforms']))}"
-                 for p in r["linked"]]
-        linked = (f"\n\n✅ <b>Привязаны — {r['linked_count']}</b>\n\n"
-                  + "\n".join(lines))
+    out += ["",
+            "———",
+            "/unlinked — кто ещё не привязан",
+            "/invite ФАМИЛИЯ — персональная ссылка для одного человека"]
+    return "\n".join(out)
+
+
+def format_unlinked(db) -> str:
+    """Список непривязанных: имя, телефон, дети. БЕЗ персональных ссылок.
+
+    Ссылки убраны намеренно. Основной путь привязки теперь — кнопка
+    «Поделиться контактом» по общей ссылке, и персональная нужна только тому,
+    у кого номер в мессенджере не совпадает с номером на сайте. Выдавать её
+    всем скопом — значит утроить длину списка ради редкого случая.
+    Точечно её отдаёт /invite.
+    """
+    from app.core.markup import esc
+
+    r = build_report(db)
+    if not r["unlinked"]:
+        return "✅ Непривязанных нет."
+
+    lines = []
+    for p in r["unlinked"]:
+        line = f"• {esc(p['full_name'])} — {esc(p['phone'])}"
+        if p["children"]:
+            line += "\n   " + esc(", ".join(p["children"]))
+        else:
+            line += "\n   (нет активных спортсменов)"
+        lines.append(line)
+
+    return (f"❗ <b>Не привязаны — {r['unlinked_count']}</b>\n"
+            "Сначала те, у кого дети в текущем составе.\n\n"
+            + "\n".join(lines)
+            + "\n\n———\n/invite ФАМИЛИЯ — персональная ссылка для одного человека")
+
+
+def format_invite(db, query: str) -> str:
+    """Персональная ссылка для одного человека.
+
+    Поиск по части фамилии или по номеру. Выбор именно так, а не по номеру
+    строки в списке: тренер помнит фамилии, а не порядковые номера, и список
+    между двумя вызовами перестраивается — привязался один человек, и все
+    номера уехали на единицу.
+    """
+    from app.core.markup import esc
+    from app.services import link_tokens
+    from app.services.binding import normalize_phone
+
+    query = (query or "").strip()
+    if not query:
+        return ("Укажите фамилию или номер: <code>/invite Абрамова</code>\n\n"
+                "Ссылка нужна только тому, у кого номер в мессенджере не "
+                "совпадает с номером на сайте. Остальным достаточно общей "
+                "ссылки и кнопки «Поделиться контактом».")
+
+    r = build_report(db)
+    digits = normalize_phone(query)
+    needle = query.casefold()
+
+    if len(digits) >= 10:
+        found = [p for p in r["unlinked"] if normalize_phone(p["phone"]) == digits]
     else:
-        linked = ""
+        found = [p for p in r["unlinked"]
+                 if needle in (p["full_name"] or "").casefold()]
 
-    return head + unlinked + linked
+    if not found:
+        # «Уже привязан» полезнее, чем «не найдено»: тренер обычно ищет
+        # человека, а не строку, и ответ должен закрывать вопрос.
+        already = [p for p in r["linked"]
+                   if needle in (p["full_name"] or "").casefold()]
+        if already:
+            names = ", ".join(esc(p["full_name"]) for p in already[:5])
+            return f"👌 {names} — уже привязаны, ссылка не нужна."
+        return (f"Никого не нашёл по запросу «{esc(query)}».\n\n"
+                "Попробуйте часть фамилии или номер телефона. "
+                "Полный список — /unlinked")
+
+    if len(found) > 1:
+        names = "\n".join(f"• {esc(p['full_name'])} — {esc(p['phone'])}"
+                          for p in found[:10])
+        more = f"\n… и ещё {len(found) - 10}" if len(found) > 10 else ""
+        return (f"Нашлось несколько ({len(found)}). Уточните запрос:\n\n"
+                + names + more)
+
+    p = found[0]
+    lk = link_tokens.links_for(db, p["user_id"])
+    kids = esc(", ".join(p["children"])) if p["children"] else "нет активных спортсменов"
+    return (f"🔗 <b>{esc(p['full_name'])}</b>\n"
+            f"{esc(p['phone'])} · {kids}\n\n"
+            f"MAX:\n{lk['max']}\n\n"
+            f"Telegram:\n{lk['telegram']}\n\n"
+            "Ссылка одноразовая, действует 14 дней. Перешлите её лично — "
+            "по ней привяжется тот, кто первым откроет.")
 
 
 def build_report(db) -> dict:

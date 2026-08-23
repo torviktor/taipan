@@ -23,6 +23,10 @@ CONTACT_KEYBOARD = {
 # нужна и только мешала бы полю ввода.
 HIDE_KEYBOARD = {"remove_keyboard": True}
 
+# Служебные команды тренера. Как и в MAX, они нигде не публикуются:
+# в /start родителю о них не сказано, а право проверяется по роли.
+STAFF_COMMANDS = ("/subs", "/unlinked", "/invite")
+
 
 async def _handle_contact(db, message: dict, chat_id: str) -> bool:
     """Обработать вложенный контакт. True — сообщение было контактом.
@@ -92,6 +96,10 @@ async def process_telegram_update(update: dict):
         message.get("from", {}).get("first_name", "") + " " +
         message.get("from", {}).get("last_name", "")
     ).strip()
+
+    # Первое слово сообщения: по нему разбираются команды с хвостом,
+    # например «/invite Абрамова».
+    cmd = text.split()[0] if text else ""
 
     if not chat_id:
         return
@@ -280,21 +288,29 @@ async def process_telegram_update(update: dict):
                         reply += f"  📍 {esc(e.location)}\n"
             await send_telegram_message(chat_id, reply)
 
-        elif text == "/subs":
-            # Служебная: охват подписок. Право проверяется по РОЛИ, а не по
-            # площадке. Родителю отвечаем ровно тем же, чем на любую другую
-            # неизвестную команду — молчанием: иначе ответ подтверждал бы, что
-            # такая команда существует.
-            from app.services.reach import is_staff, format_report
+        elif cmd in STAFF_COMMANDS:
+            # Служебные. Право проверяется по РОЛИ, а не по площадке. Родителю
+            # отвечаем ровно тем же, чем на любую другую неизвестную команду —
+            # молчанием: иначе ответ подтверждал бы, что команда существует.
+            from app.services import reach
             from app.services.max_bot import split_text
 
-            if not (subscriber and is_staff(db, subscriber.user_id)):
-                logger.info("Telegram: /subs от непривилегированного chat_id=%s", chat_id)
+            if not (subscriber and reach.is_staff(db, subscriber.user_id)):
+                logger.info("Telegram: %s от непривилегированного chat_id=%s",
+                            cmd, chat_id)
                 return
 
-            # Отчёт со ссылками перерастает лимит Telegram (4096) так же, как
-            # лимит MAX, поэтому режем тем же split_text — по границам строк.
-            for part in split_text(format_report(db), 4000):
+            if cmd == "/subs":
+                reply = reach.format_summary(db)
+            elif cmd == "/unlinked":
+                reply = reach.format_unlinked(db)
+            else:
+                parts = text.split(maxsplit=1)
+                reply = reach.format_invite(db, parts[1] if len(parts) > 1 else "")
+
+            # Список непривязанных может перерасти лимит Telegram (4096),
+            # поэтому режем тем же split_text — по границам строк.
+            for part in split_text(reply, 4000):
                 await send_telegram_message(chat_id, part)
 
     finally:

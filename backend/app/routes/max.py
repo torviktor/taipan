@@ -86,7 +86,9 @@ ACTIONS = {
 # Само право проверяется в run_action по роли, а не по тому, откуда пришёл
 # вызов: спрятанная кнопка — не защита, команду можно набрать руками.
 STAFF_ACTIONS = {
-    "subs": "Охват подписок",
+    "subs":     "Охват подписок",
+    "unlinked": "Кто не привязан",
+    "invite":   "Персональная ссылка для одного",
 }
 
 # Внутренние имена: их нельзя набрать текстом, они возникают только из
@@ -159,7 +161,8 @@ def main_keyboard(sub=None) -> list:
     if sub is not None and _db_of(sub) is not None:
         from app.services.reach import is_staff
         if is_staff(_db_of(sub), sub.user_id):
-            rows.append([callback_button("📊 Подписки", "subs")])
+            rows.append([callback_button("📊 Подписки", "subs"),
+                         callback_button("📋 Не привязаны", "unlinked")])
 
     return rows
 
@@ -370,12 +373,6 @@ def _cmd_children(db, sub) -> str:
             f"🥋 <b>Ваши спортсмены:</b>\n" + "\n".join(lines))
 
 
-def _cmd_subs(db) -> str:
-    """Охват уведомлений: кого догонять. Текст общий с телеграмным ботом."""
-    from app.services.reach import format_report
-    return format_report(db)
-
-
 def _cmd_news(db) -> str:
     from app.models.news import News
     items = (
@@ -551,15 +548,24 @@ def run_action(action: str, db, sub, raw_text: str = "") -> str:
     if action == "children":
         return _cmd_children(db, sub)
 
-    if action == "subs":
+    if action in STAFF_ACTIONS:
         # Родителю отвечаем ровно тем же, чем на любую белиберду: не «у вас нет
         # прав», а «не понимаю команду». Иначе ответ подтверждал бы, что такая
         # команда существует, и приглашал бы её поперебирать.
-        from app.services.reach import is_staff
-        if not is_staff(db, sub.user_id):
-            logger.info("MAX: /subs от непривилегированного user_id=%s", sub.external_id)
+        from app.services import reach
+        if not reach.is_staff(db, sub.user_id):
+            logger.info("MAX: /%s от непривилегированного user_id=%s",
+                        action, sub.external_id)
             return UNKNOWN
-        return _cmd_subs(db)
+
+        if action == "subs":
+            return reach.format_summary(db)
+        if action == "unlinked":
+            return reach.format_unlinked(db)
+        if action == "invite":
+            # «/invite Абрамова» — запрос идёт хвостом команды.
+            parts = raw_text.split(maxsplit=1)
+            return reach.format_invite(db, parts[1] if len(parts) > 1 else "")
 
     return UNKNOWN
 
