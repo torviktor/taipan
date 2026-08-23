@@ -386,7 +386,9 @@ def build_reminder_notification(event, days_before: int):
 
     title = f"{event.title} — {when}"
 
-    body = f"{when}, {event.event_date:%d.%m.%Y} в {event.event_date:%H:%M}"
+    # «Через 5 дн.» уже стоит в заголовке — в теле повторять незачем, там
+    # нужна конкретика: дата, время, место.
+    body = f"{event.event_date:%d.%m.%Y} в {event.event_date:%H:%M}"
     if event.location:
         body += f"\nМесто: {event.location}"
     if event.description:
