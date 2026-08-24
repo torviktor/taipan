@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_manager
 from app.models.user import User
 from app.models.news import News
 
@@ -20,10 +20,6 @@ ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".webp"}
 MAX_SIZE    = 10 * 1024 * 1024
 
 
-def require_manager(u: User = Depends(get_current_user)) -> User:
-    if u.role not in ("manager", "admin"):
-        raise HTTPException(403, "Недостаточно прав")
-    return u
 
 
 class NewsCreate(BaseModel):

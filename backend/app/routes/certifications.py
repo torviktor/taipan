@@ -7,7 +7,7 @@ from datetime import date
 
 from app.core.database import get_db
 from app.core.markup import esc
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_manager
 from app.models.user import User, Athlete
 from app.models.certification import (
     Certification, CertificationResult, Notification,
@@ -22,10 +22,6 @@ notif_router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 # ── Права ─────────────────────────────────────────────────────────────────────
 
-def require_manager(u: User = Depends(get_current_user)) -> User:
-    if u.role not in ("manager", "admin"):
-        raise HTTPException(403, "Недостаточно прав")
-    return u
 
 
 # ── Схемы ─────────────────────────────────────────────────────────────────────

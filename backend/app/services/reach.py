@@ -38,14 +38,21 @@ PLATFORM_NAMES = {
 # Теперь право объявляется НА КАЖДОЕ ДЕЙСТВИЕ отдельно. Объединяющей проверки
 # больше нет: чтобы дать доступ, надо явно вписать роль сюда, и это видно при
 # чтении, а не прячется за общим словом «staff».
-ADMIN_ONLY    = ("admin",)
-ADMIN_MANAGER = ("admin", "manager")
+# Роль manager в клубе — это ДЕНЬГИ и только: взносы, должники, начисления,
+# расчётные периоды. Всё остальное менеджеру недоступно. Admin видит и это, и
+# всё прочее, поэтому он есть в каждой строке.
+ADMIN_ONLY  = ("admin",)
+MONEY_ROLES = ("admin", "manager")
 
 ACTION_ROLES = {
-    "subs":           ADMIN_ONLY,     # охват и статистика доставки
-    "unlinked":       ADMIN_ONLY,     # список родителей с телефонами
-    "invite":         ADMIN_ONLY,     # персональные ссылки привязки
-    "insurance_club": ADMIN_MANAGER,  # страховки — нужно тренеру для работы
+    # Админское: охват, контакты родителей, приглашения, страховки клуба.
+    "subs":           ADMIN_ONLY,
+    "unlinked":       ADMIN_ONLY,
+    "invite":         ADMIN_ONLY,
+    "insurance_club": ADMIN_ONLY,
+    # Денежное: доступно менеджеру и админу.
+    "debtors":        MONEY_ROLES,
+    "collection":     MONEY_ROLES,
 }
 
 

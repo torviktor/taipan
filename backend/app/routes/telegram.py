@@ -25,7 +25,8 @@ HIDE_KEYBOARD = {"remove_keyboard": True}
 
 # Служебные команды тренера. Как и в MAX, они нигде не публикуются:
 # в /start родителю о них не сказано, а право проверяется по роли.
-STAFF_COMMANDS = ("/subs", "/unlinked", "/invite", "/insurance_club")
+STAFF_COMMANDS = ("/subs", "/unlinked", "/invite", "/insurance_club",
+                  "/debtors", "/collection")
 
 # Разделы про конкретного ребёнка: команда -> функция в parent_info.
 # Все четыре требуют привязанного аккаунта — без него бот не знает, чей ребёнок.
@@ -358,6 +359,13 @@ async def process_telegram_update(update: dict):
             elif cmd == "/insurance_club":
                 from app.services.insurance import format_club_summary
                 reply = format_club_summary(db)
+            elif cmd == "/debtors":
+                from app.services.money import debtors
+                reply = debtors(db)
+            elif cmd == "/collection":
+                from app.services.money import collection
+                parts = text.split(maxsplit=1)
+                reply = collection(db, parts[1] if len(parts) > 1 else "")
             else:
                 parts = text.split(maxsplit=1)
                 reply = reach.format_invite(db, parts[1] if len(parts) > 1 else "")

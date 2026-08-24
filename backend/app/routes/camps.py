@@ -7,7 +7,7 @@ from datetime import date
 from pydantic import BaseModel
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_manager
 from app.models.user import User, Athlete
 from app.models.camp import Camp, CampParticipant
 from app.models.certification import Notification, NotificationType
@@ -16,10 +16,6 @@ from app.models.news import News
 router = APIRouter(prefix="/camps", tags=["camps"])
 
 
-def require_manager(u: User = Depends(get_current_user)) -> User:
-    if u.role not in ("manager", "admin"):
-        raise HTTPException(403, "Недостаточно прав")
-    return u
 
 
 # ── Схемы ─────────────────────────────────────────────────────────────────────

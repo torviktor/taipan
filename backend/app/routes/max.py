@@ -201,6 +201,15 @@ def main_keyboard(sub=None) -> list:
         from app.services.reach import visible_actions
         allowed = visible_actions(_db_of(sub), sub.user_id)
 
+        # Денежное — менеджеру и админу, идёт первым: для менеджера это
+        # единственное, зачем он открывает бота.
+        money_row = [callback_button(text, act) for act, text in
+                     (("debtors", "💰 Должники"),
+                      ("collection", "📊 Сбор за месяц"))
+                     if act in allowed]
+        if money_row:
+            rows.append(money_row)
+
         admin_row = [callback_button(text, act) for act, text in
                      (("subs", "📊 Подписки"), ("unlinked", "📋 Не привязаны"))
                      if act in allowed]

@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_manager
 from app.core.seasons import get_current_season, format_season_label
 from app.models.user import User, Athlete
 from app.models.competition import CompetitionResult, Competition
@@ -62,10 +62,6 @@ SLOT_TO_ACHIEVEMENT = {
 }
 
 
-def require_manager(u: User = Depends(get_current_user)) -> User:
-    if u.role not in ("manager", "admin"):
-        raise HTTPException(403, "Недостаточно прав")
-    return u
 
 
 # ── Схемы запроса ─────────────────────────────────────────────────────────────

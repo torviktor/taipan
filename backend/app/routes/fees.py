@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_manager
 from app.models.user import User, Athlete
 from app.models.fees import FeeDeadline, MonthlyFee, FeeStatus, FeeConfig, AthleteFeePeriod
 from app.models.certification import Notification
@@ -22,10 +22,6 @@ router = APIRouter()
 PAYMENT_DAY = 25
 
 
-def require_manager(u: User = Depends(get_current_user)) -> User:
-    if u.role not in ("manager", "admin"):
-        raise HTTPException(403, "Недостаточно прав")
-    return u
 
 
 # ── Схемы ─────────────────────────────────────────────────────────────────────

@@ -2,16 +2,12 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_manager
 from app.models.user import User
 
 router = APIRouter(prefix="/news-admin", tags=["news-admin"])
 
 
-def require_manager(u: User = Depends(get_current_user)) -> User:
-    if u.role not in ("manager", "admin"):
-        raise HTTPException(403, "Недостаточно прав")
-    return u
 
 
 @router.post("/fetch-dss")

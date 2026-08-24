@@ -8,7 +8,7 @@ from typing import Optional
 from datetime import date, datetime
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_manager
 from app.models.user import User, Athlete
 from app.models.competition import (
     Competition, CompetitionResult,
@@ -106,10 +106,6 @@ _RATING_FIELDS = {
 
 # ── Права ─────────────────────────────────────────────────────────────────────
 
-def require_manager(u: User = Depends(get_current_user)) -> User:
-    if u.role not in ("manager", "admin"):
-        raise HTTPException(403, "Недостаточно прав")
-    return u
 
 
 # ── CRUD соревнований ─────────────────────────────────────────────────────────
