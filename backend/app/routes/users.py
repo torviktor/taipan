@@ -4,7 +4,8 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, date
 from app.core.database import get_db
-from app.core.security import get_current_user, require_manager, hash_password
+from app.core.security import (get_current_user, require_manager, require_admin,
+                               ensure_can_manage, hash_password)
 from app.models.user import User, Athlete, Gender
 
 router = APIRouter()
@@ -124,7 +125,7 @@ def get_my_athletes(
 
 # ─── Все пользователи (только admin/manager) ──────────────────────────────────
 @router.get("/", response_model=List[UserOut])
-def get_all_users(db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def get_all_users(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     return db.query(User).order_by(User.created_at.desc()).all()
 
 # ─── Приглашённые пользователи (viewers) — admin/manager ─────────────────────
@@ -254,11 +255,15 @@ def restore_athlete(
 def archive_parent(
     user_id: int,
     data: ArchiveRequest,
-    db: Session = Depends(get_db), _: User = Depends(require_manager)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manager),
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
+    # Блокировка — распоряжение чужой учёткой: без проверки тренер мог
+    # отключить обоих администраторов.
+    ensure_can_manage(current_user, user)
 
     children = db.query(Athlete).filter(
         Athlete.user_id == user_id,
@@ -289,11 +294,13 @@ def archive_parent(
 def restore_parent(
     user_id: int,
     restore_children: bool = True,
-    db: Session = Depends(get_db), _: User = Depends(require_manager)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manager),
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
+    ensure_can_manage(current_user, user)
     user.is_active = True
     if restore_children:
         db.query(Athlete).filter(
@@ -550,7 +557,7 @@ def get_my_feed(
 
 # ─── Активность пользователей (admin/manager) ────────────────────────────────
 @router.get("/activity")
-def get_users_activity(db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def get_users_activity(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     users = db.query(User).filter(User.is_active == True).all()
     return [
         {
@@ -569,11 +576,19 @@ def get_users_activity(db: Session = Depends(get_db), _: User = Depends(require_
 @router.patch("/{user_id}/reset-password")
 def reset_password(
     user_id: int, data: ResetPasswordRequest,
-    db: Session = Depends(get_db), _: User = Depends(require_manager)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manager),
 ):
+    """Сбросить пароль пользователю.
+
+    Роль цели проверяется обязательно. Без этого любой тренер мог задать новый
+    пароль администратору и войти под ним — при том что смену роли ему
+    запрещали. Обход получался в одну ступень.
+    """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
+    ensure_can_manage(current_user, user)
     if len(data.new_password) < 4:
         raise HTTPException(status_code=400, detail="Пароль минимум 4 символа")
     user.password = hash_password(data.new_password)
