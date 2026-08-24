@@ -341,9 +341,14 @@ async def process_telegram_update(update: dict):
             from app.services import reach
             from app.services.max_bot import split_text
 
-            if not (subscriber and reach.is_staff(db, subscriber.user_id)):
-                logger.info("Telegram: %s от непривилегированного chat_id=%s",
-                            cmd, chat_id)
+            # Право проверяется по КОНКРЕТНОЙ роли, той же картой, что в MAX.
+            action = cmd.lstrip("/")
+            if not (subscriber and reach.can(db, subscriber.user_id, action)):
+                logger.info("Telegram: %s недоступно роли %r (chat_id=%s)",
+                            cmd,
+                            reach.role_of(db, subscriber.user_id) if subscriber
+                            else "нет привязки",
+                            chat_id)
                 return
 
             if cmd == "/subs":

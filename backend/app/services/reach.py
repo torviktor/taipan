@@ -28,7 +28,25 @@ PLATFORM_NAMES = {
     "max":      "MAX",
 }
 
-STAFF_ROLES = ("manager", "admin")
+# Роли в боте разведены намеренно и по-разному.
+#
+# Раньше здесь была одна проверка is_staff на «manager или admin», и любой
+# тренер видел админское: полную статистику охвата, список ВСЕХ родителей с
+# телефонами, персональные ссылки привязки. Для работы с детьми это не нужно,
+# а телефоны чужих семей — тем более.
+#
+# Теперь право объявляется НА КАЖДОЕ ДЕЙСТВИЕ отдельно. Объединяющей проверки
+# больше нет: чтобы дать доступ, надо явно вписать роль сюда, и это видно при
+# чтении, а не прячется за общим словом «staff».
+ADMIN_ONLY    = ("admin",)
+ADMIN_MANAGER = ("admin", "manager")
+
+ACTION_ROLES = {
+    "subs":           ADMIN_ONLY,     # охват и статистика доставки
+    "unlinked":       ADMIN_ONLY,     # список родителей с телефонами
+    "invite":         ADMIN_ONLY,     # персональные ссылки привязки
+    "insurance_club": ADMIN_MANAGER,  # страховки — нужно тренеру для работы
+}
 
 
 def _role_value(user) -> str:
@@ -37,18 +55,41 @@ def _role_value(user) -> str:
     return getattr(role, "value", role) or ""
 
 
-def is_staff(db, user_id) -> bool:
-    """Тренер или администратор?
-
-    Используется как замок на служебных командах бота. Отсутствие привязки —
-    это не «нет прав», а «неизвестно кто», и ответ должен быть один и тот же:
-    команды не существует.
-    """
+def role_of(db, user_id) -> str:
+    """Роль активного пользователя строкой. Пусто — нет такого или неактивен."""
     if not user_id:
-        return False
+        return ""
     from app.models.user import User
     user = db.query(User).filter(User.id == user_id).first()
-    return bool(user and user.is_active and _role_value(user) in STAFF_ROLES)
+    if not user or not user.is_active:
+        return ""
+    return _role_value(user)
+
+
+def can(db, user_id, action: str) -> bool:
+    """Разрешено ли пользователю это служебное действие.
+
+    Единственная точка проверки прав в боте. Действие, которого нет в
+    ACTION_ROLES, недоступно НИКОМУ: забыть объявить право безопаснее, чем
+    забыть его проверить.
+
+    Отсутствие привязки — это не «нет прав», а «неизвестно кто», и ответ
+    наружу должен быть тем же, что на незнакомую команду: её не существует.
+    """
+    allowed = ACTION_ROLES.get(action)
+    if not allowed:
+        return False
+    return role_of(db, user_id) in allowed
+
+
+def visible_actions(db, user_id) -> tuple:
+    """Служебные действия, доступные этому человеку. Нужны клавиатуре.
+
+    Клавиатура строится из ТОГО ЖЕ словаря, что и проверка прав: показать
+    кнопку, которую нажать нельзя, — то же враньё, что спрятать доступную.
+    """
+    role = role_of(db, user_id)
+    return tuple(a for a, roles in ACTION_ROLES.items() if role in roles)
 
 
 def _parents_query(db):
@@ -319,7 +360,7 @@ def dangling_subscribers(db) -> dict:
     return out
 
 
-def staff_recipients(db) -> List[dict]:
+def admin_recipients(db) -> List[dict]:
     """Тренеры и админы с их привязками — кому слать служебные сообщения.
 
     Возвращает [{user_id, full_name, platform, external_id}, …] по одной
@@ -331,7 +372,7 @@ def staff_recipients(db) -> List[dict]:
     from app.models.event import MessengerSubscriber
 
     staff = db.query(User).filter(
-        User.role.in_(STAFF_ROLES),
+        User.role.in_(ADMIN_ONLY),
         User.is_active == True,
     ).all()
     if not staff:
@@ -378,7 +419,7 @@ def notify_staff_new_link(db, user, platform: str, children: List[str]) -> None:
     )
 
     sent, failed = 0, 0
-    for who in staff_recipients(db):
+    for who in admin_recipients(db):
         # Себе же уведомление о собственной привязке не шлём.
         if who["user_id"] == user.id:
             continue
@@ -393,13 +434,13 @@ def notify_staff_new_link(db, user, platform: str, children: List[str]) -> None:
                 sent += 1
             else:
                 failed += 1
-                logger.warning("Охват: тренеру %s в %s не доставлено — %s",
+                logger.warning("Охват: администратору %s в %s не доставлено — %s",
                                who["full_name"], who["platform"], err)
         except Exception:
             failed += 1
-            logger.exception("Охват: уведомление тренеру %s упало", who["full_name"])
+            logger.exception("Охват: уведомление админу %s упало", who["full_name"])
 
     # Успех тоже пишем: без этой строки «уведомление не пришло» и «уведомление
     # ушло, но тренер его не заметил» выглядят в логе одинаково — тишиной.
-    logger.info("Охват: о привязке %s (%s) уведомлено тренеров: %s, не удалось: %s",
+    logger.info("Охват: о привязке %s (%s) уведомлено админов: %s, не удалось: %s",
                 user.full_name, platform, sent, failed)

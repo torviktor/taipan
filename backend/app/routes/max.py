@@ -194,11 +194,19 @@ def main_keyboard(sub=None) -> list:
     # Служебная кнопка — только тренерам и админам. Родитель её не видит.
     # Это удобство, а не защита: право всё равно проверяется при исполнении,
     # иначе достаточно было бы набрать /subs руками.
+    # Набор берётся из ТОЙ ЖЕ карты прав, что и проверка при исполнении:
+    # показать кнопку, которую нажать нельзя, — то же враньё, что спрятать
+    # доступную. У тренера здесь окажутся только страховки, у админа — всё.
     if sub is not None and _db_of(sub) is not None:
-        from app.services.reach import is_staff
-        if is_staff(_db_of(sub), sub.user_id):
-            rows.append([callback_button("📊 Подписки", "subs"),
-                         callback_button("📋 Не привязаны", "unlinked")])
+        from app.services.reach import visible_actions
+        allowed = visible_actions(_db_of(sub), sub.user_id)
+
+        admin_row = [callback_button(text, act) for act, text in
+                     (("subs", "📊 Подписки"), ("unlinked", "📋 Не привязаны"))
+                     if act in allowed]
+        if admin_row:
+            rows.append(admin_row)
+        if "insurance_club" in allowed:
             rows.append([callback_button("🛡 Страховки клуба", "insurance_club")])
 
     return rows
@@ -600,9 +608,10 @@ def run_action(action: str, db, sub, raw_text: str = "") -> str:
         # прав», а «не понимаю команду». Иначе ответ подтверждал бы, что такая
         # команда существует, и приглашал бы её поперебирать.
         from app.services import reach
-        if not reach.is_staff(db, sub.user_id):
-            logger.info("MAX: /%s от непривилегированного user_id=%s",
-                        action, sub.external_id)
+        if not reach.can(db, sub.user_id, action):
+            logger.info("MAX: /%s недоступно роли %r (user_id=%s)",
+                        action, reach.role_of(db, sub.user_id) or "нет привязки",
+                        sub.external_id)
             return UNKNOWN
 
         if action == "subs":

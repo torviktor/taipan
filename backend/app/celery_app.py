@@ -399,7 +399,7 @@ def insurance_staff_digest_task():
     """
     from app.core.database import SessionLocal
     from app.services.insurance import club_summary, format_club_summary
-    from app.services.reach import staff_recipients
+    from app.services.reach import admin_recipients
     import logging
     log = logging.getLogger(__name__)
 
@@ -412,7 +412,7 @@ def insurance_staff_digest_task():
 
         text = format_club_summary(db)
         sent = 0
-        for who in staff_recipients(db):
+        for who in admin_recipients(db):
             try:
                 if who["platform"] == "max":
                     from app.services.max_bot import send_message_result
