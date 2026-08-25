@@ -234,3 +234,178 @@ def collection(db, period_arg: str = "") -> str:
     out += ["", "Другой месяц: <code>/collection 07.2026</code>",
             "", f"🔗 Подробно:\n{CABINET_FEES}"]
     return "\n".join(out)
+
+
+# ─── Отметка оплаты ──────────────────────────────────────────────────────────
+#
+# Единственное ДЕЙСТВИЕ среди просмотра: всё остальное в боте только читает.
+# Поэтому здесь два шага, а не один.
+#
+# ПОЧЕМУ ПОДТВЕРЖДЕНИЕ. Родитель занёс деньги на тренировке, тренер тут же
+# отмечает с телефона. Нажать не туда в списке из тридцати фамилий легко, а
+# отменённая по ошибке задолженность не всплывёт: человек просто перестанет
+# быть должником, и об этом никто не узнает. Поэтому сначала бот называет
+# фамилию, месяц и сумму, и только по второму нажатию ставит отметку.
+#
+# ПОЧЕМУ ПО ИМЕНИ, А НЕ КНОПКОЙ У КАЖДОГО. Тридцать кнопок в списке — это
+# тридцать поводов промахнуться пальцем. Ввод фамилии заставляет назвать
+# человека вслух, и промах становится маловероятным.
+
+PAY_CONFIRMED  = "payok:"
+
+
+def _find_debt_periods(db, query: str):
+    """Незакрытые периоды по части фамилии ребёнка или родителя."""
+    from app.models.fees import AthleteFeePeriod
+    from app.models.user import Athlete, User
+
+    needle = (query or "").strip().casefold()
+    if not needle:
+        return []
+
+    rows = (
+        db.query(AthleteFeePeriod, Athlete, User)
+        .join(Athlete, Athlete.id == AthleteFeePeriod.athlete_id)
+        .join(User, User.id == Athlete.user_id)
+        .filter(Athlete.is_archived == False, User.is_active == True,
+                AthleteFeePeriod.is_budget == False,
+                AthleteFeePeriod.paid == False,
+                AthleteFeePeriod.is_frozen == False)
+        .all()
+    )
+    return [(p, a, u) for p, a, u in rows
+            if needle in (a.full_name or "").casefold()
+            or needle in (u.full_name or "").casefold()]
+
+
+def pay_prompt(db, query: str):
+    """Шаг 1: найти человека и предложить подтверждение.
+
+    Возвращает (текст, payload_для_кнопки). payload пуст, если подтверждать
+    нечего — не нашли или нашли несколько.
+    """
+    from app.core.markup import esc
+
+    if not (query or "").strip():
+        return ("Укажите фамилию: <code>/paid Абрамова</code>\n\n"
+                "Отмечается взнос за текущий месяц. Долг за прошлые месяцы "
+                "закрывается в кабинете — там видно, за какой именно.", "")
+
+    found = _find_debt_periods(db, query)
+    if not found:
+        return (f"Не нашёл незакрытых взносов по запросу «{esc(query)}».\n\n"
+                "Возможно, уже оплачено. Полный список — /debtors", "")
+
+    if len(found) > 1:
+        names = "\n".join(f"• {esc(a.full_name)} ({esc(u.full_name)})"
+                          for _, a, u in found[:10])
+        return (f"Нашлось несколько ({len(found)}). Уточните запрос:\n\n"
+                + names, "")
+
+    p, a, u = found[0]
+    fee = _fee_amount(db)
+    carry = int(p.debt or 0)
+    text = (f"💰 <b>Отметить оплату?</b>\n\n"
+            f"🥋 {esc(a.full_name)}\n"
+            f"👤 {esc(u.full_name)} — {esc(u.phone)}\n\n"
+            f"Взнос за {_label(p.period_year, p.period_month)}: <b>{fee} ₽</b>")
+    if carry:
+        text += (f"\n\n⚠️ Кроме этого за прошлые месяцы числится "
+                 f"<b>{carry} ₽</b> — они останутся. Закрыть их можно в "
+                 f"кабинете, там видно, за какой месяц.")
+    text += "\n\nНажмите кнопку ниже, чтобы подтвердить."
+    return text, f"{PAY_CONFIRMED}{p.id}"
+
+
+def pay_commit(db, payload: str, actor_id: int) -> str:
+    """Шаг 2: поставить отметку. Пишет, КТО и ОТКУДА отметил."""
+    from datetime import datetime
+    from app.core.markup import esc
+    from app.models.fees import AthleteFeePeriod
+    from app.models.user import Athlete, User
+
+    try:
+        period_id = int(payload[len(PAY_CONFIRMED):])
+    except (ValueError, IndexError):
+        return "Не понял, что подтверждать. Попробуйте /paid ФАМИЛИЯ заново."
+
+    p = db.query(AthleteFeePeriod).filter(
+        AthleteFeePeriod.id == period_id).with_for_update().first()
+    if p is None:
+        return "Этот взнос больше не найден. Проверьте /debtors."
+
+    if p.paid:
+        # Кто-то успел раньше — второй тренер или кабинет. Говорим прямо, а не
+        # молча повторяем отметку: иначе непонятно, чья она.
+        who = db.query(User).filter(User.id == p.paid_by).first() if p.paid_by else None
+        when = f" {p.paid_at:%d.%m %H:%M}" if p.paid_at else ""
+        by = f" ({esc(who.full_name)})" if who else ""
+        return f"👌 Уже отмечено как оплаченное{when}{by}. Ничего не меняю."
+
+    a = db.query(Athlete).filter(Athlete.id == p.athlete_id).first()
+    p.paid = True
+    p.paid_at = datetime.utcnow()
+    p.paid_by = actor_id
+    p.paid_source = "bot"
+    db.commit()
+
+    actor = db.query(User).filter(User.id == actor_id).first()
+    logger.info("Оплата отмечена из бота: период %s (%s, %s) — отметил %s",
+                p.id, a.full_name if a else "?",
+                _label(p.period_year, p.period_month),
+                actor.full_name if actor else actor_id)
+
+    fee = _fee_amount(db)
+    carry = int(p.debt or 0)
+    out = (f"✅ <b>Оплата отмечена</b>\n\n"
+           f"🥋 {esc(a.full_name) if a else '—'}\n"
+           f"{_label(p.period_year, p.period_month)}: {fee} ₽\n\n"
+           f"Отметил: {esc(actor.full_name) if actor else '—'}")
+    if carry:
+        out += f"\n\n⚠️ За прошлые месяцы осталось {carry} ₽."
+    out += f"\n\n🔗 {CABINET_FEES}"
+    return out
+
+
+# ─── Сводка о начале просрочки ───────────────────────────────────────────────
+
+PAYMENT_DAY = 25   # то же значение, что в app/routes/fees.py
+
+
+def overdue_digest(db) -> str:
+    """Одна сводка в день начала просрочки. Пусто — рассылать нечего.
+
+    Одна на всех, а не письмо про каждого должника: при тридцати неплательщиках
+    тридцать сообщений перестанут читать ровно тогда, когда они нужны.
+    Дальше человек сам открывает /debtors, если решил звонить сегодня.
+    """
+    from app.models.fees import AthleteFeePeriod
+    from app.models.user import Athlete, User
+
+    today = date.today()
+    fee = _fee_amount(db)
+
+    rows = (
+        db.query(AthleteFeePeriod)
+        .join(Athlete, Athlete.id == AthleteFeePeriod.athlete_id)
+        .join(User, User.id == Athlete.user_id)
+        .filter(
+            AthleteFeePeriod.period_year == today.year,
+            AthleteFeePeriod.period_month == today.month,
+            AthleteFeePeriod.is_budget == False,
+            AthleteFeePeriod.is_frozen == False,
+            AthleteFeePeriod.paid == False,
+            Athlete.is_archived == False,
+            User.is_active == True,
+        )
+        .all()
+    )
+    if not rows:
+        return ""
+
+    total = len(rows) * fee
+    return (f"⏰ <b>Начался срок просрочки</b>\n\n"
+            f"Взнос за {_label(today.year, today.month)} не внесли "
+            f"<b>{len(rows)}</b> чел.\n"
+            f"Сумма: <b>{total} ₽</b>\n\n"
+            f"Кто именно — /debtors")

@@ -29,6 +29,13 @@ class AthleteFeePeriod(Base):
     is_budget    = Column(Boolean, default=False)
     paid         = Column(Boolean, default=False)
     paid_at      = Column(DateTime, nullable=True)
+    # Кто отметил оплату и откуда. Появилось вместе с отметкой из бота:
+    # действие, меняющее деньги в два касания с телефона, обязано иметь автора.
+    # «Кто поставил галочку» — первый вопрос, когда родитель говорит «я не
+    # платил», а в системе стоит оплачено.
+    paid_by      = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"),
+                          nullable=True)
+    paid_source  = Column(String(20), nullable=True)   # 'cabinet' | 'bot'
     debt         = Column(Integer, default=0)
     note         = Column(Text, nullable=True)
     is_frozen    = Column(Boolean, default=False)

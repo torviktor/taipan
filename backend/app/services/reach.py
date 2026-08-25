@@ -53,6 +53,7 @@ ACTION_ROLES = {
     # Денежное: доступно менеджеру и админу.
     "debtors":        MONEY_ROLES,
     "collection":     MONEY_ROLES,
+    "paid":           MONEY_ROLES,   # отметить оплату — единственное действие
 }
 
 
@@ -393,6 +394,39 @@ def admin_recipients(db) -> List[dict]:
         .filter(
             MessengerSubscriber.platform.in_(PLATFORMS),   # фильтр обязателен
             MessengerSubscriber.user_id.in_(ids),
+            MessengerSubscriber.subscribed == True,
+        )
+        .all()
+    )
+    return [
+        {"user_id": r.user_id, "full_name": names.get(r.user_id, ""),
+         "platform": r.platform, "external_id": r.external_id}
+        for r in rows
+    ]
+
+
+def money_recipients(db) -> List[dict]:
+    """Кому уходят денежные сводки: менеджеры и админы с привязкой.
+
+    Отдельно от admin_recipients: уведомление о новой привязке — админское,
+    а просрочка по взносам — прямая работа менеджера.
+    """
+    from app.models.user import User
+    from app.models.event import MessengerSubscriber
+
+    people = db.query(User).filter(
+        User.role.in_(MONEY_ROLES),
+        User.is_active == True,
+    ).all()
+    if not people:
+        return []
+    names = {u.id: u.full_name for u in people}
+
+    rows = (
+        db.query(MessengerSubscriber)
+        .filter(
+            MessengerSubscriber.platform.in_(PLATFORMS),   # фильтр обязателен
+            MessengerSubscriber.user_id.in_(list(names)),
             MessengerSubscriber.subscribed == True,
         )
         .all()

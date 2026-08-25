@@ -100,6 +100,13 @@ celery_app.conf.update(
         # Сводка тренерам. Раз в неделю, понедельник 09:30 МСК: незаполненных
         # дат много, разбирать их удобнее пачкой. Замолкает сама, когда
         # разбирать становится нечего.
+        # Сводка о начале просрочки. Срок оплаты — 25-е, значит 26-го в 09:30
+        # МСК уже понятно, кто не внёс. Один раз в месяц, не ежедневно: цель —
+        # напомнить в момент, когда сумма ещё мала, а не долбить каждый день.
+        "overdue-digest": {
+            "task":     "app.tasks.overdue_digest",
+            "schedule": crontab(hour=6, minute=30, day_of_month=26),
+        },
         "insurance-staff-digest": {
             "task":     "app.tasks.insurance_staff_digest",
             "schedule": crontab(hour=6, minute=30, day_of_week=1),
@@ -441,6 +448,57 @@ def insurance_staff_digest_task():
     except Exception:
         db.rollback()
         log.exception("insurance_staff_digest: задача упала")
+        raise
+    finally:
+        db.close()
+
+
+@celery_app.task(name="app.tasks.overdue_digest")
+def overdue_digest_task():
+    """Одна сводка о начале просрочки — менеджерам и админам.
+
+    Одна на всех, а не письмо про каждого должника: при тридцати
+    неплательщиках тридцать сообщений перестанут читать ровно тогда, когда
+    они нужны. Дальше человек сам открывает /debtors.
+
+    Молчит, когда должников нет: сводка «все заплатили» раз в месяц научила бы
+    её пролистывать, и в месяц, когда заплатят не все, её тоже пролистают.
+    """
+    from app.core.database import SessionLocal
+    from app.services.money import overdue_digest
+    from app.services.reach import money_recipients
+    import logging
+    log = logging.getLogger(__name__)
+
+    db = SessionLocal()
+    try:
+        text = overdue_digest(db)
+        if not text:
+            log.info("overdue_digest: должников нет, молчим")
+            return {"sent": 0, "nothing_to_report": True}
+
+        sent = 0
+        for who in money_recipients(db):
+            try:
+                if who["platform"] == "max":
+                    from app.services.max_bot import send_message_result
+                    status, err = send_message_result(who["external_id"], text)
+                else:
+                    from app.services.notifications import send_telegram_sync
+                    status, err = send_telegram_sync(who["external_id"], text)
+                if status == "sent":
+                    sent += 1
+                else:
+                    log.warning("overdue_digest: %s в %s — %s",
+                                who["full_name"], who["platform"], err)
+            except Exception:
+                log.exception("overdue_digest: отправка упала")
+
+        log.info("overdue_digest: отправлено %s", sent)
+        return {"sent": sent}
+    except Exception:
+        db.rollback()
+        log.exception("overdue_digest: задача упала")
         raise
     finally:
         db.close()

@@ -26,7 +26,7 @@ HIDE_KEYBOARD = {"remove_keyboard": True}
 # Служебные команды тренера. Как и в MAX, они нигде не публикуются:
 # в /start родителю о них не сказано, а право проверяется по роли.
 STAFF_COMMANDS = ("/subs", "/unlinked", "/invite", "/insurance_club",
-                  "/debtors", "/collection")
+                  "/debtors", "/collection", "/paid")
 
 # Разделы про конкретного ребёнка: команда -> функция в parent_info.
 # Все четыре требуют привязанного аккаунта — без него бот не знает, чей ребёнок.
@@ -362,6 +362,22 @@ async def process_telegram_update(update: dict):
             elif cmd == "/debtors":
                 from app.services.money import debtors
                 reply = debtors(db)
+            elif cmd == "/paid":
+                # В Telegram inline-кнопок у бота нет, поэтому подтверждение
+                # вторым словом: «/paid Абрамова да». Смысл тот же — назвать
+                # человека, увидеть сумму, подтвердить отдельным действием.
+                from app.services.money import pay_prompt, pay_commit
+                parts = text.split(maxsplit=2)
+                query = parts[1] if len(parts) > 1 else ""
+                confirm = (parts[2].strip().lower() if len(parts) > 2 else "")
+                t, payload = pay_prompt(db, query)
+                if payload and confirm in ("да", "yes", "ок", "ok"):
+                    reply = pay_commit(db, payload, subscriber.user_id)
+                elif payload:
+                    reply = (t + "\n\nДля подтверждения повторите команду со "
+                             "словом «да»:\n<code>/paid " + query + " да</code>")
+                else:
+                    reply = t
             elif cmd == "/collection":
                 from app.services.money import collection
                 parts = text.split(maxsplit=1)

@@ -735,6 +735,13 @@ def process_max_update(update: dict) -> None:
         sub = _get_or_create(db, external_id, username, full_name)
         reply = run_action(action, db, sub, raw_text)
 
+        # Отметка оплаты возвращает пару: текст и кнопку подтверждения. Своя
+        # клавиатура вместо обычной — чтобы «Да, отметить» стояло прямо под
+        # вопросом, а не терялось среди десятка кнопок меню.
+        own_buttons = None
+        if isinstance(reply, tuple):
+            reply, own_buttons = reply
+
         # Успешная обработка раньше не оставляла в логе НИЧЕГО: писались только
         # ошибки. Из-за этого по логу нельзя было отличить «нажатие не дошло»
         # от «дошло и отработало» — при разборе первого же нажатия это сразу
@@ -745,8 +752,9 @@ def process_max_update(update: dict) -> None:
 
         # Кнопки показываем под каждым ответом: разговор с ботом идёт с
         # телефона, и набирать «/month» руками там неудобно.
-        status, err = send_message_result(external_id, reply,
-                                          buttons=main_keyboard(sub))
+        status, err = send_message_result(
+            external_id, reply,
+            buttons=own_buttons if own_buttons else main_keyboard(sub))
         if status != "sent":
             logger.error("MAX: ответ не доставлен user_id=%s — %s", external_id, err)
     except Exception:
