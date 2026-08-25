@@ -409,3 +409,30 @@ def overdue_digest(db) -> str:
             f"<b>{len(rows)}</b> чел.\n"
             f"Сумма: <b>{total} ₽</b>\n\n"
             f"Кто именно — /debtors")
+
+
+def debtors_count(db) -> int:
+    """Сколько РОДИТЕЛЕЙ имеют долг. Для счётчика в шапке кабинета.
+
+    Считает по той же выборке, что и debtors(), чтобы цифра в кабинете и в
+    боте не расходились: две независимые формулы одного числа рано или поздно
+    разъезжаются, и тогда непонятно, какой верить.
+    """
+    from app.models.fees import AthleteFeePeriod
+    from app.models.user import Athlete, User
+
+    fee = _fee_amount(db)
+    rows = (
+        db.query(AthleteFeePeriod, Athlete, User)
+        .join(Athlete, Athlete.id == AthleteFeePeriod.athlete_id)
+        .join(User, User.id == Athlete.user_id)
+        .filter(Athlete.is_archived == False, User.is_active == True,
+                AthleteFeePeriod.is_frozen == False)
+        .all()
+    )
+    parents = set()
+    for p, ath, parent in rows:
+        total = int(p.debt or 0) + (fee if _owes_current(p) else 0)
+        if total > 0:
+            parents.add(parent.id)
+    return len(parents)

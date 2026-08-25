@@ -60,11 +60,12 @@ celery_app.conf.update(
             "task":     "app.tasks.daily_event_reports",
             "schedule": crontab(hour=10, minute=0),
         },
-        # Генерация взносов — 1-го числа каждого месяца в 09:00
-        "generate-monthly-fees": {
-            "task":     "app.tasks.generate_monthly_fees",
-            "schedule": crontab(day_of_month=1, hour=9, minute=0),
-        },
+        # СНЯТО С РАСПИСАНИЯ 25.08.2026 — generate-monthly-fees.
+        # Задача начисляла взносы в monthly_fees и рассылала по ней же. Клуб
+        # ведёт взносы в athlete_fee_periods (кабинет → «Периоды»), а эта
+        # таблица накопила 165 начислений и ноль оплат: каждый её запуск
+        # добавлял 55 фальшивых долгов и слал по ним уведомления.
+        # Таблица и данные оставлены, снят только автозапуск.
         # Еженедельный дайджест событий — воскресенье 18:00
         "weekly-digest": {
             "task":     "app.tasks.weekly_digest",
@@ -75,11 +76,10 @@ celery_app.conf.update(
             "task":     "app.tasks.weekly_news_digest",
             "schedule": crontab(hour=20, minute=0, day_of_week=0),
         },
-        # Уведомление должников — ежедневно в 10:00
-        "notify-overdue-fees": {
-            "task":     "app.tasks.notify_overdue_fees",
-            "schedule": crontab(hour=10, minute=0),
-        },
+        # СНЯТО С РАСПИСАНИЯ 25.08.2026 — notify-overdue-fees.
+        # Ежедневно рассылала «вы должник» по monthly_fees, где нет оплат.
+        # Сводка о просрочке по рабочей таблице приходит в бот менеджеру и
+        # админу — app/services/money.py, overdue_digest().
         # Пересчёт ачивок — ежедневно в 10:00
         "recompute-achievements": {
             "task":     "app.tasks.recompute_achievements",
@@ -211,28 +211,17 @@ def daily_event_reports_task():
 
 @celery_app.task(name="app.tasks.generate_monthly_fees")
 def generate_monthly_fees_task():
-    from app.core.database import SessionLocal
-    from app.routes.fees import generate_monthly_fees
-    db = SessionLocal()
-    try:
-        count = generate_monthly_fees(db, notify=True)
-        print(f"[fees] Создано записей взносов: {count}")
-        return count
-    finally:
-        db.close()
+    """ОТКЛЮЧЕНА 25.08.2026 вместе с monthly_fees. Снята с расписания;
+    тело оставлено заглушкой, чтобы ручной вызов не начислял долги молча."""
+    print("[fees] generate_monthly_fees_task отключена 25.08.2026, ничего не делаю")
+    return 0
 
 
 @celery_app.task(name="app.tasks.notify_overdue_fees")
 def notify_overdue_fees_task():
-    from app.core.database import SessionLocal
-    from app.routes.fees import notify_overdue
-    db = SessionLocal()
-    try:
-        sent = notify_overdue(db)
-        print(f"[fees] Уведомлений должникам отправлено: {sent}")
-        return sent
-    finally:
-        db.close()
+    """ОТКЛЮЧЕНА 25.08.2026 вместе с monthly_fees. См. generate_monthly_fees_task."""
+    print("[fees] notify_overdue_fees_task отключена 25.08.2026, ничего не делаю")
+    return 0
 
 
 @celery_app.task(name="app.tasks.weekly_digest")

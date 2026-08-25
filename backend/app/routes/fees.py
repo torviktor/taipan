@@ -1,4 +1,5 @@
 import io
+import logging
 from datetime import datetime, date as date_type
 from typing import Optional, List
 from urllib.parse import quote
@@ -17,6 +18,7 @@ from app.models.fees import FeeDeadline, MonthlyFee, FeeStatus, FeeConfig, Athle
 from app.models.certification import Notification
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # День месяца, когда формируется счёт на взнос. Зашит в код, не настраивается.
 PAYMENT_DAY = 25
@@ -168,6 +170,28 @@ def generate_monthly_fees(db: Session, notify: bool = True) -> int:
     return len(new_athlete_ids)
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# ВЫВЕДЕНО ИЗ ЭКСПЛУАТАЦИИ 25.08.2026 — monthly_fees и fee_deadlines
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Клуб ведёт взносы в athlete_fee_periods — это эндпоинты /fees/periods* ниже и
+# app/services/money.py. Всё, что идёт отсюда до пометки «конец выведенного»,
+# работает с ПАРАЛЛЕЛЬНОЙ таблицей, которую никто не заполняет: 165 начислений
+# и НОЛЬ оплат за всё время, единственный дедлайн от 07.04.2026.
+#
+# ЧЕМ ЭТО УЖЕ НАВРЕДИЛО. Числа отсюда утекали в три места, и всюду были ложью:
+# родитель в кабинете видел «ПРОСРОЧЕНО» по всем месяцам подряд, бот называл
+# ему выдуманный долг, счётчик в шапке показывал 55 должников при реальных 29.
+# Я сам взял эту таблицу, когда делал денежный раздел бота, — просто потому что
+# имя monthly_fees выглядит правильнее, чем athlete_fee_periods.
+#
+# ЕСЛИ ВЫ ЧИТАЕТЕ ЭТО, СОБИРАЯСЬ СЧИТАТЬ ВЗНОСЫ — вам нужен AthleteFeePeriod и
+# app/services/money.py. Не эти функции. Ни одна из них.
+#
+# Данные и таблицы намеренно НЕ удалены: место копеечное, удаление необратимо.
+# Отключены: generate_monthly_fees (снята с расписания Celery), рассылка
+# notify_overdue и создание дедлайнов POST /fees/deadlines.
+
 # ── Дедлайны ──────────────────────────────────────────────────────────────────
 
 @router.get("/deadlines")
@@ -193,40 +217,18 @@ def create_deadline(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_manager),
 ):
-    if not 1 <= body.day_of_month <= 28:
-        raise HTTPException(400, "День месяца должен быть от 1 до 28")
+    """ОТКЛЮЧЕНО 25.08.2026. Раньше сохраняло дедлайн и звало
+    generate_monthly_fees(notify=True), то есть один вызов рассылал всем 55
+    родителям «вы должник» по таблице, где ноль оплат. Достаточно было нажать
+    кнопку в интерфейсе.
 
-    today = date_type.today()
-    period = date_type(today.year, today.month, 1)
-    current_deadline = date_type(today.year, today.month, body.day_of_month)
-
-    # Upsert: обновляем существующую настройку или создаём новую
-    config = db.query(FeeDeadline).order_by(FeeDeadline.created_at.desc()).first()
-    if config:
-        config.period = period
-        config.deadline = current_deadline
-        config.amount_due = body.amount_due
-        db.commit()
-        db.refresh(config)
-    else:
-        config = FeeDeadline(
-            period=period,
-            deadline=current_deadline,
-            amount_due=body.amount_due,
-            created_by=current_user.id,
-        )
-        db.add(config)
-        db.commit()
-        db.refresh(config)
-
-    created = generate_monthly_fees(db, notify=True)
-
-    return {
-        "day_of_month": config.deadline.day,
-        "amount_due": float(config.amount_due),
-        "athletes_count": created,
-        "message": "Настройка сохранена",
-    }
+    Сводка о просрочке по рабочей таблице уже есть — money.overdue_digest().
+    """
+    raise HTTPException(
+        410,
+        "Модуль дедлайнов выведен из эксплуатации 25.08.2026. "
+        "Взносы ведутся в разделе «Периоды».",
+    )
 
 
 # ── Все взносы (admin/manager) ─────────────────────────────────────────────────
@@ -322,28 +324,76 @@ def my_fees(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Взносы родителя за последние месяцы.
+
+    ИСТОЧНИК — athlete_fee_periods, как у тренера и в боте.
+
+    До 25.08.2026 читалось из monthly_fees, где ноль оплат при 165
+    начислениях: родитель видел «ПРОСРОЧЕНО» по всем месяцам подряд, включая
+    те, что закрыты. Цифра расходилась и с ботом, и с тем, что назовёт тренер.
+
+    Форма ответа сохранена прежней — MyFeesTab не меняли, поменяли только то,
+    откуда берутся числа.
+    """
+    from app.models.fees import AthleteFeePeriod
+
     athletes = db.query(Athlete).filter(
         Athlete.user_id == current_user.id,
         Athlete.is_archived == False,
     ).all()
-    athlete_ids = [a.id for a in athletes]
-    if not athlete_ids:
+    ids = [a.id for a in athletes]
+    if not ids:
         return []
+
+    cfg = db.query(FeeConfig).first()
+    fee = int(cfg.fee_amount) if cfg and cfg.fee_amount else 2000
 
     today = date_type.today()
     y, m = today.year, today.month - 6
     if m <= 0:
         y -= 1
         m += 12
-    since = date_type(y, m, 1)
 
-    fees = db.query(MonthlyFee).filter(
-        MonthlyFee.athlete_id.in_(athlete_ids),
-        MonthlyFee.period >= since,
-    ).all()
-    result = [fee_to_dict(f) for f in fees]
-    result.sort(key=lambda x: x["period"] or "", reverse=True)
-    return result
+    rows = (
+        db.query(AthleteFeePeriod)
+        .filter(
+            AthleteFeePeriod.athlete_id.in_(ids),
+            (AthleteFeePeriod.period_year > y)
+            | ((AthleteFeePeriod.period_year == y)
+               & (AthleteFeePeriod.period_month >= m)),
+        )
+        .all()
+    )
+
+    names = {a.id: a.full_name for a in athletes}
+    out = []
+    for p in rows:
+        if p.is_budget:
+            due, paid, status = 0, 0, "subsidized"
+        elif p.paid:
+            due, paid, status = fee, fee, "paid"
+        elif p.is_frozen:
+            # Месяц закрыт, а взнос не внесён — это и есть просрочка.
+            due, paid, status = fee, 0, "overdue"
+        else:
+            due, paid, status = fee, 0, "due"
+
+        out.append({
+            "id":            p.id,
+            "athlete_id":    p.athlete_id,
+            "athlete_name":  names.get(p.athlete_id, ""),
+            "period":        f"{p.period_year}-{p.period_month:02d}",
+            "period_label":  f"{MONTHS_RU_LIST[p.period_month]} {p.period_year}",
+            "amount_due":    due,
+            "amount_paid":   paid,
+            "debt":          max(0, due - paid),
+            "status":        status,
+            "is_subsidized": bool(p.is_budget),
+            "paid_at":       p.paid_at.isoformat() if p.paid_at else None,
+        })
+
+    out.sort(key=lambda x: x["period"], reverse=True)
+    return out
 
 
 # ── Сводка ────────────────────────────────────────────────────────────────────
@@ -475,128 +525,51 @@ def export_fees(
 # ── Автоуведомление должников (вызывается планировщиком) ──────────────────────
 
 def notify_overdue(db: Session) -> int:
+    """ОТКЛЮЧЕНО 25.08.2026. Рассылка по monthly_fees.
+
+    Считала должником каждого, у кого amount_paid < amount_due. Поскольку в
+    той таблице ни одной оплаты, должниками выходили ВСЕ — включая тех, кто
+    заплатил, и льготников за месяцы, когда льготы ещё не проставили.
+
+    Оставлена телом-заглушкой, а не удалена, чтобы вызов из старого кода не
+    падал молча, а был виден в логе.
     """
-    Найти MonthlyFee где дедлайн был ровно 7 дней назад (первый день overdue).
-    Отправить уведомление родителю/спортсмену.
-    """
-    from datetime import timedelta
-    today = date_type.today()
-    overdue_start = today - timedelta(days=7)  # дедлайн был 7 дней назад
+    logger.warning("notify_overdue вызван, но отключён 25.08.2026 "
+                   "(monthly_fees выведена из эксплуатации)")
+    return 0
 
-    fees = (
-        db.query(MonthlyFee)
-        .join(FeeDeadline, MonthlyFee.deadline_id == FeeDeadline.id)
-        .options(
-            joinedload(MonthlyFee.athlete),
-        )
-        .filter(
-            FeeDeadline.deadline == overdue_start,
-            MonthlyFee.amount_paid < MonthlyFee.amount_due,
-            MonthlyFee.is_subsidized != True,
-        )
-        .all()
-    )
-
-    sent = 0
-    for fee in fees:
-        athlete = fee.athlete
-        if not athlete or not athlete.user_id:
-            continue
-        month_label = period_label(fee.period)
-        debt = float(fee.amount_due or 0) - float(fee.amount_paid or 0)
-        notif_body = f"Взнос за {month_label} не внесён. Долг: {debt:.0f} руб. Пожалуйста, свяжитесь с тренером."
-        db.add(Notification(
-            user_id=athlete.user_id,
-            type="fee",
-            title="Просрочен взнос",
-            body=notif_body,
-            link_id=fee.id,
-            tg_status="pending",
-        ))
-        sent += 1
-
-    db.commit()
-    from app.services.notifications import enqueue_telegram_delivery
-    enqueue_telegram_delivery()
-    return sent
-
-
-# ── Уведомить должников вручную ───────────────────────────────────────────────
 
 @router.post("/notify-overdue")
 def notify_overdue_manual(
     db: Session = Depends(get_db),
     _: User = Depends(require_manager),
 ):
-    today = date_type.today()
-    period_date = date_type(today.year, today.month, 1)
-
-    fees = (
-        db.query(MonthlyFee)
-        .join(FeeDeadline, MonthlyFee.deadline_id == FeeDeadline.id)
-        .options(joinedload(MonthlyFee.athlete))
-        .filter(
-            MonthlyFee.period == period_date,
-            MonthlyFee.amount_paid < MonthlyFee.amount_due,
-            FeeDeadline.deadline <= today,
-            MonthlyFee.is_subsidized != True,
-        )
-        .all()
+    """ОТКЛЮЧЕНО 25.08.2026. См. notify_overdue выше."""
+    raise HTTPException(
+        410,
+        "Рассылка должникам по этой таблице выведена из эксплуатации "
+        "25.08.2026: в ней не отмечались оплаты, и письмо ушло бы всем. "
+        "Список должников — раздел «Периоды», сводка приходит в бот.",
     )
 
-    sent = 0
-    for fee in fees:
-        athlete = fee.athlete
-        if not athlete or not athlete.user_id:
-            continue
-        status = fee.computed_status
-        if status not in (FeeStatus.due, FeeStatus.overdue):
-            continue
-        month_label = period_label(fee.period)
-        debt = float(fee.amount_due or 0) - float(fee.amount_paid or 0)
-        deadline_str = fee.deadline_obj.deadline.strftime("%d.%m.%Y") if fee.deadline_obj else ""
-        if status == FeeStatus.due:
-            body = f"Внесите взнос за {month_label}. Сумма: {debt:.0f} руб. Дедлайн: {deadline_str}."
-        else:
-            body = f"Просрочен взнос за {month_label}. Долг: {debt:.0f} руб. Обратитесь к тренеру."
-        db.add(Notification(
-            user_id=athlete.user_id,
-            type="fee",
-            title="Напоминание о взносе",
-            body=body,
-            link_id=fee.id,
-            tg_status="pending",
-        ))
-        sent += 1
 
-    db.commit()
-    from app.services.notifications import enqueue_telegram_delivery
-    enqueue_telegram_delivery()
-    return {"sent": sent, "queued": True}
-
-
-# ── Счётчик просроченных взносов ──────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# конец выведенного из эксплуатации
+# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/overdue-count")
 def overdue_count(
     db: Session = Depends(get_db),
     _: User = Depends(require_manager),
 ):
-    today = date_type.today()
-    period_date = date_type(today.year, today.month, 1)
+    """Сколько человек с долгом — счётчик в шапке кабинета.
 
-    count = (
-        db.query(MonthlyFee)
-        .join(FeeDeadline, MonthlyFee.deadline_id == FeeDeadline.id)
-        .filter(
-            MonthlyFee.period == period_date,
-            MonthlyFee.amount_paid < MonthlyFee.amount_due,
-            FeeDeadline.deadline < today,
-            MonthlyFee.is_subsidized != True,
-        )
-        .count()
-    )
-    return {"count": count}
+    До 25.08.2026 считалось по monthly_fees и показывало 55 при реальных 29:
+    в той таблице ноль оплат, поэтому должниками выходили все. Теперь счёт по
+    той же выборке, что у бота, и цифры сходятся.
+    """
+    from app.services.money import debtors_count
+    return {"count": debtors_count(db)}
 
 
 # ══════════════════════════════════════════════════════════════════════════════

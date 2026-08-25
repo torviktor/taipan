@@ -51,7 +51,7 @@ def _still_relevant(db, n) -> bool:
     from app.models.camp import Camp
     from app.models.certification import Certification
     from app.models.competition import Competition
-    from app.models.fees import MonthlyFee
+    from app.models.fees import AthleteFeePeriod
     from app.models.user import Athlete
 
     kind = (n.link_type or n.type or "").lower()
@@ -77,10 +77,24 @@ def _still_relevant(db, n) -> bool:
         return bool(c and c.date >= today)
 
     if kind == "fee":
-        f = db.query(MonthlyFee).filter(MonthlyFee.id == n.link_id).first()
-        if not f or f.is_subsidized:
-            return False
-        return float(f.amount_paid or 0) < float(f.amount_due or 0)
+        # Смотрим на самого плательщика, а не на строку начисления: напоминание
+        # об оплате создаётся без link_id (см. /fees/periods/save-and-notify),
+        # так что искать по нему нечего.
+        #
+        # До 25.08.2026 здесь был поиск MonthlyFee по link_id = NULL. Он всегда
+        # возвращал None, то есть КАЖДОЕ напоминание о взносе считалось
+        # неактуальным и молча не досылалось. Ошибка была невидимой: досылка
+        # отрабатывала «успешно», просто ни одного взноса в ней не было.
+        rows = (
+            db.query(AthleteFeePeriod)
+            .join(Athlete, Athlete.id == AthleteFeePeriod.athlete_id)
+            .filter(Athlete.user_id == n.user_id,
+                    Athlete.is_archived == False,
+                    AthleteFeePeriod.is_budget == False,
+                    AthleteFeePeriod.paid == False)
+            .count()
+        )
+        return rows > 0
 
     # Прочее — только совсем свежее: у него нет срока, по которому можно
     # судить, и через неделю оно почти наверняка уже неинтересно.
