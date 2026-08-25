@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_manager
+from app.core.security import get_current_user, require_admin
 from app.models.user import User
 from app.models.news import News
 
@@ -62,7 +62,7 @@ def list_news(limit: int = 20, offset: int = 0, db: Session = Depends(get_db)):
 
 
 @router.get("/drafts/count")
-def drafts_count(db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def drafts_count(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     return {"count": db.query(News).filter(News.status == 'draft').count()}
 
 
@@ -71,7 +71,7 @@ def list_drafts(
     limit:  int = 50,
     offset: int = 0,
     db:     Session = Depends(get_db),
-    _:      User    = Depends(require_manager),
+    _:      User    = Depends(require_admin),
 ):
     items = (
         db.query(News)
@@ -87,7 +87,7 @@ def list_drafts(
 def publish_draft(
     news_id: int,
     db:      Session = Depends(get_db),
-    _:       User    = Depends(require_manager),
+    _:       User    = Depends(require_admin),
 ):
     n = db.query(News).filter(News.id == news_id, News.status == 'draft').first()
     if not n:
@@ -106,7 +106,7 @@ def get_news(news_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", status_code=201)
-def create_news(data: NewsCreate, db: Session = Depends(get_db), user: User = Depends(require_manager)):
+def create_news(data: NewsCreate, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     if data.competition_id:
         existing = db.query(News).filter(News.competition_id == data.competition_id, News.status.in_(('draft', 'published'))).first()
         if existing: raise HTTPException(400, "Новость об этом соревновании уже опубликована")
@@ -132,7 +132,7 @@ def create_news(data: NewsCreate, db: Session = Depends(get_db), user: User = De
 
 
 @router.patch("/{news_id}")
-def update_news(news_id: int, data: NewsUpdate, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def update_news(news_id: int, data: NewsUpdate, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     n = db.query(News).filter(News.id == news_id).first()
     if not n: raise HTTPException(404, "Новость не найдена")
     if data.title is not None: n.title = data.title
@@ -142,7 +142,7 @@ def update_news(news_id: int, data: NewsUpdate, db: Session = Depends(get_db), _
 
 
 @router.post("/{news_id}/photo")
-def upload_photo(news_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def upload_photo(news_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), _: User = Depends(require_admin)):
     n = db.query(News).filter(News.id == news_id).first()
     if not n: raise HTTPException(404, "Новость не найдена")
     ext = os.path.splitext(file.filename)[1].lower()
@@ -160,7 +160,7 @@ def upload_photo(news_id: int, file: UploadFile = File(...), db: Session = Depen
 
 
 @router.delete("/{news_id}/photo", status_code=204)
-def delete_photo(news_id: int, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def delete_photo(news_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     n = db.query(News).filter(News.id == news_id).first()
     if not n: raise HTTPException(404)
     if n.photo_url:
@@ -171,7 +171,7 @@ def delete_photo(news_id: int, db: Session = Depends(get_db), _: User = Depends(
 
 
 @router.delete("/{news_id}", status_code=204)
-def delete_news(news_id: int, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def delete_news(news_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     n = db.query(News).filter(News.id == news_id).first()
     if not n: raise HTTPException(404, "Новость не найдена")
     if n.photo_url:

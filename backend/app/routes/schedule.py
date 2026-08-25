@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
 from app.core.database import get_db
-from app.core.security import require_manager
+from app.core.security import require_admin
 from app.models.user import Schedule, Section, User
 
 router = APIRouter()
@@ -65,7 +65,7 @@ def get_sections(db: Session = Depends(get_db)):
 def create_schedule(
     data: ScheduleCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_manager)
+    _: User = Depends(require_admin)
 ):
     item = Schedule(**data.model_dump())
     db.add(item)
@@ -77,7 +77,7 @@ def create_schedule(
 def delete_schedule(
     item_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_manager)
+    _: User = Depends(require_admin)
 ):
     item = db.query(Schedule).filter(Schedule.id == item_id).first()
     if not item:

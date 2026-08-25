@@ -252,7 +252,10 @@ export default function Cabinet() {
   const [editing,      setEditing]      = useState(null)
   const [editData,     setEditData]     = useState({})
   const [search,       setSearch]       = useState('')
-  const [view,         setView]         = useState('athletes')
+  // Менеджер — роль про деньги: у него одна вкладка «Взносы», и открываться
+  // кабинет должен сразу на ней. У админа прежний вход на «Спортсменов».
+  const [view,         setView]         = useState(
+    () => (localStorage.getItem('role') === 'manager' ? 'fees' : 'athletes'))
   const [resetUser,    setResetUser]    = useState(null)
   // Вкладка кабинета родителя. Начальное значение берём из ?tab= — по таким
   // ссылкам приходят из бота: «посмотреть подробнее» должно открывать нужный
@@ -960,6 +963,17 @@ export default function Cabinet() {
           {/* ── Вкладки тренера ── */}
           <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
 
+{role === 'manager' ? (
+  /* Менеджер отвечает только за деньги: одна вкладка, без групп. Остальные
+     эндпоинты ему закрыты, и показывать вкладки, ведущие в 403, значит
+     обещать доступ, которого нет. */
+  <div className="cabinet-tabs-group">
+    <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
+      <button className={`cabinet-tab ${view==='fees'?'active':''}`}
+              onClick={() => setView('fees')}>Взносы</button>
+    </div>
+  </div>
+) : (<>
 <div className="cabinet-tabs-group">
   {/* Люди */}
   <div style={{ display:'flex', alignItems:'stretch', gap:0 }}>
@@ -1003,6 +1017,7 @@ export default function Cabinet() {
     </div>
   </div>
 </div>
+</>)}
 
           </div>
 

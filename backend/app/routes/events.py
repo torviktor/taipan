@@ -5,7 +5,7 @@ from typing import Optional, List
 from datetime import datetime
 from app.core.markup import esc
 from app.core.database import get_db
-from app.core.security import get_current_user, require_manager
+from app.core.security import get_current_user, require_admin
 from app.models.user import User
 
 # Импортируем модели событий
@@ -93,7 +93,7 @@ def create_event(
     data: EventCreate,
     background_tasks: BackgroundTasks,
     db:   Session = Depends(get_db),
-    current_user: User = Depends(require_manager)
+    current_user: User = Depends(require_admin)
 ):
     from app.models.event import Event
     event = Event(
@@ -137,7 +137,7 @@ def update_event(
     event_id: int,
     data: EventUpdate,
     db:   Session = Depends(get_db),
-    _:    User    = Depends(require_manager)
+    _:    User    = Depends(require_admin)
 ):
     from app.models.event import Event
     event = db.query(Event).filter(Event.id == event_id).first()
@@ -162,7 +162,7 @@ def update_event(
 def delete_event(
     event_id: int,
     db:   Session = Depends(get_db),
-    _:    User    = Depends(require_manager)
+    _:    User    = Depends(require_admin)
 ):
     from app.models.event import Event
     event = db.query(Event).filter(Event.id == event_id).first()

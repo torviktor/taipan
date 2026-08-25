@@ -6,25 +6,13 @@ from pydantic import BaseModel
 from datetime import date, timedelta
 from typing import Optional
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_admin
 from app.models.attendance import TrainingSession, Attendance
 from app.models.user import Athlete, User, UserRole
 
 router = APIRouter(prefix="/attendance", tags=["Посещаемость"])
 
 
-def require_staff(current_user: User = Depends(get_current_user)):
-    """Тренер ИЛИ администратор — посещаемость нужна обоим.
-
-    Раньше функция называлась require_admin, хотя пускала и менеджера. Рядом,
-    в individual_training.py, лежит настоящий require_admin с проверкой
-    role != "admin". Два одинаковых имени с разным смыслом — заготовка для
-    дыры: кто-то напишет Depends(require_admin), будучи уверен, что закрыл
-    эндпоинт от тренеров. Само право здесь верное, врало только имя.
-    """
-    if current_user.role not in [UserRole.admin, UserRole.manager]:
-        raise HTTPException(status_code=403, detail="Нет доступа")
-    return current_user
 
 
 # ── Схемы ──────────────────────────────────────────────────────────────────────
@@ -45,7 +33,7 @@ class SessionMarkRequest(BaseModel):
 # ── Создать тренировку ──────────────────────────────────────────────────────────
 
 @router.post("/sessions")
-def create_session(data: SessionCreate, db: Session = Depends(get_db), _=Depends(require_staff)):
+def create_session(data: SessionCreate, db: Session = Depends(get_db), _=Depends(require_admin)):
     # Проверяем — нет ли уже тренировки этой группы в эту дату
     existing = db.query(TrainingSession).filter(
         TrainingSession.date == data.date,
@@ -64,7 +52,7 @@ def create_session(data: SessionCreate, db: Session = Depends(get_db), _=Depends
 # ── Получить список тренировок ──────────────────────────────────────────────────
 
 @router.get("/seasons")
-def get_attendance_seasons(db: Session = Depends(get_db), _=Depends(require_staff)):
+def get_attendance_seasons(db: Session = Depends(get_db), _=Depends(require_admin)):
     """Список лет начала спортивных сезонов."""
     rows = db.query(TrainingSession.date).all()
     seasons = set()
@@ -81,7 +69,7 @@ def get_sessions(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     db: Session = Depends(get_db),
-    _=Depends(require_staff)
+    _=Depends(require_admin)
 ):
     q = db.query(TrainingSession)
     if group_name:
@@ -107,7 +95,7 @@ def get_sessions(
 # ── Получить тренировку с записями ─────────────────────────────────────────────
 
 @router.get("/sessions/{session_id}")
-def get_session(session_id: int, db: Session = Depends(get_db), _=Depends(require_staff)):
+def get_session(session_id: int, db: Session = Depends(get_db), _=Depends(require_admin)):
     s = db.query(TrainingSession).filter(TrainingSession.id == session_id).first()
     if not s:
         raise HTTPException(status_code=404, detail="Не найдено")
@@ -146,7 +134,7 @@ def mark_attendance(
     session_id: int,
     data: SessionMarkRequest,
     db: Session = Depends(get_db),
-    _=Depends(require_staff)
+    _=Depends(require_admin)
 ):
     s = db.query(TrainingSession).filter(TrainingSession.id == session_id).first()
     if not s:
@@ -226,7 +214,7 @@ def athlete_stats(
 # ── Общая статистика для админа ─────────────────────────────────────────────────
 
 @router.get("/stats")
-def overall_stats(db: Session = Depends(get_db), _=Depends(require_staff)):
+def overall_stats(db: Session = Depends(get_db), _=Depends(require_admin)):
     since = date.today() - timedelta(days=90)
 
     total_sessions = db.query(func.count(TrainingSession.id)).filter(

@@ -7,7 +7,7 @@ from datetime import date
 from pydantic import BaseModel
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_manager
+from app.core.security import get_current_user, require_admin
 from app.models.user import User, Athlete
 from app.models.camp import Camp, CampParticipant
 from app.models.certification import Notification, NotificationType
@@ -45,7 +45,7 @@ class StatusUpdate(BaseModel):
 # ── CRUD сборов ───────────────────────────────────────────────────────────────
 
 @router.post("", status_code=201)
-def create_camp(data: CampCreate, db: Session = Depends(get_db), user: User = Depends(require_manager)):
+def create_camp(data: CampCreate, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     camp = Camp(
         name=data.name, date_start=data.date_start, date_end=data.date_end,
         location=data.location, price=data.price, notes=data.notes,
@@ -101,7 +101,7 @@ def get_camp(camp_id: int, db: Session = Depends(get_db), _: User = Depends(get_
 
 
 @router.delete("/{camp_id}", status_code=204)
-def delete_camp(camp_id: int, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def delete_camp(camp_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     camp = _get_or_404(camp_id, db)
     # Удаляем автодрафты-черновики, привязанные к этим сборам.
     db.query(News).filter(
@@ -119,7 +119,7 @@ def set_participants(
     camp_id: int,
     data: BulkParticipants,
     db: Session = Depends(get_db),
-    _: User = Depends(require_manager)
+    _: User = Depends(require_admin)
 ):
     """Задать список участников (заменяет текущий список)."""
     _get_or_404(camp_id, db)
@@ -147,7 +147,7 @@ def update_participant_status(
     athlete_id: int,
     data: StatusUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_manager)
+    _: User = Depends(require_admin)
 ):
     p = db.query(CampParticipant).filter(
         CampParticipant.camp_id == camp_id,
@@ -175,7 +175,7 @@ def update_participant_status(
 # ── Уведомление участникам ────────────────────────────────────────────────────
 
 @router.post("/{camp_id}/notify")
-def notify_camp(camp_id: int, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def notify_camp(camp_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     """
     Отправить уведомление всем участникам сборов.
     Родители могут ответить да/нет через вкладку Уведомления.

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_manager
+from app.core.security import get_current_user, require_admin
 from app.models.user import User
 from app.models.competition import Competition
 from app.models.competition_file import CompetitionFile
@@ -52,7 +52,7 @@ def upload_file(
     comp_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: User = Depends(require_manager)
+    user: User = Depends(require_admin)
 ):
     comp = db.query(Competition).filter(Competition.id == comp_id).first()
     if not comp:
@@ -97,7 +97,7 @@ def delete_file(
     comp_id: int,
     file_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_manager)
+    _: User = Depends(require_admin)
 ):
     cf = db.query(CompetitionFile).filter(
         CompetitionFile.id == file_id,

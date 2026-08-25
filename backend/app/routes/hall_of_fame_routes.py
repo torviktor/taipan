@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
 from app.core.database import get_db
-from app.core.security import get_current_user, require_manager
+from app.core.security import get_current_user, require_admin
 from app.models.hall_of_fame import HallOfFame
 from app.models.user import User
 import os, shutil, uuid
@@ -64,7 +64,7 @@ def list_hof(db: Session = Depends(get_db)):
 # ── Создать ───────────────────────────────────────────────────────────────────
 
 @router.post("")
-def create_hof(data: HofCreate, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def create_hof(data: HofCreate, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     h = HallOfFame(
         full_name=data.full_name,
         achievements=data.achievements,
@@ -82,7 +82,7 @@ def create_hof(data: HofCreate, db: Session = Depends(get_db), _: User = Depends
 # ── Обновить ──────────────────────────────────────────────────────────────────
 
 @router.patch("/{hof_id}")
-def update_hof(hof_id: int, data: HofUpdate, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def update_hof(hof_id: int, data: HofUpdate, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     h = db.query(HallOfFame).filter(HallOfFame.id == hof_id).first()
     if not h:
         raise HTTPException(404, "Не найдено")
@@ -100,7 +100,7 @@ def update_hof(hof_id: int, data: HofUpdate, db: Session = Depends(get_db), _: U
 # ── Позиция фото ─────────────────────────────────────────────────────────────
 
 @router.patch("/{hof_id}/position")
-def update_position(hof_id: int, data: HofPosition, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def update_position(hof_id: int, data: HofPosition, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     h = db.query(HallOfFame).filter(HallOfFame.id == hof_id).first()
     if not h:
         raise HTTPException(404, "Не найдено")
@@ -116,7 +116,7 @@ def upload_photo(
     hof_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    _: User = Depends(require_manager)
+    _: User = Depends(require_admin)
 ):
     h = db.query(HallOfFame).filter(HallOfFame.id == hof_id).first()
     if not h:
@@ -143,7 +143,7 @@ def upload_photo(
 # ── Удалить ───────────────────────────────────────────────────────────────────
 
 @router.delete("/{hof_id}", status_code=204)
-def delete_hof(hof_id: int, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def delete_hof(hof_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     h = db.query(HallOfFame).filter(HallOfFame.id == hof_id).first()
     if not h:
         raise HTTPException(404, "Не найдено")

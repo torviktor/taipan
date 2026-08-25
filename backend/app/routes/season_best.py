@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_manager
+from app.core.security import get_current_user, require_admin
 from app.core.seasons import get_current_season, format_season_label
 from app.models.user import User, Athlete
 from app.models.competition import CompetitionResult, Competition
@@ -236,7 +236,7 @@ def suggest_for_slot(
     slot:   str = Query(...),
     season: Optional[int] = Query(None),
     db:     Session = Depends(get_db),
-    _:      User = Depends(require_manager),
+    _:      User = Depends(require_admin),
 ):
     """Топ-3 кандидата для слота в указанном сезоне (или текущем)."""
     if season is None:
@@ -253,7 +253,7 @@ def suggest_for_slot(
 def assign_slot(
     body: AssignBody,
     db:   Session = Depends(get_db),
-    _:    User = Depends(require_manager),
+    _:    User = Depends(require_admin),
 ):
     """Назначить спортсмена в слот. Если слот уже занят — 409 с информацией
     о текущем занявшем (фронт показывает модалку подтверждения)."""
@@ -312,7 +312,7 @@ def assign_slot(
 def replace_slot(
     body: AssignBody,
     db:   Session = Depends(get_db),
-    _:    User = Depends(require_manager),
+    _:    User = Depends(require_admin),
 ):
     """Принудительная замена (после подтверждения модалки).
     Снимает старого, назначает нового. Ачивка перевыдаётся."""
@@ -360,7 +360,7 @@ def replace_slot(
 def delete_slot(
     entry_id: int,
     db:       Session = Depends(get_db),
-    _:        User = Depends(require_manager),
+    _:        User = Depends(require_admin),
 ):
     """Снять спортсмена со слота без назначения нового."""
     entry = db.query(SeasonBestAthlete).filter(SeasonBestAthlete.id == entry_id).first()
@@ -379,7 +379,7 @@ def upload_slot_photo(
     entry_id: int,
     file:     UploadFile = File(...),
     db:       Session = Depends(get_db),
-    _:        User = Depends(require_manager),
+    _:        User = Depends(require_admin),
 ):
     """Загрузить/заменить фото слота. Старый файл удаляется."""
     entry = db.query(SeasonBestAthlete).filter(SeasonBestAthlete.id == entry_id).first()
@@ -409,7 +409,7 @@ def update_slot_position(
     entry_id: int,
     body:     PositionBody,
     db:       Session = Depends(get_db),
-    _:        User = Depends(require_manager),
+    _:        User = Depends(require_admin),
 ):
     """Сохранить кадрирование фото слота (формат "Xpx Ypx / zoom%")."""
     entry = db.query(SeasonBestAthlete).filter(SeasonBestAthlete.id == entry_id).first()

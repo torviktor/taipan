@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 from app.core.database import get_db
-from app.core.security import get_current_user, require_manager
+from app.core.security import get_current_user, require_admin
 from app.models.user import Application, ApplicationStatus, User
 
 router = APIRouter()
@@ -47,7 +47,7 @@ def create_application(data: ApplicationCreate, db: Session = Depends(get_db)):
 def get_all_applications(
     status: Optional[ApplicationStatus] = None,
     db: Session = Depends(get_db),
-    _: User = Depends(require_manager)
+    _: User = Depends(require_admin)
 ):
     query = db.query(Application)
     if status:
@@ -60,7 +60,7 @@ def update_status(
     app_id: int,
     data: StatusUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_manager)
+    _: User = Depends(require_admin)
 ):
     application = db.query(Application).filter(Application.id == app_id).first()
     if not application:
@@ -75,7 +75,7 @@ def update_status(
 def delete_application(
     app_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_manager)
+    _: User = Depends(require_admin)
 ):
     application = db.query(Application).filter(Application.id == app_id).first()
     if not application:

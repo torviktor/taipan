@@ -8,7 +8,7 @@ from typing import Optional
 from datetime import date, datetime
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_manager
+from app.core.security import get_current_user, require_admin
 from app.models.user import User, Athlete
 from app.models.competition import (
     Competition, CompetitionResult,
@@ -114,7 +114,7 @@ _RATING_FIELDS = {
 def create_competition(
     data: CompetitionCreate,
     db:   Session = Depends(get_db),
-    user: User    = Depends(require_manager)
+    user: User    = Depends(require_admin)
 ):
     if data.level not in SIGNIFICANCE_TABLE:
         raise HTTPException(400, f"Неизвестный уровень: {data.level}")
@@ -306,7 +306,7 @@ def get_competition(comp_id: int, db: Session = Depends(get_db), _: User = Depen
 
 
 @router.patch("/{comp_id}")
-def update_competition(comp_id: int, data: CompetitionUpdate, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def update_competition(comp_id: int, data: CompetitionUpdate, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     comp = _get_or_404(comp_id, db)
     upd = data.dict(exclude_none=True)
     new_level = upd.get("level", comp.level)
@@ -323,7 +323,7 @@ def update_competition(comp_id: int, data: CompetitionUpdate, db: Session = Depe
 
 
 @router.delete("/{comp_id}", status_code=204)
-def delete_competition(comp_id: int, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def delete_competition(comp_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     comp = _get_or_404(comp_id, db)
     # Удаляем связанное событие в календаре если есть
     try:
@@ -349,7 +349,7 @@ def delete_competition(comp_id: int, db: Session = Depends(get_db), _: User = De
 # ── Результаты ────────────────────────────────────────────────────────────────
 
 @router.put("/{comp_id}/results")
-def bulk_upsert_results(comp_id: int, data: BulkResults, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def bulk_upsert_results(comp_id: int, data: BulkResults, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     comp = _get_or_404(comp_id, db)
     existing = {r.athlete_id: r for r in db.query(CompetitionResult).filter(CompetitionResult.competition_id == comp_id).all()}
     ids = [r.athlete_id for r in data.results]
@@ -400,7 +400,7 @@ def bulk_upsert_results(comp_id: int, data: BulkResults, db: Session = Depends(g
 
 
 @router.delete("/{comp_id}/results/{athlete_id}", status_code=204)
-def delete_result(comp_id: int, athlete_id: int, db: Session = Depends(get_db), user: User = Depends(require_manager)):
+def delete_result(comp_id: int, athlete_id: int, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     r = db.query(CompetitionResult).filter(
         CompetitionResult.competition_id == comp_id,
         CompetitionResult.athlete_id == athlete_id
@@ -416,7 +416,7 @@ def delete_result(comp_id: int, athlete_id: int, db: Session = Depends(get_db), 
 @router.patch("/{comp_id}/results/{athlete_id}/paid")
 def update_result_paid(
     comp_id: int, athlete_id: int, paid: bool,
-    db: Session = Depends(get_db), _: User = Depends(require_manager)
+    db: Session = Depends(get_db), _: User = Depends(require_admin)
 ):
     r = db.query(CompetitionResult).filter(
         CompetitionResult.competition_id == comp_id,
@@ -433,7 +433,7 @@ def update_result_paid(
 @router.patch("/{comp_id}/results/{athlete_id}")
 def patch_result(
     comp_id: int, athlete_id: int, data: ResultPatch,
-    db: Session = Depends(get_db), user: User = Depends(require_manager)
+    db: Session = Depends(get_db), user: User = Depends(require_admin)
 ):
     sent = data.model_fields_set
     if not sent:
@@ -485,7 +485,7 @@ def patch_result(
 # ── Уведомления о соревновании ────────────────────────────────────────────────
 
 @router.post("/{comp_id}/notify")
-def notify_competition(comp_id: int, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def notify_competition(comp_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     """
     Отправить уведомление ВСЕМ зарегистрированным пользователям клуба
     о предстоящем соревновании.

@@ -130,7 +130,7 @@ def get_all_users(db: Session = Depends(get_db), _: User = Depends(require_admin
 
 # ─── Приглашённые пользователи (viewers) — admin/manager ─────────────────────
 @router.get("/viewers")
-def get_viewers(db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def get_viewers(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     from app.models.invite import AthleteViewer
     rows = db.query(AthleteViewer).all()
     result = []
@@ -162,7 +162,7 @@ def get_viewers(db: Session = Depends(get_db), _: User = Depends(require_manager
 @router.delete("/viewers/{viewer_id}/athlete/{athlete_id}")
 def revoke_viewer_access(
     viewer_id: int, athlete_id: int,
-    db: Session = Depends(get_db), _: User = Depends(require_manager)
+    db: Session = Depends(get_db), _: User = Depends(require_admin)
 ):
     from app.models.invite import AthleteViewer
     rows = db.query(AthleteViewer).filter(
@@ -192,7 +192,7 @@ def get_athletes(db: Session = Depends(get_db), _: User = Depends(require_manage
 @router.patch("/athletes/{athlete_id}")
 def update_athlete(
     athlete_id: int, data: AthleteUpdate,
-    db: Session = Depends(get_db), _: User = Depends(require_manager)
+    db: Session = Depends(get_db), _: User = Depends(require_admin)
 ):
     a = db.query(Athlete).filter(Athlete.id == athlete_id).first()
     if not a:
@@ -212,7 +212,7 @@ class ArchiveRequest(BaseModel):
 @router.patch("/athletes/{athlete_id}/archive")
 def archive_athlete(
     athlete_id: int,
-    db: Session = Depends(get_db), _: User = Depends(require_manager)
+    db: Session = Depends(get_db), _: User = Depends(require_admin)
 ):
     a = db.query(Athlete).filter(Athlete.id == athlete_id).first()
     if not a:
@@ -236,7 +236,7 @@ def archive_athlete(
 @router.patch("/athletes/{athlete_id}/restore")
 def restore_athlete(
     athlete_id: int,
-    db: Session = Depends(get_db), _: User = Depends(require_manager)
+    db: Session = Depends(get_db), _: User = Depends(require_admin)
 ):
     a = db.query(Athlete).filter(Athlete.id == athlete_id).first()
     if not a:
@@ -256,7 +256,7 @@ def archive_parent(
     user_id: int,
     data: ArchiveRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_manager),
+    current_user: User = Depends(require_admin),
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -295,7 +295,7 @@ def restore_parent(
     user_id: int,
     restore_children: bool = True,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_manager),
+    current_user: User = Depends(require_admin),
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -314,7 +314,7 @@ def restore_parent(
 @router.delete("/athletes/{athlete_id}")
 def delete_athlete(
     athlete_id: int,
-    db: Session = Depends(get_db), _: User = Depends(require_manager)
+    db: Session = Depends(get_db), _: User = Depends(require_admin)
 ):
     a = db.query(Athlete).filter(Athlete.id == athlete_id).first()
     if not a:
@@ -577,7 +577,7 @@ def get_users_activity(db: Session = Depends(get_db), _: User = Depends(require_
 def reset_password(
     user_id: int, data: ResetPasswordRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_manager),
+    current_user: User = Depends(require_admin),
 ):
     """Сбросить пароль пользователю.
 

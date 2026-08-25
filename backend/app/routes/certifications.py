@@ -7,7 +7,7 @@ from datetime import date
 
 from app.core.database import get_db
 from app.core.markup import esc
-from app.core.security import get_current_user, require_manager
+from app.core.security import get_current_user, require_admin
 from app.models.user import User, Athlete
 from app.models.certification import (
     Certification, CertificationResult, Notification,
@@ -58,7 +58,7 @@ class BulkResults(BaseModel):
 def create_certification(
     data: CertificationCreate,
     db:   Session = Depends(get_db),
-    user: User    = Depends(require_manager)
+    user: User    = Depends(require_admin)
 ):
     cert = Certification(
         name=data.name, date=data.date, location=data.location,
@@ -114,7 +114,7 @@ def update_certification(
     cert_id: int,
     data:    CertificationUpdate,
     db:      Session = Depends(get_db),
-    _:       User    = Depends(require_manager)
+    _:       User    = Depends(require_admin)
 ):
     cert = _get_or_404(cert_id, db)
     for k, v in data.dict(exclude_none=True).items():
@@ -124,7 +124,7 @@ def update_certification(
 
 
 @router.delete("/{cert_id}", status_code=204)
-def delete_certification(cert_id: int, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def delete_certification(cert_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     cert = _get_or_404(cert_id, db)
     # Удаляем автодрафты-черновики, привязанные к этой аттестации.
     db.query(News).filter(
@@ -142,7 +142,7 @@ def upsert_results(
     cert_id: int,
     data:    BulkResults,
     db:      Session = Depends(get_db),
-    _:       User    = Depends(require_manager)
+    _:       User    = Depends(require_admin)
 ):
     """Сохранить список кандидатов с предполагаемыми гыпами."""
     _get_or_404(cert_id, db)
@@ -186,7 +186,7 @@ def upsert_results(
 def finalize_certification(
     cert_id: int,
     db:      Session = Depends(get_db),
-    _:       User    = Depends(require_manager)
+    _:       User    = Depends(require_admin)
 ):
     """
     Завершить аттестацию:
@@ -223,7 +223,7 @@ def finalize_certification(
 @router.patch("/{cert_id}/results/{athlete_id}/paid")
 def update_paid(
     cert_id: int, athlete_id: int, paid: bool,
-    db: Session = Depends(get_db), _: User = Depends(require_manager)
+    db: Session = Depends(get_db), _: User = Depends(require_admin)
 ):
     r = db.query(CertificationResult).filter(
         CertificationResult.certification_id == cert_id,
@@ -239,7 +239,7 @@ def update_paid(
 def send_notifications(
     cert_id: int,
     db:      Session = Depends(get_db),
-    _:       User    = Depends(require_manager)
+    _:       User    = Depends(require_admin)
 ):
     """Отправить уведомления родителям/спортсменам об аттестации."""
     cert = _get_or_404(cert_id, db)

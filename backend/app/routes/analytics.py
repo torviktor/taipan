@@ -7,7 +7,7 @@ from sqlalchemy import func, case
 from typing import Optional
 from datetime import date
 from app.core.database import get_db
-from app.core.security import get_current_user, require_manager
+from app.core.security import get_current_user, require_admin
 from app.models.user import User, Athlete, Application
 from app.models.analytics import Analytics
 from app.models.certification import Notification, NotificationType
@@ -36,7 +36,7 @@ async def create_analytics(
     application_id: Optional[int] = Form(None),
     file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_manager),
+    current_user: User = Depends(require_admin),
 ):
     athlete = db.query(Athlete).filter(Athlete.id == athlete_id).first()
     if not athlete:
@@ -101,7 +101,7 @@ def get_all_analytics(athlete_id: Optional[int] = None, db: Session = Depends(ge
 # ─── Удалить аналитику ──────────────────────────────────────────────────────
 
 @router.delete("/analytics/{analytics_id}", status_code=204)
-def delete_analytics(analytics_id: int, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+def delete_analytics(analytics_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     record = db.query(Analytics).filter(Analytics.id == analytics_id).first()
     if not record: raise HTTPException(404, "Аналитика не найдена")
     if record.file_path:

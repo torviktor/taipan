@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.core.security import get_current_user, require_manager
+from app.core.security import get_current_user, require_admin
 from app.models.user import User
 
 router = APIRouter(prefix="/news-admin", tags=["news-admin"])
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/news-admin", tags=["news-admin"])
 
 
 @router.post("/fetch-dss")
-def fetch_dss(user: User = Depends(require_manager)):
+def fetch_dss(user: User = Depends(require_admin)):
     try:
         from app.tasks.news_fetcher import run_dss_fetch
         count = run_dss_fetch()
@@ -21,7 +21,7 @@ def fetch_dss(user: User = Depends(require_manager)):
 
 
 @router.post("/fetch-vk")
-def fetch_vk(user: User = Depends(require_manager)):
+def fetch_vk(user: User = Depends(require_admin)):
     try:
         from app.tasks.vk_fetcher import run_vk_fetch
         count = run_vk_fetch()
