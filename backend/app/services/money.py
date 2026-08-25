@@ -18,9 +18,23 @@
 вовсе не платит, а 45 периодов закрыты. Поймано проверкой на живых данных до
 того, как это увидел менеджер.
 
-Считаем как кабинет: должен тот, у кого period не бюджетный, не заморожен и
-не отмечен оплаченным. Сумма — из FeeConfig, поле debt на строке периода
-переопределяет её, если задано.
+КАК СКЛАДЫВАЕТСЯ ДОЛГ — проверено на живых данных, а не выведено из имён
+полей. При создании нового месяца предыдущий замораживается, а неоплаченные
+замороженные пересчитываются в поле debt нового периода:
+
+    debt = (число неоплаченных замороженных) * fee_amount
+
+То есть debt — это ПЕРЕНОС С ПРОШЛЫХ месяцев, собственный взнос текущего в
+него НЕ входит. Богатырёв: май/июнь/июль не оплачены, август debt=4500, и
+сверх того он должен 1500 за сам август — итого 6000.
+
+Первая версия брала debt ВМЕСТО взноса и недосчитывала по 1500 ₽ на каждом
+должнике. Отсюда правило: должен = перенос + собственный взнос месяца.
+
+ПРО ЗАМОРОЗКУ. is_frozen значит «месяц закрыт», а не «платить не надо».
+В списке должников замороженные месяцы отдельными строками не идут — они уже
+свёрнуты в перенос. А вот в сборе за месяц их исключать нельзя, иначе
+история любого прошлого месяца превращается в «0 ₽, 100 %».
 """
 
 import logging
@@ -64,18 +78,9 @@ def _period_from(arg: str):
     return today.year, today.month
 
 
-def _owes(p) -> bool:
-    """Должен ли по этой строке периода.
-
-    Бюджетники не платят вовсе, замороженные исключены намеренно (так тренер
-    помечает пропуски по болезни и отъезду), оплаченные закрыты.
-    """
-    return not p.is_budget and not p.is_frozen and not p.paid
-
-
-def _amount(p, default: int) -> int:
-    """Сколько должен: debt на строке переопределяет общую сумму взноса."""
-    return int(p.debt) if p.debt else default
+def _owes_current(p) -> bool:
+    """Должен ли за САМ этот месяц (без переноса)."""
+    return not p.is_budget and not p.paid
 
 
 def debtors(db) -> str:
@@ -101,16 +106,31 @@ def debtors(db) -> str:
 
     # Копим по РЕБЁНКУ: у родителя может быть двое, и слить их в одну строку
     # значит потерять, за кого именно долг.
+    #
+    # Считаем так: перенос берём с АКТИВНОГО (незамороженного) периода — это
+    # текущий месяц, и в его debt уже свёрнуты все прошлые неоплаченные. Сверх
+    # переноса добавляем собственный взнос текущего месяца, если он не закрыт.
+    # Замороженные периоды нужны только чтобы назвать месяцы: суммы из них
+    # брать нельзя, они бы удвоили перенос.
     by_athlete = {}
     for p, ath, parent in rows:
-        if not _owes(p):
-            continue
         rec = by_athlete.setdefault(ath.id, {
             "athlete": ath.full_name, "parent": parent.full_name,
-            "phone": parent.phone, "total": 0, "periods": [],
+            "phone": parent.phone, "carry": 0, "own": 0, "periods": [],
         })
-        rec["total"] += _amount(p, fee)
-        rec["periods"].append((p.period_year, p.period_month))
+        if p.is_frozen:
+            if not p.is_budget and not p.paid:
+                rec["periods"].append((p.period_year, p.period_month))
+            continue
+        # Активный период — их не больше одного на спортсмена.
+        rec["carry"] = int(p.debt or 0)
+        if _owes_current(p):
+            rec["own"] = fee
+            rec["periods"].append((p.period_year, p.period_month))
+
+    for rec in by_athlete.values():
+        rec["total"] = rec["carry"] + rec["own"]
+    by_athlete = {k: v for k, v in by_athlete.items() if v["total"] > 0}
 
     if not by_athlete:
         return ("💰 <b>Должники</b>\n\nДолгов нет — все взносы закрыты.\n\n"
@@ -172,18 +192,24 @@ def collection(db, period_arg: str = "") -> str:
                 "Другой месяц: <code>/collection 07.2026</code>\n\n"
                 f"🔗 {CABINET_FEES}")
 
-    # Бюджетные и замороженные из расчёта исключены: включи их в «начислено» —
-    # процент сбора занизится на ровном месте.
-    payable = [p for p in rows if not p.is_budget and not p.is_frozen]
-    due  = sum(_amount(p, fee) for p in payable)
-    paid = sum(_amount(p, fee) for p in payable if p.paid)
+    # Из расчёта исключены только бюджетники: они не платят вовсе, и включи их
+    # в «начислено» — процент сбора занизится на ровном месте.
+    #
+    # Замороженные НЕ исключаем. Заморозка значит «месяц закрыт», а не «платить
+    # не надо»: у всех прошлых месяцев она стоит поголовно, и отбросив их, мы
+    # показали бы историю как «0 ₽, 100 %».
+    #
+    # Считаем по собственному взносу месяца, без переноса: «сбор за август» —
+    # это про август, а не про накопленный долг. Накопленный виден в должниках.
+    payable = [p for p in rows if not p.is_budget]
+    due  = len(payable) * fee
+    paid = sum(fee for p in payable if p.paid)
     left = max(0, due - paid)
     pct  = round(paid * 100 / due) if due else 100
 
     closed = sum(1 for p in payable if p.paid)
     open_  = len(payable) - closed
     budget = sum(1 for p in rows if p.is_budget)
-    frozen = sum(1 for p in rows if p.is_frozen and not p.is_budget)
 
     # Полоска: долю видно быстрее числа, а тренер смотрит с телефона.
     filled = round(pct / 10)
@@ -200,13 +226,8 @@ def collection(db, period_arg: str = "") -> str:
         "",
         f"Закрыли: {closed}   ·   Должны: {open_}",
     ]
-    extra = []
     if budget:
-        extra.append(f"бюджетных {budget}")
-    if frozen:
-        extra.append(f"заморожено {frozen}")
-    if extra:
-        out.append("В расчёт не входят: " + ", ".join(extra))
+        out.append(f"Бюджетных мест: {budget} (в расчёт не входят)")
 
     out += ["", "Другой месяц: <code>/collection 07.2026</code>",
             "", f"🔗 Подробно:\n{CABINET_FEES}"]
