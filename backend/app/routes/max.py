@@ -612,6 +612,21 @@ def run_action(action: str, db, sub, raw_text: str = "") -> str:
         from app.services import parent_info
         return getattr(parent_info, action)(db, sub.user_id)
 
+    # Подтверждение оплаты: payload кнопки несёт номер периода.
+    #
+    # Право проверяется ВТОРОЙ раз, хотя кнопку мог получить только тот, кому
+    # можно: payload подделывается тривиально, а на другом конце — запись в
+    # денежные данные.
+    from app.services.money import PAY_CONFIRMED
+    if action.startswith(PAY_CONFIRMED):
+        from app.services import reach
+        if not reach.can(db, sub.user_id, "paid"):
+            logger.info("MAX: подтверждение оплаты от роли %r отклонено",
+                        reach.role_of(db, sub.user_id) or "нет привязки")
+            return UNKNOWN
+        from app.services.money import pay_commit
+        return pay_commit(db, action, sub.user_id)
+
     if action in STAFF_ACTIONS:
         # Родителю отвечаем ровно тем же, чем на любую белиберду: не «у вас нет
         # прав», а «не понимаю команду». Иначе ответ подтверждал бы, что такая
