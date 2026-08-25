@@ -102,7 +102,23 @@ STAFF_ACTIONS = {
     "unlinked":  "Кто не привязан",
     "invite":    "Персональная ссылка для одного",
     "insurance_club": "Страховки по клубу",
+    # Денежное — менеджеру и админу. Право на каждое проверяется в run_action
+    # по карте ACTION_ROLES, здесь только регистрация имени.
+    "debtors":    "Должники",
+    "collection": "Сбор за месяц",
+    "paid":       "Отметить оплату",
 }
+
+# ЭТОТ СЛОВАРЬ — НЕ СПРАВОЧНИК, А ВКЛЮЧАТЕЛЬ. Имя, которого здесь нет, не
+# исполняется вообще: run_action дойдёт до последнего return и ответит
+# «не понимаю эту команду», а COMMAND_ALIASES не примет текстовую команду.
+#
+# 25.08.2026 на этом сгорели debtors/collection/paid: они были в клавиатуре и в
+# карте прав, но ни в ACTIONS, ни здесь. Кнопки рисовались, право проверялось и
+# давало «можно», payload доезжал до run_action — и там проваливался мимо всех
+# веток. Снаружи это выглядело как «payload не разрешается», хотя разрешался.
+# Добавляя действие, надо тронуть ТРИ места: карту прав, этот словарь и ветку
+# исполнения. Клавиатура — четвёртое и необязательное.
 
 # Внутренние имена: их нельзя набрать текстом, они возникают только из
 # вложения с контактом. Поэтому и в ACTIONS, и в COMMAND_ALIASES их нет.
@@ -650,6 +666,30 @@ def run_action(action: str, db, sub, raw_text: str = "") -> str:
             from app.services.insurance import format_club_summary
             return format_club_summary(db)
 
+        if action == "debtors":
+            from app.services.money import debtors
+            return debtors(db)
+
+        if action == "collection":
+            # «/collection июль» — месяц хвостом команды. Кнопка присылает
+            # голое имя действия, и это значит «текущий месяц».
+            from app.services.money import collection
+            parts = raw_text.split(maxsplit=1)
+            return collection(db, parts[1] if len(parts) > 1 else "")
+
+        if action == "paid":
+            # Шаг 1 из двух: назвать человека и показать кнопку подтверждения.
+            # Возврат парой (текст, кнопки) — так же, как других мест с
+            # собственной клавиатурой; сама отметка ставится веткой PAY_CONFIRMED
+            # выше, по второму нажатию.
+            from app.services.max_bot import callback_button
+            from app.services.money import pay_prompt
+            parts = raw_text.split(maxsplit=1)
+            text, payload = pay_prompt(db, parts[1] if len(parts) > 1 else "")
+            if not payload:
+                return text
+            return text, [[callback_button("✅ Да, отметить оплату", payload)]]
+
     return UNKNOWN
 
 
@@ -761,9 +801,15 @@ def process_max_update(update: dict) -> None:
         # ошибки. Из-за этого по логу нельзя было отличить «нажатие не дошло»
         # от «дошло и отработало» — при разборе первого же нажатия это сразу
         # оказалось неудобно. Строка короткая, на объём лога не влияет.
-        logger.info("MAX: %s от user_id=%s -> действие %r",
+        # Пишем ИСХОД, а не только намерение. Прежняя строка печатала имя
+        # запрошенного действия и читалась как успех, даже когда бот отвечал
+        # «не понимаю»: по логу от 25.08 нажатие на «Должники» выглядело
+        # обработанным. Лог, одинаковый при успехе и отказе, бесполезен ровно
+        # тогда, когда по нему разбираются.
+        logger.info("MAX: %s от user_id=%s -> действие %r: %s",
                     "нажатие" if callback_id else "сообщение",
-                    external_id, action or "(неизвестное)")
+                    external_id, action or "(неизвестное)",
+                    "не распознано" if reply == UNKNOWN else "выполнено")
 
         # Кнопки показываем под каждым ответом: разговор с ботом идёт с
         # телефона, и набирать «/month» руками там неудобно.

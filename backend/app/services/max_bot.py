@@ -145,6 +145,13 @@ BUTTON_TEXT_LIMIT    = 128
 CALLBACK_PAYLOAD_LIMIT = 1024
 
 
+# Короткое всплывающее на нажатие. Пустым быть не может (см. answer_callback),
+# поэтому нужен текст, честный в момент показа: работа ещё не сделана, ответ
+# придёт отдельным сообщением.
+ACK_TEXT = "Секунду…"
+NOTIFICATION_LIMIT = 200
+
+
 def callback_button(text: str, payload: str) -> dict:
     """Кнопка, присылающая апдейт message_callback."""
     text = (text or "").strip()[:BUTTON_TEXT_LIMIT]
@@ -189,15 +196,32 @@ def keyboard(rows: list) -> dict:
     return {"type": "inline_keyboard", "payload": {"buttons": rows}}
 
 
-def answer_callback(callback_id: str, notification: Optional[str] = None) -> bool:
+def answer_callback(callback_id: str, notification: str = ACK_TEXT) -> bool:
     """Подтвердить нажатие кнопки.
 
-    Без этого у нажавшего остаётся крутящийся индикатор: платформа ждёт
-    подтверждения. Пустое тело допустимо и ничего не показывает — всплывающее
-    уведомление на каждое нажатие только мешало бы, ответ и так приходит
-    отдельным сообщением.
+    Без подтверждения у нажавшего висит индикатор ожидания: платформа ждёт
+    ответа на колбэк.
+
+    ТЕЛО ОБЯЗАТЕЛЬНО. Здесь до 25.08.2026 стояло обратное утверждение —
+    «пустое тело допустимо и ничего не показывает». Это была моя догадка,
+    записанная как факт; MAX на каждое нажатие отвечал
+
+        400 {"code":"proto.payload",
+             "message":"Invalid request. `message` or `notification` required"}
+
+    то есть подтверждений не было НИ РАЗУ с 22.08, и индикатор у нажавшего не
+    гас. В лог при этом писалось предупреждение — на него никто не смотрел,
+    потому что ответ бота приходил отдельным сообщением и всё выглядело
+    работающим.
+
+    Проверить это подделанным callback_id нельзя: платформа сверяет
+    идентификатор раньше тела и на любой вариант отвечает одинаково. Источник
+    знания здесь — ответ на живое нажатие, а не проба.
+
+    Выбран `notification` (короткое всплывающее), а не `message`: второй
+    ЗАМЕНЯЕТ сообщение с кнопками, а ответ у нас приходит отдельным.
     """
-    body = {"notification": notification} if notification else {}
+    body = {"notification": (notification or ACK_TEXT)[:NOTIFICATION_LIMIT]}
     try:
         r = httpx.post(f"{api_base()}/answers", params={"callback_id": callback_id},
                        json=body, headers=api_headers(),
