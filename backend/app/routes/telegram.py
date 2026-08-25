@@ -382,9 +382,24 @@ async def process_telegram_update(update: dict):
                 from app.services.money import collection
                 parts = text.split(maxsplit=1)
                 reply = collection(db, parts[1] if len(parts) > 1 else "")
-            else:
+            elif cmd == "/invite":
                 parts = text.split(maxsplit=1)
                 reply = reach.format_invite(db, parts[1] if len(parts) > 1 else "")
+
+            else:
+                # Сюда попасть можно единственным способом: команду внесли в
+                # STAFF_COMMANDS, а ветку исполнения не написали. Раньше на
+                # этом месте стоял «else: format_invite», и такая команда молча
+                # выполняла ЧУЖОЕ действие — выдавала персональную ссылку
+                # вместо запрошенного. Это хуже, чем «не понимаю»: ошибку не
+                # видно ни человеку, ни по логу.
+                #
+                # Тот же класс дефекта 25.08.2026 сработал в MAX (кнопки
+                # «Должники» и «Сбор»), только там он проявлялся честнее.
+                # Проверка — scripts/check_bot_actions.py.
+                logger.error("Telegram: %s объявлена в STAFF_COMMANDS, но ветки "
+                             "исполнения нет — команда проигнорирована", cmd)
+                return
 
             # Список непривязанных может перерасти лимит Telegram (4096),
             # поэтому режем тем же split_text — по границам строк.
