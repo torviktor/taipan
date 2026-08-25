@@ -212,7 +212,9 @@ def collection(db, period_arg: str = "") -> str:
     budget = sum(1 for p in rows if p.is_budget)
 
     # Полоска: долю видно быстрее числа, а тренер смотрит с телефона.
-    filled = round(pct / 10)
+    # Округление ВНИЗ, а не round: иначе 95 % рисуется полной полоской, и
+    # «почти собрали» выглядит как «собрали».
+    filled = 10 if pct >= 100 else int(pct // 10)
     bar = "█" * filled + "░" * (10 - filled)
 
     out = [
