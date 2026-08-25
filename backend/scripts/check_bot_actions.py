@@ -34,9 +34,16 @@ return UNKNOWN. Три места из четырёх были заполнен�
 копируется (Dockerfile: WORKDIR /app, COPY . . из backend/), и написанная
 здесь команда запуска молча не работала бы.
 """
+import os
 import re
 import sys
 import asyncio
+
+# python scripts/check_bot_actions.py кладёт в sys.path каталог САМОГО скрипта,
+# а не рабочий, поэтому пакет app иначе не находится. Проверено запуском:
+# первая версия падала на ModuleNotFoundError ровно той командой, которая
+# написана выше как способ её запустить.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.core.database import SessionLocal
 from app.models.event import MessengerSubscriber, TelegramSubscriber
