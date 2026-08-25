@@ -171,62 +171,66 @@ def achievements(db, user_id) -> str:
 # ─── Взносы ──────────────────────────────────────────────────────────────────
 
 def fees(db, user_id) -> str:
-    """Оплата за текущий месяц плюс долги за прошлые, если есть."""
+    """Оплата за текущий месяц плюс перенос с прошлых.
+
+    ИСТОЧНИК — athlete_fee_periods, тот же, что у тренера и в кабинете.
+
+    Первая версия читала monthly_fees и показывала родителю выдуманный долг:
+    в той таблице ноль оплат при 165 начислениях, поэтому у любого выходило
+    «не оплачено, срок прошёл». Проверено на живом родителе — бот утверждал
+    1500 ₽ долга плюс 3000 ₽ за прошлые месяцы там, где по рабочей таблице
+    задолженности нет вовсе.
+
+    Родителю особенно важно, чтобы цифра совпадала с той, что назовёт тренер:
+    расхождение здесь — это спор на ровном месте.
+    """
     from app.core.markup import esc
-    from app.models.fees import MonthlyFee, FeeStatus
+    from app.models.fees import AthleteFeePeriod
+    from app.services.money import _fee_amount
 
     mine = _athletes(db, user_id)
     if not mine:
         return _no_athletes()
 
     today = date.today()
-    period = date(today.year, today.month, 1)
+    fee = _fee_amount(db)
     ids = [a.id for a in mine]
 
-    current = {f.athlete_id: f for f in
-               db.query(MonthlyFee)
-               .filter(MonthlyFee.athlete_id.in_(ids), MonthlyFee.period == period)
-               .all()}
-
-    # Долги за прошлые месяцы: показываем одной строкой, разбор — в кабинете.
-    past = (db.query(MonthlyFee)
-            .filter(MonthlyFee.athlete_id.in_(ids), MonthlyFee.period < period)
+    rows = (db.query(AthleteFeePeriod)
+            .filter(AthleteFeePeriod.athlete_id.in_(ids))
             .all())
-    debt = sum(max(0.0, float(f.amount_due or 0) - float(f.amount_paid or 0))
-               for f in past)
+
+    # Активный (незамороженный) период — текущий месяц. В его debt уже свёрнуты
+    # все прошлые неоплаченные, поэтому отдельно их не суммируем.
+    current = {p.athlete_id: p for p in rows if not p.is_frozen}
 
     blocks = []
+    carry_total = 0
     for a in mine:
-        f = current.get(a.id)
-        if f is None:
+        p = current.get(a.id)
+        if p is None:
             blocks.append(f"🥋 <b>{esc(a.full_name)}</b>\n"
                           "За этот месяц начислений пока нет.")
             continue
 
-        due  = float(f.amount_due or 0)
-        paid = float(f.amount_paid or 0)
-        st   = f.computed_status
+        carry = int(p.debt or 0)
+        carry_total += carry
 
-        if st == FeeStatus.subsidized:
+        if p.is_budget:
             line = "Бюджетное место — платить не нужно."
-        elif st == FeeStatus.paid:
-            line = f"✅ Оплачено — {due:.0f} ₽"
-        elif paid > 0:
-            line = (f"⚠️ Оплачено частично: {paid:.0f} из {due:.0f} ₽\n"
-                    f"Осталось: <b>{due - paid:.0f} ₽</b>")
-        elif st == FeeStatus.overdue:
-            line = f"🔴 Не оплачено, срок прошёл — <b>{due:.0f} ₽</b>"
-        elif st == FeeStatus.due:
-            line = f"🟠 Не оплачено, срок подходит — <b>{due:.0f} ₽</b>"
+        elif p.is_frozen:
+            line = "Месяц закрыт."
+        elif p.paid:
+            line = f"✅ Оплачено — {fee} ₽"
         else:
-            line = f"🕓 К оплате: <b>{due:.0f} ₽</b>"
+            line = f"🕓 К оплате: <b>{fee} ₽</b>"
 
         blocks.append(f"🥋 <b>{esc(a.full_name)}</b>\n{line}")
 
     head = f"💰 <b>Взносы за {MONTHS[today.month - 1]}</b>\n\n"
     tail = ""
-    if debt > 0.5:
-        tail = f"\n\n❗ Задолженность за прошлые месяцы: <b>{debt:.0f} ₽</b>"
+    if carry_total:
+        tail = f"\n\n❗ Долг за прошлые месяцы: <b>{carry_total} ₽</b>"
 
     return head + "\n\n".join(blocks) + tail + _footer("fees", "История платежей:")
 
