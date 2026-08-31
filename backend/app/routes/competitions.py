@@ -9,6 +9,7 @@ from datetime import date, datetime
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_admin
+from app.core.seasons import get_current_season
 from app.models.user import User, Athlete
 from app.models.competition import (
     Competition, CompetitionResult,
@@ -173,8 +174,9 @@ def sig_table():
 
 @router.get("/seasons")
 def get_seasons(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    rows = db.query(Competition.season).distinct().order_by(Competition.season.desc()).all()
-    return [r[0] for r in rows]
+    rows  = db.query(Competition.season).distinct().all()
+    years = sorted({r[0] for r in rows} | {get_current_season()}, reverse=True)
+    return years
 
 
 def _get_sport_season(d: date) -> int:
