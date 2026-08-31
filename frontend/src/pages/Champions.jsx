@@ -146,12 +146,28 @@ export default function Champions() {
       fetchWithTimeout(`${API}/season-best`).then(r => r.ok ? r.json() : null),
       fetchWithTimeout(`${API}/season-best/seasons`).then(r => r.ok ? r.json() : []),
     ])
-    .then(([hof, sb, seas]) => {
+    .then(async ([hof, sb, seas]) => {
       setItems(hof)
-      setCurrentSB(sb)
-      // Из истории исключаем текущий сезон — он показан отдельно сверху.
-      const currentSeason = sb?.season
-      setSeasons((seas || []).filter(s => s.season !== currentSeason))
+
+      // Витрина показывает ПОСЛЕДНИЙ сезон с подведёнными итогами (то есть
+      // с назначенными слотами в season-best), а не текущий календарный:
+      // итоги подводятся в конце мая и висят до итогов следующего сезона.
+      let shownSB = sb
+      const seasonsList = seas || []
+      const maxEntry = seasonsList.reduce(
+        (m, s) => (!m || s.season > m.season) ? s : m, null
+      )
+      if (maxEntry && maxEntry.season !== sb?.season) {
+        try {
+          const r = await fetchWithTimeout(`${API}/season-best?season=${maxEntry.season}`)
+          if (r.ok) shownSB = await r.json()
+        } catch {}
+      }
+
+      setCurrentSB(shownSB)
+      // Из истории исключаем сезон, реально показанный сверху витриной.
+      const shownSeason = shownSB?.season
+      setSeasons(seasonsList.filter(s => s.season !== shownSeason))
       setLoading(false)
     })
     .catch(() => setLoading(false))
@@ -254,18 +270,13 @@ export default function Champions() {
             </div>
           )}
 
-          {!loading && (
+          {!loading && seasons.length > 0 && (
             <div className="season-best-history">
               <button className="season-best-history-toggle"
                 onClick={() => setHistoryOpen(v => !v)}>
                 {historyOpen ? '▾' : '▸'}  История лучших по сезонам
               </button>
-              {historyOpen && seasons.length === 0 && (
-                <div className="season-best-history-empty">
-                  История пока пуста. Появится после завершения текущего сезона.
-                </div>
-              )}
-              {historyOpen && seasons.length > 0 && (
+              {historyOpen && (
                 <div className="season-best-history-list">
                   {seasons.map(s => {
                     const isOpen = !!openSeasons[s.season]
