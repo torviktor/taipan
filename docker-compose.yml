@@ -78,6 +78,8 @@ services:
       TELEGRAM_API_SECRET: ${TELEGRAM_API_SECRET:-}
       MAX_BOT_TOKEN:      ${MAX_BOT_TOKEN:-}
       LOG_SERVICE:        celery_worker
+      YANDEX_API_KEY:     ${YANDEX_API_KEY}
+      YANDEX_FOLDER_ID:   ${YANDEX_FOLDER_ID}
     mem_limit: 512m
     restart: always
 
