@@ -60,6 +60,7 @@ class NotificationType(str, enum.Enum):
     competition   = "competition"
     camp          = "camp"
     general       = "general"
+    news          = "news"
 
 
 class Notification(Base):

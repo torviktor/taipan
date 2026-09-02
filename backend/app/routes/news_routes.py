@@ -1,7 +1,7 @@
 # backend/app/routes/news_routes.py
 
-import os, uuid
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+import os, uuid, logging
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
@@ -12,6 +12,22 @@ from app.models.user import User
 from app.models.news import News
 
 router = APIRouter(prefix="/news", tags=["news"])
+log = logging.getLogger(__name__)
+
+NEWS_PREVIEW_LIMIT = 400
+
+
+def _news_preview(body: str, limit: int = NEWS_PREVIEW_LIMIT) -> str:
+    """Превью тела новости для рассылки: обрезка по границе слова + ссылка."""
+    text = body.strip()
+    if len(text) > limit:
+        cut = text[:limit]
+        last_space = cut.rfind(" ")
+        if last_space > 0:
+            cut = cut[:last_space]
+        text = cut.rstrip() + "…"
+    return f"{text}\n\nhttps://taipan-tkd.ru/news"
+
 
 UPLOAD_DIR = "/app/static/news"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -86,6 +102,7 @@ def list_drafts(
 @router.post("/{news_id}/publish", status_code=204)
 def publish_draft(
     news_id: int,
+    notify:  bool = Query(False),
     db:      Session = Depends(get_db),
     _:       User    = Depends(require_admin),
 ):
@@ -97,6 +114,35 @@ def publish_draft(
     n.published_at = func.now()
     n.needs_review = False
     db.commit()
+
+    if notify:
+        # Рассылка — best-effort и не должна откатывать уже случившуюся
+        # публикацию: та же логика, что у enqueue_telegram_delivery
+        # (ошибку постановки в очередь намеренно проглатываем).
+        try:
+            from app.models.certification import Notification, NotificationType
+            from app.services.notifications import reminder_audience, enqueue_telegram_delivery
+
+            audience = reminder_audience(db, None)
+            preview  = _news_preview(n.body)
+            for user in audience:
+                db.add(Notification(
+                    user_id   = user.id,
+                    type      = NotificationType.news,
+                    title     = n.title,
+                    body      = preview,
+                    link_type = "news",
+                    link_id   = n.id,
+                    tg_status = "pending",
+                ))
+            db.commit()
+            enqueue_telegram_delivery()
+        except Exception:
+            db.rollback()
+            log.exception(
+                "publish_draft: рассылка новости %s не поставлена, новость остаётся опубликованной",
+                news_id,
+            )
 
 
 @router.get("/{news_id}")

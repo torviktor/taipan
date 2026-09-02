@@ -33,6 +33,7 @@ export default function NewsTab({ token }) {
   const [confirm,      setConfirm]      = useState(null)
   const [tab,          setTab]          = useState('drafts')  // 'drafts' | 'published'
   const [form, setForm] = useState({ title: '', body: '' })
+  const [notifyMap,    setNotifyMap]    = useState({})  // { newsId: bool } — своя галочка на черновик
 
   useEffect(() => { loadNews() }, [tab])
 
@@ -75,10 +76,11 @@ export default function NewsTab({ token }) {
     } catch {}
   }
 
-  const publishDraft = async (id) => {
+  const publishDraft = async (id, notify) => {
     setSaving(true); setMsg('')
     try {
-      const r = await apiFetch(`${API}/news/${id}/publish`, { method: 'POST', headers: h })
+      const url = `${API}/news/${id}/publish${notify ? '?notify=true' : ''}`
+      const r = await apiFetch(url, { method: 'POST', headers: h })
       if (r.ok) {
         setMsg('Новость опубликована')
         await loadNews()
@@ -221,10 +223,18 @@ export default function NewsTab({ token }) {
                 {n.photo_url && <img src={n.photo_url} alt="" style={{ width:100, height:70, objectFit:'cover', borderRadius:2 }} />}
                 <div style={{ display:'flex', gap:6 }}>
                   {tab === 'drafts' && (
-                    <button className="btn-primary" style={{ fontSize:'11px', padding:'4px 10px' }}
-                      onClick={() => publishDraft(n.id)} disabled={saving}>
-                      Опубликовать
-                    </button>
+                    <>
+                      <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:'11px', color:'var(--gray)', cursor:'pointer' }}>
+                        <input type="checkbox"
+                          checked={!!notifyMap[n.id]}
+                          onChange={() => setNotifyMap(prev => ({ ...prev, [n.id]: !prev[n.id] }))} />
+                        Оповестить родителей
+                      </label>
+                      <button className="btn-primary" style={{ fontSize:'11px', padding:'4px 10px' }}
+                        onClick={() => publishDraft(n.id, !!notifyMap[n.id])} disabled={saving}>
+                        Опубликовать
+                      </button>
+                    </>
                   )}
                   <button className="att-all-btn" style={{ fontSize:'11px', padding:'4px 10px' }}
                     onClick={() => { setEditingId(n.id); setEditForm({ title: n.title, body: n.body }); setEditPhoto(null); setEditHasPhoto(!!n.photo_url) }}>
