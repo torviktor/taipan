@@ -223,6 +223,14 @@ def delete_photo(news_id: int, db: Session = Depends(get_db), _: User = Depends(
 def delete_news(news_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     n = db.query(News).filter(News.id == news_id).first()
     if not n: raise HTTPException(404, "Новость не найдена")
+    if n.body and "Source-URL:" in n.body:
+        # Черновик парсера: физическое удаление стёрло бы маркер вместе со
+        # строкой, и news_already_exists() на следующем прогоне не нашёл бы
+        # дубль — новость вернулась бы заново. Архивируем вместо удаления,
+        # фото ей ещё принадлежит — не трогаем.
+        n.status = 'archived'
+        db.commit()
+        return
     if n.photo_url:
         path = f"/app/static/news/{os.path.basename(n.photo_url)}"
         if os.path.exists(path): os.remove(path)
