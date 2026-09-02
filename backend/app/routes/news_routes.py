@@ -95,6 +95,7 @@ def publish_draft(
     from sqlalchemy import func
     n.status = 'published'
     n.published_at = func.now()
+    n.needs_review = False
     db.commit()
 
 
@@ -137,6 +138,8 @@ def update_news(news_id: int, data: NewsUpdate, db: Session = Depends(get_db), _
     if not n: raise HTTPException(404, "Новость не найдена")
     if data.title is not None: n.title = data.title
     if data.body  is not None: n.body  = data.body
+    if data.title is not None or data.body is not None:
+        n.needs_review = False
     db.commit(); db.refresh(n)
     return _out(n)
 
