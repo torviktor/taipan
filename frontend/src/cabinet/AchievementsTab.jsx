@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { API, currentSeason, seasonRange, seasonLabel } from './constants'
 import { apiFetch } from '../utils/apiFetch'
 import AchievementBadge from '../components/AchievementBadge'
@@ -7,29 +7,28 @@ import { CATEGORY_LABEL } from '../components/AchievementBadge'
 export { AchievementBadge }
 
 export function AchievementsLeaderboard({ token }) {
-  const [data,    setData]    = useState([])
-  const [loading, setLoading] = useState(false)
-  const [season,  setSeason]  = useState(currentSeason)
-  const [seasons, setSeasons] = useState([currentSeason])
+  const [data,     setData]     = useState([])
+  const [loading,  setLoading]  = useState(false)
+  const [season,   setSeason]   = useState(currentSeason)
+  const [seasons,  setSeasons]  = useState([currentSeason])
+  const [expanded, setExpanded] = useState(null)
 
   useEffect(() => {
-    // Загружаем доступные сезоны из соревнований
     apiFetch(`${API}/competitions/seasons`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [currentSeason])
       .then(s => {
         const list = s.length ? s : [currentSeason]
         setSeasons(list)
-        // Устанавливаем текущий сезон если есть, иначе первый
-        if (list.includes(currentSeason)) setSeason(currentSeason)
-        else setSeason(list[0])
+        setSeason(list.includes(currentSeason) ? currentSeason : list[0])
       })
       .catch(() => {})
   }, [])
 
   useEffect(() => {
     setLoading(true)
+    setExpanded(null)
     const url = season !== ''
-      ? (() => { const {start,end} = seasonRange(season); return `${API}/achievements/leaderboard?date_from=${start}&date_to=${end}` })()
+      ? `${API}/achievements/leaderboard?season=${season}`
       : `${API}/achievements/leaderboard`
     apiFetch(url, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [])
@@ -42,14 +41,16 @@ export function AchievementsLeaderboard({ token }) {
   return (
     <div>
       <div style={{marginBottom:12}}>
-        <select className="att-date-input" value={season} onChange={e => setSeason(e.target.value === '' ? '' : Number(e.target.value))} style={{width:'auto'}}>
+        <select className="att-date-input" value={season}
+                onChange={e => setSeason(e.target.value === '' ? '' : Number(e.target.value))}
+                style={{width:'auto'}}>
           <option value="">Все сезоны</option>
-          {seasons.map(y=>(
-            <option key={y} value={y}>{seasonLabel(y)}</option>
-          ))}
+          {seasons.map(y => <option key={y} value={y}>{seasonLabel(y)}</option>)}
         </select>
       </div>
+
       {data.length === 0 && <div className="cabinet-empty">Ачивок за этот сезон пока нет.</div>}
+
       {data.length > 0 && <div className="athletes-table-wrap">
       <table className="athletes-table">
         <thead><tr>
@@ -60,15 +61,53 @@ export function AchievementsLeaderboard({ token }) {
           <th>Легендарных</th>
         </tr></thead>
         <tbody>
-          {data.map((r, i) => (
-            <tr key={r.athlete_id}>
-              <td style={{textAlign:'center', fontFamily:'Bebas Neue', fontWeight:700, fontSize:'1.2rem'}}>{i+1}</td>
-              <td className="td-name">{r.full_name}</td>
-              <td>{r.group||'—'}</td>
-              <td style={{textAlign:'center', fontWeight:700}}>{r.total}</td>
-              <td style={{textAlign:'center', color:'#c8962a', fontWeight:700}}>{r.legendary||0}</td>
-            </tr>
-          ))}
+          {data.map(r => {
+            const open = expanded === r.athlete_id
+            const legend = r.items.filter(x => x.tier === 'legendary')
+            return (
+              <React.Fragment key={r.athlete_id}>
+                <tr onClick={() => setExpanded(open ? null : r.athlete_id)}
+                    style={{cursor:'pointer', background: open ? 'rgba(255,255,255,0.04)' : undefined}}>
+                  <td style={{textAlign:'center', fontFamily:'Bebas Neue', fontWeight:700, fontSize:'1.2rem'}}>{r.place}</td>
+                  <td className="td-name">
+                    <span style={{color:'var(--gray)', marginRight:8, fontSize:'0.8rem'}}>{open ? '▾' : '▸'}</span>
+                    {r.full_name}
+                    {legend.map(x => (
+                      <span key={x.code} style={{
+                        marginLeft:6, padding:'2px 8px', borderRadius:10, fontSize:'0.7rem',
+                        border:'1px solid #c8962a', color:'#c8962a', whiteSpace:'nowrap'
+                      }}>{x.name}</span>
+                    ))}
+                  </td>
+                  <td>{r.group || '—'}</td>
+                  <td style={{textAlign:'center', fontWeight:700}}>{r.total}</td>
+                  <td style={{textAlign:'center', color:'#c8962a', fontWeight:700}}>{r.legendary || 0}</td>
+                </tr>
+                {open && (
+                  <tr>
+                    <td colSpan={5} style={{padding:'4px 16px 16px', background:'rgba(255,255,255,0.02)'}}>
+                      {r.items.map((x, j) => (
+                        <div key={x.code + j} style={{
+                          display:'flex', alignItems:'baseline', gap:10,
+                          padding:'6px 0', borderBottom:'1px solid var(--gray-dim)'
+                        }}>
+                          <span style={{
+                            width:8, height:8, borderRadius:'50%', flexShrink:0,
+                            background:x.tier_color, display:'inline-block'
+                          }}/>
+                          <span style={{color:'var(--white)', fontWeight:600, minWidth:170}}>{x.name}</span>
+                          <span style={{color:'var(--gray)', fontSize:'0.85rem', flex:1}}>{x.description}</span>
+                          <span style={{color:'var(--gray)', fontSize:'0.78rem', whiteSpace:'nowrap'}}>
+                            {new Date(x.granted_at).toLocaleDateString('ru-RU')}
+                          </span>
+                        </div>
+                      ))}
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            )
+          })}
         </tbody>
       </table>
       </div>}
