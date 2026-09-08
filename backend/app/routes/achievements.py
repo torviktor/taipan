@@ -98,38 +98,55 @@ def get_athlete_achievements(
 
 @router.get("/leaderboard")
 def leaderboard(
-    date_from: Optional[str] = None,
-    date_to:   Optional[str] = None,
+    season: Optional[int] = None,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user)
+    user: User = Depends(get_current_user)
 ):
+    if user.role not in ("manager", "admin"):
+        raise HTTPException(403)
+
     q = (
-        db.query(Athlete, func.count(AthleteAchievement.id))
-        .join(AthleteAchievement, AthleteAchievement.athlete_id == Athlete.id)
+        db.query(AthleteAchievement, Athlete)
+        .join(Athlete, Athlete.id == AthleteAchievement.athlete_id)
         .filter(Athlete.is_archived == False)
     )
-    if date_from:
-        q = q.filter(AthleteAchievement.granted_at >= date_from)
-    if date_to:
-        q = q.filter(AthleteAchievement.granted_at <= date_to + ' 23:59:59')
-    rows = q.group_by(Athlete.id).order_by(func.count(AthleteAchievement.id).desc()).all()
-    result = []
-    for i, (a, cnt) in enumerate(rows):
-        legendary = db.query(AthleteAchievement).filter(
-            AthleteAchievement.athlete_id == a.id,
-            AthleteAchievement.code.in_([
-                ac["code"] for ac in ACHIEVEMENTS if ac["tier"] == "legendary"
-            ])
-        ).count()
-        result.append({
-            "place":      i + 1,
+    if season is not None:
+        q = q.filter(AthleteAchievement.season == season)
+
+    by_athlete = {}
+    for ach, a in q.all():
+        entry = by_athlete.setdefault(a.id, {
             "athlete_id": a.id,
             "full_name":  a.full_name,
             "group":      a.group,
             "gup":        a.gup,
-            "total":      cnt,
-            "legendary":  legendary,
+            "total":      0,
+            "legendary":  0,
+            "items":      [],
         })
+        meta = ACHIEVEMENT_MAP.get(ach.code)
+        tier = meta["tier"] if meta else "common"
+        entry["total"] += 1
+        if tier == "legendary":
+            entry["legendary"] += 1
+        entry["items"].append({
+            "code":        ach.code,
+            "name":        meta["name"] if meta else ach.code,
+            "description": meta["description"] if meta else "Ачивка удалена из системы",
+            "tier":        tier,
+            "tier_label":  TIER_LABEL.get(tier, "—"),
+            "tier_color":  TIER_COLOR.get(tier, "#888888"),
+            "granted_at":  str(ach.granted_at),
+            "known":       meta is not None,
+        })
+
+    result = sorted(
+        by_athlete.values(),
+        key=lambda e: (-e["total"], -e["legendary"], e["full_name"] or "")
+    )
+    for i, e in enumerate(result):
+        e["place"] = i + 1
+        e["items"].sort(key=lambda x: (-TIER_ORDER.get(x["tier"], 0), x["granted_at"]))
     return result
 
 
