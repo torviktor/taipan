@@ -228,6 +228,10 @@ def auto_grant(athlete_id: int, db: Session) -> list[str]:
         if season_present >= 90:  grant("attendance_90")
 
         # 100% за любой месяц текущего сезона
+        # Текущий месяц не проверяем — он ещё не закрыт.
+        # Сверка идёт 1 числа по полному прошедшему месяцу.
+        month_start = date.today().replace(day=1)
+
         sessions_by_month = (
             db.query(
                 extract('year',  TrainingSession.date).label('y'),
@@ -240,6 +244,7 @@ def auto_grant(athlete_id: int, db: Session) -> list[str]:
                 Attendance.athlete_id == athlete_id,
                 TrainingSession.date >= season_start,
                 TrainingSession.date <= season_end,
+                TrainingSession.date < month_start,
             )
             .group_by('y', 'm')
             .all()
@@ -348,7 +353,10 @@ def auto_grant(athlete_id: int, db: Session) -> list[str]:
         grant("combo_full")
 
     # ── Мета-ачивки (за количество ачивок в сезоне) ───────────────────────────
-    season_count = len(existing)  # уже включает только что выданные
+    # Мета-ачивки не считаются сами: иначе meta_5 плюс 9 реальных
+    # дают meta_10, а к концу сезона перекос дотягивается до meta_15.
+    META_CODES = {"meta_5", "meta_10", "meta_15"}
+    season_count = len([c for c in existing if c not in META_CODES])
     if season_count >= 5:  grant("meta_5")
     if season_count >= 10: grant("meta_10")
     if season_count >= 15: grant("meta_15")
