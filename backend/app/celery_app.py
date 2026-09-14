@@ -111,6 +111,11 @@ celery_app.conf.update(
             "task":     "app.tasks.insurance_staff_digest",
             "schedule": crontab(hour=6, minute=30, day_of_week=1),
         },
+        # Уборка зависших заданий транскрибации (задача 30) — раз в час.
+        "transcribe-cleanup": {
+            "task":     "app.tasks.transcribe_cleanup",
+            "schedule": crontab(minute=0),
+        },
     },
 )
 
@@ -491,3 +496,65 @@ def overdue_digest_task():
         raise
     finally:
         db.close()
+
+
+@celery_app.task(name="app.tasks.transcribe_cleanup")
+def transcribe_cleanup_task():
+    """Раз в час: зависшие задания транскрибации (задача 30) и файлы в inbox.
+
+    Единственная очередь, которой хватает — новую под это заводить не стали
+    (см. findings по задаче 30: тяжёлой работы на стороне сайта не остаётся,
+    распознаёт бот-транскрайбер /opt/transcriber). Без этой уборки зависшее
+    задание (бот упал, колбэк не дошёл) лежало бы в inbox вечно и рано или
+    поздно забило бы диск.
+    """
+    import os
+    from datetime import datetime, timedelta, timezone
+    from app.core.database import SessionLocal
+    from app.models.transcription import TranscriptionJob
+    import logging
+    log = logging.getLogger(__name__)
+
+    inbox_dir = os.getenv("TRANSCRIBE_INBOX_DIR", "/data/transcribe_inbox")
+    ttl_hours = int(os.getenv("TRANSCRIBE_TTL_HOURS", "6"))
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=ttl_hours)
+
+    db = SessionLocal()
+    timed_out = 0
+    try:
+        stale = db.query(TranscriptionJob).filter(
+            TranscriptionJob.status.in_(("uploaded", "processing")),
+            TranscriptionJob.created_at < cutoff,
+        ).all()
+        for j in stale:
+            j.status = "error"
+            j.error = f"Не обработано за {ttl_hours} ч. — снято по таймауту"
+            j.finished_at = datetime.now(timezone.utc)
+            timed_out += 1
+        if stale:
+            db.commit()
+    except Exception:
+        db.rollback()
+        log.exception("transcribe_cleanup: не удалось обновить БД")
+    finally:
+        db.close()
+
+    removed = 0
+    cutoff_ts = cutoff.timestamp()
+    try:
+        if os.path.isdir(inbox_dir):
+            for name in os.listdir(inbox_dir):
+                path = os.path.join(inbox_dir, name)
+                try:
+                    if os.path.isfile(path) and os.path.getmtime(path) < cutoff_ts:
+                        os.remove(path)
+                        removed += 1
+                except OSError:
+                    continue
+    except Exception:
+        log.exception("transcribe_cleanup: не удалось почистить inbox")
+
+    if timed_out or removed:
+        log.info("transcribe_cleanup: просрочено заданий %s, удалено файлов из inbox %s",
+                  timed_out, removed)
+    return {"timed_out": timed_out, "removed_files": removed}

@@ -35,12 +35,14 @@ from app.routes.analytics import router as analytics_router
 from app.routes.competition_files import router as competition_files_router
 from app.routes.fees import router as fees_router
 from app.routes.season_best import router as season_best_router
+from app.routes.transcribe import router as transcribe_router
 from app.models import user, event, attendance, competition, certification, achievement, camp
 from app.models import hall_of_fame, analytics, news, competition_file
 from app.models import fees as fees_model
 from app.models import individual_training
 from app.models import invite as invite_model
 from app.models import season_best as season_best_model
+from app.models import transcription as transcription_model
 from app.routes.individual_training import router as individual_training_router
 from app.routes.invite import router as invite_router
 from app.routes.preparation import router as preparation_router
@@ -95,6 +97,7 @@ app.include_router(individual_training_router, prefix="/api",            tags=["
 app.include_router(invite_router,              prefix="/api",            tags=["Приглашения"])
 app.include_router(preparation_router,         prefix="/api",            tags=["Подготовка к аттестации"])
 app.include_router(season_best_router,         prefix="/api",            tags=["Лучшие сезона"])
+app.include_router(transcribe_router,          prefix="/api",            tags=["Транскрибация"])
 
 
 @app.on_event("startup")

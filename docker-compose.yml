@@ -37,6 +37,11 @@ services:
       # при каждом `docker compose down` в деплое, а git reset --hard не должен
       # их трогать. Ротация: по размеру — в приложении, по сроку — logrotate.
       - /var/log/taipan:/var/log/taipan
+      # Общий каталог с ботом-транскрайбером (отдельный проект/сеть на этом
+      # же сервере, /opt/transcriber) — единственный канал сайт→бот, сети
+      # между собой не видят друг друга. Бот монтирует тот же хостовый путь
+      # в /app/inbox.
+      - /opt/transcriber/inbox:/data/transcribe_inbox
     environment:
       DATABASE_URL:        postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       SECRET_KEY:          ${SECRET_KEY}
@@ -51,6 +56,10 @@ services:
       ANTHROPIC_API_KEY:   ${ANTHROPIC_API_KEY}
       YANDEX_API_KEY:      ${YANDEX_API_KEY}
       YANDEX_FOLDER_ID:    ${YANDEX_FOLDER_ID}
+      TRANSCRIBE_INBOX_DIR:      /data/transcribe_inbox
+      TRANSCRIBE_CALLBACK_SECRET: ${TRANSCRIBE_CALLBACK_SECRET:-}
+      TRANSCRIBE_TTL_HOURS:       ${TRANSCRIBE_TTL_HOURS:-6}
+      TRANSCRIBE_MAX_SIZE_MB:     ${TRANSCRIBE_MAX_SIZE_MB:-2048}
     ports:
       - "8000:8000"
     healthcheck:
@@ -66,6 +75,9 @@ services:
     command: celery -A app.celery_app worker --loglevel=info
     volumes:
       - /var/log/taipan:/var/log/taipan
+      # Для transcribe_cleanup_task (задача 30) — та же уборка по TTL, что
+      # и у backend, только выполняет её воркер по расписанию beat'а.
+      - /opt/transcriber/inbox:/data/transcribe_inbox
     depends_on:
       - db
       - redis
@@ -80,6 +92,8 @@ services:
       LOG_SERVICE:        celery_worker
       YANDEX_API_KEY:     ${YANDEX_API_KEY}
       YANDEX_FOLDER_ID:   ${YANDEX_FOLDER_ID}
+      TRANSCRIBE_INBOX_DIR: /data/transcribe_inbox
+      TRANSCRIBE_TTL_HOURS: ${TRANSCRIBE_TTL_HOURS:-6}
     mem_limit: 512m
     restart: always
 
