@@ -27,6 +27,9 @@ const EMPTY_FORM = {
   location: '', notify_before_days: [1], notify_everyone: true,
 }
 
+const pad2 = n => String(n).padStart(2, '0')
+const localDateStr = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+
 const TelegramIcon = () => (
   <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="16" cy="16" r="15" stroke="#CC0000" strokeWidth="1.5"/>
@@ -59,8 +62,8 @@ export default function CalendarPage() {
 
   function openCreate(dateInfo) {
     if (!isAdmin()) return
-    const date = dateInfo?.dateStr || new Date().toISOString().split('T')[0]
-    setForm({ ...EMPTY_FORM, event_date: date, event_time: '10:00' })
+    const date = dateInfo?.dateStr || localDateStr(new Date())
+    setForm({ ...EMPTY_FORM, event_date: date })
     setEditEvent(null)
     setModal(true)
   }
@@ -74,7 +77,7 @@ export default function CalendarPage() {
     const dt = new Date(e.event_date)
     setForm({
       title: e.title, description: e.description || '',
-      event_date: dt.toISOString().split('T')[0],
+      event_date: localDateStr(dt),
       event_time: dt.toTimeString().slice(0, 5),
       location: e.location || '',
       notify_before_days: e.notify_before_days || [1],
