@@ -24,11 +24,12 @@ recipient.chat_id: см. подробности в app/services/max_bot.py.
 import hashlib
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from fastapi import APIRouter, Request
 
 from app.core.database import SessionLocal
+from app.core.timeutil import now_msk
 from app.services.max_bot import esc
 
 logger = logging.getLogger(__name__)
@@ -374,7 +375,7 @@ def _fmt_event(e) -> str:
 def _events_between(db, days: int):
     """События от «сейчас» на days вперёд."""
     from app.models.event import Event
-    now = datetime.utcnow()
+    now = now_msk()
     return (
         db.query(Event)
         .filter(
@@ -391,7 +392,7 @@ def _cmd_events(db) -> str:
     from app.models.event import Event
     e = (
         db.query(Event)
-        .filter(Event.is_active == True, Event.event_date > datetime.utcnow())
+        .filter(Event.is_active == True, Event.event_date > now_msk())
         .order_by(Event.event_date)
         .first()
     )

@@ -6,6 +6,7 @@ import logging
 from fastapi import APIRouter, Request
 from app.core.database import SessionLocal
 from app.core.markup import esc
+from app.core.timeutil import now_msk
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -129,7 +130,7 @@ async def process_telegram_update(update: dict):
     try:
         from app.models.event import TelegramSubscriber, Event
         from app.services.notifications import send_telegram_message
-        from datetime import datetime, timedelta
+        from datetime import timedelta
 
         subscriber = db.query(TelegramSubscriber).filter(
             TelegramSubscriber.telegram_id == chat_id
@@ -222,7 +223,7 @@ async def process_telegram_update(update: dict):
         elif text == "/events":
             e = db.query(Event).filter(
                 Event.is_active == True,
-                Event.event_date > datetime.utcnow()
+                Event.event_date > now_msk()
             ).order_by(Event.event_date).first()
             if not e:
                 reply = "📅 Ближайших событий нет."
@@ -234,7 +235,7 @@ async def process_telegram_update(update: dict):
             await send_telegram_message(chat_id, reply)
 
         elif text == "/week":
-            now = datetime.utcnow()
+            now = now_msk()
             events = db.query(Event).filter(
                 Event.is_active == True,
                 Event.event_date >= now,
@@ -318,7 +319,7 @@ async def process_telegram_update(update: dict):
                     name=esc(user.full_name)), reply_markup=HIDE_KEYBOARD)
 
         elif text == "/month":
-            now = datetime.utcnow()
+            now = now_msk()
             events = db.query(Event).filter(
                 Event.is_active == True,
                 Event.event_date >= now,

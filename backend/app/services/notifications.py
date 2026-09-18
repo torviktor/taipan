@@ -8,12 +8,12 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
-from zoneinfo import ZoneInfo
 import os
 
 logger = logging.getLogger(__name__)
 
 from app.core.markup import esc
+from app.core.timeutil import now_msk
 
 BOT_USERNAME = "taipan_tkd_bot"
 
@@ -310,7 +310,7 @@ def check_and_send_reminders(db):
     from app.models.certification import Notification
     from app.models.event import Event, EventReminder
 
-    now    = datetime.now(ZoneInfo("Europe/Moscow")).replace(tzinfo=None)
+    now    = now_msk()
     events = db.query(Event).filter(
         Event.is_active   == True,
         Event.event_date  >  now,
